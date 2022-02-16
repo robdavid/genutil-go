@@ -38,6 +38,10 @@ func (o *Option[T]) IsEmpty() bool {
 	return !o.nonEmpty || (o.isNilable && reflect.ValueOf(o.value).IsNil())
 }
 
+func (o Option[T]) IsZero() bool {
+	return o.IsEmpty()
+}
+
 func (o *Option[T]) HasValue() bool {
 	return !o.IsEmpty()
 }
