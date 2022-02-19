@@ -1,6 +1,7 @@
 package option
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,4 +67,31 @@ func TestOptionList(t *testing.T) {
 	assert.True(t, opt.IsEmpty())
 	opt.Set(append(opt.GetOrZero(), 1))
 	assert.Equal(t, []int{1}, opt.Get())
+}
+
+type testMarshall struct {
+	Name  string          `json:"name"`
+	Value int             `json:"value"`
+	Opt   Option[testOpt] `json:"opt,omitempty"`
+}
+
+type testOpt struct {
+	Metadata string   //`json:"metadata,omitempty"`
+	ItemList []string //`json:"itemList,omitempty"`
+}
+
+func TestJSONMarshallOmitOption(t *testing.T) {
+	testData := testMarshall{
+		Name:  "test1",
+		Value: 1,
+		Opt:   Empty[testOpt](),
+	}
+	y, err := json.Marshal(&testData)
+	if assert.NoError(t, err) {
+		text := string(y)
+		assert.Contains(t, text, "\"opt\":null")
+		var testData2 testMarshall
+		assert.NoError(t, json.Unmarshal(y, &testData2))
+		assert.Equal(t, testData, testData2)
+	}
 }
