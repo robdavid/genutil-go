@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,14 +72,14 @@ func TestOptionList(t *testing.T) {
 }
 
 type testMarshall struct {
-	Name  string          `json:"name"`
-	Value int             `json:"value"`
-	Opt   Option[testOpt] `json:"opt,omitempty"`
+	Name  string          `json:"name" yaml:"name"`
+	Value int             `json:"value" yaml:"value"`
+	Opt   Option[testOpt] `json:"opt" yaml:"opt,omitempty"`
 }
 
 type testOpt struct {
-	Metadata string   //`json:"metadata,omitempty"`
-	ItemList []string //`json:"itemList,omitempty"`
+	Metadata string   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	ItemList []string `json:"itemList,omitempty" yaml:"itemList,omitempty"`
 }
 
 func TestJSONMarshallOmitOption(t *testing.T) {
@@ -92,6 +94,24 @@ func TestJSONMarshallOmitOption(t *testing.T) {
 		assert.Contains(t, text, "\"opt\":null")
 		var testData2 testMarshall
 		assert.NoError(t, json.Unmarshal(y, &testData2))
+		assert.Equal(t, testData, testData2)
+	}
+}
+
+func TestYAMLMarshallOption(t *testing.T) {
+	testData := testMarshall{
+		Name:  "test1",
+		Value: 1,
+		Opt:   Value(testOpt{Metadata: "md", ItemList: []string{"item1"}}),
+	}
+	y, err := yaml.Marshal(&testData)
+	if assert.NoError(t, err) {
+		text := string(y)
+		assert.Contains(t, text, "opt:")
+		assert.Contains(t, text, "metadata:")
+		assert.Contains(t, text, "itemList:")
+		var testData2 testMarshall
+		assert.NoError(t, yaml.Unmarshal(y, &testData2))
 		assert.Equal(t, testData, testData2)
 	}
 }

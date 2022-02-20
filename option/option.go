@@ -140,7 +140,7 @@ func MapRef[T, U any](o *Option[T], f func(*T) U) Option[U] {
 
 // Marshalling / unmarshalling support //
 
-func (o *Option[T]) IsZero() bool {
+func (o Option[T]) IsZero() bool {
 	return o.IsEmpty()
 }
 
@@ -161,5 +161,17 @@ func (o *Option[T]) UnmarshalJSON(j []byte) error {
 		}
 		o.nonEmpty = !isNil(&o.value)
 	}
+	return nil
+}
+
+func (o Option[T]) MarshalYAML() (interface{}, error) {
+	return o.value, nil
+}
+
+func (o *Option[T]) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	if err := unmarshal(&o.value); err != nil {
+		return err
+	}
+	o.nonEmpty = !isNil(o.value)
 	return nil
 }
