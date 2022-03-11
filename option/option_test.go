@@ -115,3 +115,21 @@ func TestYAMLMarshallOption(t *testing.T) {
 		assert.Equal(t, testData, testData2)
 	}
 }
+
+func TestYAMLMarshallOmitOption(t *testing.T) {
+	testData := testMarshall{
+		Name:  "test1",
+		Value: 1,
+		Opt:   Empty[testOpt](),
+	}
+	y, err := yaml.Marshal(&testData)
+	if assert.NoError(t, err) {
+		text := string(y)
+		assert.NotContains(t, text, "opt:")
+		assert.NotContains(t, text, "metadata:")
+		assert.NotContains(t, text, "itemList:")
+		var testData2 testMarshall
+		assert.NoError(t, yaml.Unmarshal(y, &testData2))
+		assert.Equal(t, testData, testData2)
+	}
+}
