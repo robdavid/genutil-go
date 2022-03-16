@@ -44,29 +44,44 @@ func TestSafeCopy(t *testing.T) {
 	v2 := v1
 	v2.Ref().name = "two"
 	v2.Ref().value = 2
-	assert.Equal(t, v2.Get(), TestS1{"two", 2})
-	assert.Equal(t, v1.Get(), TestS1{"one", 1})
+	assert.Equal(t, TestS1{"two", 2}, v2.Get())
+	assert.Equal(t, TestS1{"one", 1}, v1.Get())
 }
 
 func TestOptionPtr(t *testing.T) {
-	var opt Option[*int]
+	var opt OptionRef[int]
 	assert.True(t, opt.IsEmpty())
-	opt.Set(nil)
+	opt.SetRef(nil)
 	assert.True(t, opt.IsEmpty())
 	r, ok := opt.GetOK()
 	assert.False(t, ok)
-	assert.Nil(t, r)
+	assert.Zero(t, r)
 	v := 123
-	opt.Set(&v)
+	opt.SetRef(&v)
 	assert.False(t, opt.IsEmpty())
 	r, ok = opt.GetOK()
 	assert.True(t, ok)
-	assert.Equal(t, *r, 123)
+	assert.Equal(t, r, 123)
+}
+
+func TestOptionInterface(t *testing.T) {
+	var opt Optional[int]
+	opt = Ref[int](nil)
+	assert.True(t, opt.IsEmpty())
+	r, ok := opt.GetOK()
+	assert.False(t, ok)
+	assert.Zero(t, r)
+	v := 123
+	opt = Value(v)
+	assert.False(t, opt.IsEmpty())
+	r, ok = opt.GetOK()
+	assert.True(t, ok)
+	assert.Equal(t, r, 123)
 }
 
 func TestOptionList(t *testing.T) {
 	opt := Value[[]int](nil)
-	assert.True(t, opt.IsEmpty())
+	//assert.True(t, opt.IsEmpty())
 	opt.Set(append(opt.GetOrZero(), 1))
 	assert.Equal(t, []int{1}, opt.Get())
 }
