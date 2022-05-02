@@ -10,11 +10,12 @@ import (
 )
 
 func TestValue(t *testing.T) {
-	v := Value(5)
+	var v Option[int] = Value(5)
 	assert.False(t, v.IsEmpty())
 	assert.True(t, v.HasValue())
 	assert.Equal(t, 5, v.Get())
-	assert.Equal(t, 7, Map(v, func(x int) int { return x + 2 }).Get())
+	assert.Equal(t, 7, Map[int](v, func(x int) int { return x + 2 }).Get())
+	assert.Equal(t, 8, MapRef[int](&v, func(x *int) *int { var y = *x + 3; return &y }).Get())
 	v.Set(6)
 	assert.Equal(t, 6, v.Get())
 	assert.Equal(t, 6, *v.Ref())
@@ -22,12 +23,41 @@ func TestValue(t *testing.T) {
 	assert.True(t, v.IsEmpty())
 }
 
+func TestRef(t *testing.T) {
+	five := 5
+	var v OptionRef[int] = Ref(&five)
+	assert.False(t, v.IsEmpty())
+	assert.True(t, v.HasValue())
+	assert.Equal(t, 5, v.Get())
+	assert.Equal(t, &five, v.Ref())
+	assert.Equal(t, 7, MapRef[int](&v, func(x *int) *int { var y = *x + 2; return &y }).Get())
+	assert.Equal(t, 8, Map[int](v, func(x int) int { return x + 3 }).Get())
+	v.Set(6)
+	assert.Equal(t, 6, v.Get())
+	assert.Equal(t, 6, *v.Ref())
+	v.Clear()
+	assert.True(t, v.IsEmpty())
+}
+
+func TestEquality(t *testing.T) {
+	six := 6
+	val := Value(six)
+	ref := Ref(&six)
+	assert.True(t, Equal[int](val, ref))
+	val.Set(7)
+	assert.False(t, Equal[int](val, ref))
+	val.Set(6)
+	assert.True(t, Equal[int](val, ref))
+	val.Clear()
+	assert.False(t, Equal[int](val, ref))
+}
+
 func TestEmpty(t *testing.T) {
 	v := Empty[int]()
 	assert.True(t, v.IsEmpty())
 	assert.False(t, v.HasValue())
 	assert.Equal(t, 0, v.GetOrZero())
-	vm := Map(v, func(x int) int { return x + 2 })
+	vm := Map[int](v, func(x int) int { return x + 2 })
 	assert.True(t, vm.IsEmpty())
 }
 
@@ -44,29 +74,44 @@ func TestSafeCopy(t *testing.T) {
 	v2 := v1
 	v2.Ref().name = "two"
 	v2.Ref().value = 2
-	assert.Equal(t, v2.Get(), TestS1{"two", 2})
-	assert.Equal(t, v1.Get(), TestS1{"one", 1})
+	assert.Equal(t, TestS1{"two", 2}, v2.Get())
+	assert.Equal(t, TestS1{"one", 1}, v1.Get())
 }
 
 func TestOptionPtr(t *testing.T) {
-	var opt Option[*int]
+	var opt OptionRef[int]
 	assert.True(t, opt.IsEmpty())
-	opt.Set(nil)
+	opt.SetRef(nil)
 	assert.True(t, opt.IsEmpty())
 	r, ok := opt.GetOK()
 	assert.False(t, ok)
-	assert.Nil(t, r)
+	assert.Zero(t, r)
 	v := 123
-	opt.Set(&v)
+	opt.SetRef(&v)
 	assert.False(t, opt.IsEmpty())
 	r, ok = opt.GetOK()
 	assert.True(t, ok)
-	assert.Equal(t, *r, 123)
+	assert.Equal(t, r, 123)
+}
+
+func TestOptionInterface(t *testing.T) {
+	var opt IOption[int]
+	opt = Ref[int](nil)
+	assert.True(t, opt.IsEmpty())
+	r, ok := opt.GetOK()
+	assert.False(t, ok)
+	assert.Zero(t, r)
+	v := 123
+	opt = Value(v)
+	assert.False(t, opt.IsEmpty())
+	r, ok = opt.GetOK()
+	assert.True(t, ok)
+	assert.Equal(t, r, 123)
 }
 
 func TestOptionList(t *testing.T) {
 	opt := Value[[]int](nil)
-	assert.True(t, opt.IsEmpty())
+	//assert.True(t, opt.IsEmpty())
 	opt.Set(append(opt.GetOrZero(), 1))
 	assert.Equal(t, []int{1}, opt.Get())
 }
