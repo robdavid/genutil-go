@@ -7,7 +7,7 @@ import (
 
 var ErrOptionIsEmpty = errors.New("option is empty")
 
-type Optional[T any] interface {
+type IOption[T any] interface {
 	IsEmpty() bool
 	HasValue() bool
 	GetOrZero() T
@@ -16,8 +16,9 @@ type Optional[T any] interface {
 	Get() T
 }
 
-type OptionalWriter[T any] interface {
-	Ref() *T // Ref is writable, so part of writer interface
+type IOptionRef[T any] interface {
+	IOption[T]
+	Ref() *T
 	RefOrNil() *T
 	RefOr(*T) *T
 	RefOK() (*T, bool)
@@ -210,7 +211,7 @@ func (o *OptionRef[T]) Clear() {
 	o.ref = nil
 }
 
-func Equal[T comparable](o, p Optional[T]) bool {
+func Equal[T comparable](o, p IOption[T]) bool {
 	if o.IsEmpty() && p.IsEmpty() {
 		return true
 	} else if o.IsEmpty() != p.IsEmpty() {
@@ -220,21 +221,20 @@ func Equal[T comparable](o, p Optional[T]) bool {
 	}
 }
 
-func Map[T, U any](o Option[T], f func(T) U) Option[U] {
+func Map[T, U any](o IOption[T], f func(T) U) Option[U] {
 	if o.IsEmpty() {
 		return Empty[U]()
 	} else {
-		u := f(o.value)
+		u := f(o.Get())
 		return Value(u)
 	}
 }
 
-func MapRef[T, U any](o *Option[T], f func(*T) U) Option[U] {
-	if o.IsEmpty() {
-		return Empty[U]()
+func MapRef[T, U any](o IOptionRef[T], f func(*T) *U) OptionRef[U] {
+	if r := o.RefOrNil(); r == nil {
+		return Ref[U](nil)
 	} else {
-		u := f(&o.value)
-		return Value(u)
+		return Ref(f(r))
 	}
 }
 
