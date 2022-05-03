@@ -52,6 +52,18 @@ func TestEquality(t *testing.T) {
 	assert.False(t, Equal[int](val, ref))
 }
 
+func TestRefEquality(t *testing.T) {
+	six := 6
+	val := Value(six)
+	ref := Ref(&six)
+	assert.True(t, EqualRef[int](&val, &ref))
+	val.Set(7)
+	assert.False(t, EqualRef[int](&val, &ref))
+	val.Set(6)
+	assert.True(t, EqualRef[int](&val, &ref))
+	val.Clear()
+	assert.False(t, EqualRef[int](&val, &ref))
+}
 func TestEmpty(t *testing.T) {
 	v := Empty[int]()
 	assert.True(t, v.IsEmpty())
@@ -124,16 +136,18 @@ func TestOptionPtr(t *testing.T) {
 }
 
 func TestOptionInterface(t *testing.T) {
-	var opt IOption[int]
-	opt = Ref[int](nil)
-	assert.True(t, opt.IsEmpty())
-	r, ok := opt.GetOK()
+	var opti IOptionRef[int]
+	ref := Ref[int](nil)
+	opti = &ref
+	assert.True(t, opti.IsEmpty())
+	r, ok := opti.GetOK()
 	assert.False(t, ok)
 	assert.Zero(t, r)
 	v := 123
-	opt = Value(v)
-	assert.False(t, opt.IsEmpty())
-	r, ok = opt.GetOK()
+	opt := Value(v)
+	opti = &opt
+	assert.False(t, opti.IsEmpty())
+	r, ok = opti.GetOK()
 	assert.True(t, ok)
 	assert.Equal(t, r, 123)
 }

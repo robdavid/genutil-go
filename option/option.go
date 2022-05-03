@@ -8,8 +8,6 @@ import (
 var ErrOptionIsEmpty = errors.New("option is empty")
 
 type IOption[T any] interface {
-	IsEmpty() bool
-	HasValue() bool
 	GetOrZero() T
 	GetOr(T) T
 	GetOK() (T, bool)
@@ -18,6 +16,8 @@ type IOption[T any] interface {
 
 type IOptionRef[T any] interface {
 	IOption[T]
+	IsEmpty() bool
+	HasValue() bool
 	Ref() *T
 	RefOrNil() *T
 	RefOr(*T) *T
@@ -48,19 +48,19 @@ func Empty[T any]() Option[T] {
 	return Option[T]{}
 }
 
-func (o Option[T]) IsEmpty() bool {
+func (o *Option[T]) IsEmpty() bool {
 	return !o.nonEmpty
 }
 
-func (o OptionRef[T]) IsEmpty() bool {
+func (o *OptionRef[T]) IsEmpty() bool {
 	return o.ref == nil
 }
 
-func (o Option[T]) HasValue() bool {
+func (o *Option[T]) HasValue() bool {
 	return o.nonEmpty
 }
 
-func (o OptionRef[T]) HasValue() bool {
+func (o *OptionRef[T]) HasValue() bool {
 	return o.ref != nil
 }
 
@@ -213,21 +213,34 @@ func (o *OptionRef[T]) Clear() {
 }
 
 func Equal[T comparable](o, p IOption[T]) bool {
-	if o.IsEmpty() && p.IsEmpty() {
+	valo, oko := o.GetOK()
+	valp, okp := p.GetOK()
+	if !oko && !okp {
 		return true
-	} else if o.IsEmpty() != p.IsEmpty() {
+	} else if oko != okp {
 		return false
 	} else {
-		return o.Get() == p.Get()
+		return valo == valp
+	}
+}
+
+func EqualRef[T comparable](o, p IOptionRef[T]) bool {
+	refo, oko := o.RefOK()
+	refp, okp := p.RefOK()
+	if !oko && !okp {
+		return true
+	} else if oko != okp {
+		return false
+	} else {
+		return *refo == *refp
 	}
 }
 
 func Map[T, U any](o IOption[T], f func(T) U) Option[U] {
-	if o.IsEmpty() {
+	if val, ok := o.GetOK(); !ok {
 		return Empty[U]()
 	} else {
-		u := f(o.Get())
-		return Value(u)
+		return Value(f(val))
 	}
 }
 
