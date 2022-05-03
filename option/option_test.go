@@ -61,6 +61,23 @@ func TestEmpty(t *testing.T) {
 	assert.True(t, vm.IsEmpty())
 }
 
+type Wrapper[T any] struct {
+	Wrapped IOptionRef[T]
+}
+
+func TestInterfaceAssignment(t *testing.T) {
+	var io IOption[int]
+	var ior IOptionRef[int]
+	var wrapper Wrapper[int]
+	o := Value(123)
+	io = o
+	ior = &o
+	wrapper = Wrapper[int]{&o}
+	assert.Equal(t, io.Get(), 123)
+	assert.Equal(t, ior.Get(), 123)
+	assert.Equal(t, wrapper.Wrapped.Get(), 123)
+}
+
 type TestS1 struct {
 	name  string
 	value int
@@ -76,6 +93,18 @@ func TestSafeCopy(t *testing.T) {
 	v2.Ref().value = 2
 	assert.Equal(t, TestS1{"two", 2}, v2.Get())
 	assert.Equal(t, TestS1{"one", 1}, v1.Get())
+}
+
+// OptionRefs refer to the original item when copied
+func TestRefCopy(t *testing.T) {
+	t1 := TestS1{"one", 1}
+	v1 := Ref(&t1)
+	assert.Equal(t, TestS1{"one", 1}, v1.Get())
+	v2 := v1
+	v2.Ref().name = "two"
+	v2.Ref().value = 2
+	assert.Equal(t, TestS1{"two", 2}, v2.Get())
+	assert.Equal(t, TestS1{"two", 2}, v1.Get())
 }
 
 func TestOptionPtr(t *testing.T) {

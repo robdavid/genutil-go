@@ -121,6 +121,7 @@ func (o OptionRef[T]) Get() T {
 	}
 }
 
+// To get a ref you have to pass a ref
 func (o *Option[T]) Ref() *T {
 	if o.IsEmpty() {
 		panic(ErrOptionIsEmpty)
@@ -129,7 +130,7 @@ func (o *Option[T]) Ref() *T {
 	}
 }
 
-func (o *OptionRef[T]) Ref() *T {
+func (o OptionRef[T]) Ref() *T {
 	if o.ref == nil {
 		panic(ErrOptionIsEmpty)
 	} else {
@@ -141,7 +142,7 @@ func (o *Option[T]) RefOrNil() *T {
 	return o.RefOr(nil)
 }
 
-func (o *OptionRef[T]) RefOrNil() *T {
+func (o OptionRef[T]) RefOrNil() *T {
 	return o.ref
 }
 
@@ -153,7 +154,7 @@ func (o *Option[T]) RefOr(def *T) *T {
 	}
 }
 
-func (o *OptionRef[T]) RefOr(def *T) *T {
+func (o OptionRef[T]) RefOr(def *T) *T {
 	if o.ref == nil {
 		return def
 	} else {
@@ -169,8 +170,8 @@ func (o *Option[T]) RefOK() (*T, bool) {
 	}
 }
 
-func (o *OptionRef[T]) RefOK() (ref *T, ok bool) {
-	if o != nil {
+func (o OptionRef[T]) RefOK() (ref *T, ok bool) {
+	if o.ref != nil {
 		ref = o.ref
 		ok = true
 	}
