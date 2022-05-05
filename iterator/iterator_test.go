@@ -21,6 +21,22 @@ func TestMapIter(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestDoMapIter(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6}
+	actual, err := Collect(DoMap(Slice(input), func(n int) (int, error) {
+		if n < 4 {
+			return n * 2, nil
+		} else {
+			return 0, fmt.Errorf("Value %d too large", n)
+		}
+	}))
+	assert.Equal(t, expected, actual)
+	if assert.Error(t, err) {
+		assert.Equal(t, "Value 4 too large", err.Error())
+	}
+}
+
 func TestPipeIter(t *testing.T) {
 	pipe := Pipe(func(y Yield[int]) error {
 		for i := 0; i < 10; i++ {

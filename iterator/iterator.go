@@ -18,8 +18,8 @@ type Iterator[T any] interface {
 // Wraps an iterator and adds a mapping function
 type Func[T, U any] struct {
 	base    Iterator[T]
-	mapping func(T) U
-	value   option.Option[U]
+	mapping func(T) (U, error)
+	value   option.Option[Result[U]]
 }
 
 func (i *Func[T, U]) Next() bool {
@@ -33,10 +33,10 @@ func (i *Func[T, U]) Value() (u U, err error) {
 		if t, err = i.base.Value(); err != nil {
 			return
 		}
-		u = i.mapping(t)
-		i.value.Set(u)
+		u, err = i.mapping(t)
+		i.value.Set(Result[U]{u, err})
 	} else {
-		u = i.value.Get()
+		u, err = i.value.Ref().Pair()
 	}
 	return
 }
@@ -78,9 +78,17 @@ func Slice[T any](slice []T) Iterator[T] {
 	return &SliceIter[T]{slice, 0, t}
 }
 
+// Wraps an iterator with a mapping function that may return an error, producing a new iterator
+func DoMap[T any, U any](iter Iterator[T], mapping func(T) (U, error)) Iterator[U] {
+	return &Func[T, U]{iter, mapping, option.Empty[Result[U]]()}
+}
+
 // Wraps an iterator with a mapping function, producing a new iterator
 func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
-	return &Func[T, U]{iter, mapping, option.Empty[U]()}
+	action := func(t T) (U, error) {
+		return mapping(t), nil
+	}
+	return &Func[T, U]{iter, action, option.Empty[Result[U]]()}
 }
 
 // Collects all elements from an iterator into a slice. If the iterator
@@ -111,6 +119,10 @@ func Collect[T any](iter Iterator[T]) ([]T, error) {
 type Result[T any] struct {
 	value T
 	err   error
+}
+
+func (r *Result[T]) Pair() (T, error) {
+	return r.value, r.err
 }
 
 // Creates a new non-error result
