@@ -73,9 +73,16 @@ func (si *SliceIter[T]) Value() (T, error) {
 	return si.value, nil
 }
 
+// Makes an Iterator[T] from slice []T
 func Slice[T any](slice []T) Iterator[T] {
 	var t T
 	return &SliceIter[T]{slice, 0, t}
+}
+
+// Makes an Iterator[T] from variadic arguments of type T
+func Of[T any](elements ...T) Iterator[T] {
+	var t T
+	return &SliceIter[T]{elements, 0, t}
 }
 
 // Wraps an iterator with a mapping function that may return an error, producing a new iterator
