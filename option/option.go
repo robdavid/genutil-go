@@ -3,6 +3,7 @@ package option
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 var ErrOptionIsEmpty = errors.New("option is empty")
@@ -118,6 +119,22 @@ func (o OptionRef[T]) Get() T {
 		panic(ErrOptionIsEmpty)
 	} else {
 		return *o.ref
+	}
+}
+
+func (o Option[T]) String() string {
+	if o.IsEmpty() {
+		return ""
+	} else {
+		return fmt.Sprintf("%v", o.value)
+	}
+}
+
+func (o OptionRef[T]) String() string {
+	if o.ref == nil {
+		return ""
+	} else {
+		return fmt.Sprintf("%v", *o.ref)
 	}
 }
 

@@ -2,11 +2,11 @@ package option
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
-	yaml "gopkg.in/yaml.v2"
-
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v2"
 )
 
 func TestValue(t *testing.T) {
@@ -168,6 +168,13 @@ type testMarshall struct {
 type testOpt struct {
 	Metadata string   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	ItemList []string `json:"itemList,omitempty" yaml:"itemList,omitempty"`
+}
+
+func TestPrintFormatting(t *testing.T) {
+	actual := fmt.Sprintf("String is %s and num is %s", Value("5 by 5"), Value(25))
+	assert.Equal(t, "String is 5 by 5 and num is 25", actual)
+	actual = fmt.Sprintf("String is %s and num is %s", Empty[string](), Empty[int]())
+	assert.Equal(t, "String is  and num is ", actual)
 }
 
 func TestJSONMarshallOmitOption(t *testing.T) {
