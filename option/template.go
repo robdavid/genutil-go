@@ -1,13 +1,26 @@
 package option
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"text/template"
 )
 
 type objOption interface {
+	GetObj() any
 	GetObjOK() (any, bool)
+	GetObjOr(any) any
+	GetObjOrZero() any
+	IsObjEmpty() bool
+}
+
+func (o Option[_]) GetObj() any {
+	return o.Get()
+}
+
+func (o OptionRef[_]) GetObj() any {
+	return o.Ref()
 }
 
 func (o Option[_]) GetObjOK() (any, bool) {
@@ -16,6 +29,30 @@ func (o Option[_]) GetObjOK() (any, bool) {
 
 func (o OptionRef[_]) GetObjOK() (any, bool) {
 	return o.GetOK()
+}
+
+func (o Option[T]) GetObjOr(a any) any {
+	return o.GetOr(a.(T))
+}
+
+func (o OptionRef[T]) GetObjOr(a any) any {
+	return o.GetOr(a.(T))
+}
+
+func (o Option[_]) GetObjOrZero() any {
+	return o.GetOrZero()
+}
+
+func (o OptionRef[_]) GetObjOrZero() any {
+	return o.GetOrZero()
+}
+
+func (o Option[_]) IsObjEmpty() bool {
+	return !o.nonEmpty
+}
+
+func (o OptionRef[_]) IsObjEmpty() bool {
+	return o.ref == nil
 }
 
 func tmplOptionReflect(a any) (b any, isopt bool, ok bool) {
@@ -46,9 +83,8 @@ func tmplOption(a any) (b any, isopt bool, ok bool) {
 
 func TmplIsEmpty(a any) bool {
 	switch v := a.(type) {
-	case IOption[any]:
-		_, t := v.GetOK()
-		return !t
+	case objOption:
+		return v.IsObjEmpty()
 	case []any:
 		return len(v) == 0
 	case map[any]any:
@@ -58,36 +94,29 @@ func TmplIsEmpty(a any) bool {
 	}
 }
 
+func TmplHasValue(a any) bool {
+	return !TmplIsEmpty(a)
+}
+
 func TmplIsZero(a any) bool {
-	b, isopt, ok := tmplOption(a)
-	if isopt {
-		if ok {
-			return TmplIsZero(b)
+	switch v := a.(type) {
+	case objOption:
+		w, t := v.GetObjOK()
+		if t {
+			return TmplIsZero(w)
 		} else {
 			return true
 		}
-	} else {
+	default:
 		ref := reflect.ValueOf(a)
 		return ref.IsZero()
 	}
-	// switch v := a.(type) {
-	// case IOption[_]:
-	// 	w, t := v.getObjOK()
-	// 	if t {
-	// 		return TmplIsZero(w)
-	// 	} else {
-	// 		return true
-	// 	}
-	// default:
-	// 	ref := reflect.ValueOf(a)
-	// 	return ref.IsZero()
-	// }
 }
 
 func TmplGetOrZero(a any) any {
 	switch v := a.(type) {
-	case IOption[any]:
-		return v.GetOrZero()
+	case objOption:
+		return v.GetObjOrZero()
 	default:
 		return a
 	}
@@ -95,8 +124,8 @@ func TmplGetOrZero(a any) any {
 
 func TmplGet(a any) any {
 	switch v := a.(type) {
-	case IOption[any]:
-		return v.Get()
+	case objOption:
+		return v.GetObj()
 	default:
 		return a
 	}
@@ -104,22 +133,75 @@ func TmplGet(a any) any {
 
 func TmplGetOr(a any, b any) any {
 	switch v := a.(type) {
-	case IOption[any]:
-		return v.GetOr(b)
+	case objOption:
+		return v.GetObjOr(b)
 	default:
 		return a
 	}
 }
 
-func TmplGetDefault(d any, a any) any {
-	return TmplGetOr(a, d)
+func TmplGetDefault(d any, a ...any) any {
+	for i := range a {
+		if !TmplIsEmpty(a[i]) {
+			return a[i]
+		}
+	}
+	return d
+}
+
+func TmplPad(a any, padstr ...string) string {
+	text := ""
+	pre := " "
+	post := ""
+	if l := len(padstr); l > 0 {
+		pre = padstr[0]
+		if l > 1 {
+			post = padstr[1]
+		}
+	}
+
+	switch v := a.(type) {
+	case fmt.Stringer:
+		text = v.String()
+	case string:
+		text = v
+	default:
+		text = fmt.Sprintf("%v", v)
+	}
+
+	if text != "" {
+		text = pre + text + post
+	}
+	return text
+}
+
+func TmplFmt(pairs ...any) (string, error) {
+	var result strings.Builder
+	for i := 0; i+1 < len(pairs); i += 2 {
+		switch v := pairs[i+1].(type) {
+		case objOption:
+			if vv, ok := v.GetObjOK(); ok {
+				fmt.Fprintf(&result, pairs[i].(string), vv)
+			}
+		case bool:
+			if v {
+				result.WriteString(pairs[i].(string))
+			}
+		default:
+			return result.String(), fmt.Errorf("data values should be either option or bool")
+		}
+	}
+	return result.String(), nil
 }
 
 var TmplFunctions template.FuncMap = template.FuncMap{
 	"isZero":     TmplIsZero,
+	"hasValue":   TmplHasValue,
 	"isEmpty":    TmplIsEmpty,
-	"get":        TmplGet,
-	"getOr":      TmplGetOr,
-	"getOrZero":  TmplGetOrZero,
-	"getDefault": TmplGetDefault,
+	"opt":        TmplGet,
+	"optOr":      TmplGetOr,
+	"optOrZero":  TmplGetOrZero,
+	"optDefault": TmplGetDefault,
+	"pad":        TmplPad,
+	"optFmt":     TmplFmt,
 }
