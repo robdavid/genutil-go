@@ -18,6 +18,13 @@ func (r *Result[T]) Get() T {
 	return r.value
 }
 
+func (r *Result[T]) Must() T {
+	if r.err != nil {
+		panic(r.err)
+	}
+	return r.value
+}
+
 func (r *Result[T]) IsError() bool {
 	return r.err != nil
 }
@@ -59,4 +66,11 @@ func MapErr[T, U any](r Result[T], f func(T) (U, error)) Result[U] {
 			return Value(u)
 		}
 	}
+}
+
+func Must[T any](t T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
