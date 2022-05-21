@@ -194,6 +194,10 @@ func TmplFmt(pairs ...any) (string, error) {
 	return result.String(), nil
 }
 
+func TmplValue[T any](v T) Option[T] {
+	return Value(v)
+}
+
 var TmplFunctions template.FuncMap = template.FuncMap{
 	"isZero":     TmplIsZero,
 	"hasValue":   TmplHasValue,
@@ -204,4 +208,5 @@ var TmplFunctions template.FuncMap = template.FuncMap{
 	"optDefault": TmplGetDefault,
 	"pad":        TmplPad,
 	"optFmt":     TmplFmt,
+	"value":      TmplValue[any],
 }
