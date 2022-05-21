@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/result"
 )
 
 // Generic iterator
@@ -19,7 +20,7 @@ type Iterator[T any] interface {
 type Func[T, U any] struct {
 	base    Iterator[T]
 	mapping func(T) (U, error)
-	value   option.Option[Result[U]]
+	value   option.Option[result.Result[U]]
 }
 
 func (i *Func[T, U]) Next() bool {
@@ -34,7 +35,7 @@ func (i *Func[T, U]) Value() (u U, err error) {
 			return
 		}
 		u, err = i.mapping(t)
-		i.value.Set(Result[U]{u, err})
+		i.value.Set(result.Pair(u, err))
 	} else {
 		u, err = i.value.Ref().Pair()
 	}
@@ -87,7 +88,7 @@ func Of[T any](elements ...T) Iterator[T] {
 
 // Wraps an iterator with a mapping function that may return an error, producing a new iterator
 func DoMap[T any, U any](iter Iterator[T], mapping func(T) (U, error)) Iterator[U] {
-	return &Func[T, U]{iter, mapping, option.Empty[Result[U]]()}
+	return &Func[T, U]{iter, mapping, option.Empty[result.Result[U]]()}
 }
 
 // Wraps an iterator with a mapping function, producing a new iterator
@@ -95,7 +96,7 @@ func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
 	action := func(t T) (U, error) {
 		return mapping(t), nil
 	}
-	return &Func[T, U]{iter, action, option.Empty[Result[U]]()}
+	return &Func[T, U]{iter, action, option.Empty[result.Result[U]]()}
 }
 
 // Collects all elements from an iterator into a slice. If the iterator
@@ -122,32 +123,11 @@ func Collect[T any](iter Iterator[T]) ([]T, error) {
 	return result, nil
 }
 
-// Contains a value of type T, or an error
-type Result[T any] struct {
-	value T
-	err   error
-}
-
-func (r *Result[T]) Pair() (T, error) {
-	return r.value, r.err
-}
-
-// Creates a new non-error result
-func NewResult[T any](t T) Result[T] {
-	return Result[T]{t, nil}
-}
-
-// Creates an error result
-func NewError[T any](err error) Result[T] {
-	var t T
-	return Result[T]{t, err}
-}
-
 // An iterator that obtains values (or an error) from
 // a channel
 type PipeIter[T any] struct {
-	source <-chan Result[T]
-	value  Result[T]
+	source <-chan result.Result[T]
+	value  result.Result[T]
 }
 
 func (pi *PipeIter[T]) Next() bool {
@@ -157,28 +137,29 @@ func (pi *PipeIter[T]) Next() bool {
 }
 
 func (pi *PipeIter[T]) Value() (T, error) {
-	return pi.value.value, pi.value.err
+	return pi.value.Pair()
 }
 
 func (pi *PipeIter[T]) MustValue() T {
-	if err := pi.value.err; err != nil {
+	if v, err := pi.value.Pair(); err != nil {
 		panic(err)
+	} else {
+		return v
 	}
-	return pi.value.value
 }
 
 // An object to which consecutive iterator values are supplied via the Yield
 // method (or an error via the Error method), sent via a channel
 type Yield[T any] struct {
-	sink chan<- Result[T]
+	sink chan<- result.Result[T]
 }
 
 func (y Yield[T]) Yield(t T) {
-	y.sink <- NewResult(t)
+	y.sink <- result.Value(t)
 }
 
 func (y Yield[T]) Error(err error) {
-	y.sink <- NewError[T](err)
+	y.sink <- result.Error[T](err)
 }
 
 // An error type indicating that a Pipe iterator function has panicked
@@ -215,7 +196,7 @@ func runPipe[T any](y Yield[T], activity PipeFunc[T]) {
 //
 // PipeFunc[T] is an alias for func(Yield[T]) error
 func Pipe[T any](activity PipeFunc[T]) Iterator[T] {
-	ch := make(chan Result[T], 1)
+	ch := make(chan result.Result[T], 1)
 	yield := Yield[T]{ch}
 	go runPipe(yield, activity)
 	return &PipeIter[T]{source: ch}
