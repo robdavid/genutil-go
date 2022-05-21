@@ -88,10 +88,22 @@ func TestTemplateValueFromInt(t *testing.T) {
 	assert.Equal(t, "Int value is: 04", result)
 }
 
-func TestTemplateValueFromFload(t *testing.T) {
+func TestTemplateValueFromFloat(t *testing.T) {
 	tmpl := testTemplate(t, `{{optFmt "Float value is: %.3f" (value 1.23)}}`)
 	result := runTemplate(t, tmpl, make(map[string]any))
 	assert.Equal(t, "Float value is: 1.230", result)
+}
+
+func TestTemplateEmptyFromInt(t *testing.T) {
+	tmpl := testTemplate(t, `{{optFmt "Int value is: %02d" (empty 0)}}`)
+	result := runTemplate(t, tmpl, make(map[string]any))
+	assert.Equal(t, "", result)
+}
+
+func TestTemplateIntAsEmpty(t *testing.T) {
+	tmpl := testTemplate(t, `{{optFmt "Int value is: %02d" (asEmpty (value 12))}}`)
+	result := runTemplate(t, tmpl, make(map[string]any))
+	assert.Equal(t, "", result)
 }
 
 func TestTemplateConditionalEmpty(t *testing.T) {

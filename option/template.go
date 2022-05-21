@@ -198,6 +198,18 @@ func TmplValue[T any](v T) Option[T] {
 	return Value(v)
 }
 
+func TmplEmpty[T any](v T) Option[T] {
+	return Empty[T]()
+}
+
+func TmplAsEmpty[T any](o Option[T]) Option[T] {
+	if o.IsEmpty() {
+		return o
+	} else {
+		return Empty[T]()
+	}
+}
+
 var TmplFunctions template.FuncMap = template.FuncMap{
 	"isZero":     TmplIsZero,
 	"hasValue":   TmplHasValue,
@@ -209,4 +221,6 @@ var TmplFunctions template.FuncMap = template.FuncMap{
 	"pad":        TmplPad,
 	"optFmt":     TmplFmt,
 	"value":      TmplValue[any],
+	"empty":      TmplEmpty[any],
+	"asEmpty":    TmplAsEmpty[any],
 }
