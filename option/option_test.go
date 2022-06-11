@@ -170,6 +170,11 @@ type testOpt struct {
 	ItemList []string `json:"itemList,omitempty" yaml:"itemList,omitempty"`
 }
 
+type testOptMarshall struct {
+	Name  Option[string] `json:"name" yaml:"name"`
+	Value Option[int]    `json:"value" yaml:"value"`
+}
+
 func TestPrintFormatting(t *testing.T) {
 	actual := fmt.Sprintf("String is %s and num is %s", Value("5 by 5"), Value(25))
 	assert.Equal(t, "String is 5 by 5 and num is 25", actual)
@@ -190,6 +195,17 @@ func TestJSONMarshallOmitOption(t *testing.T) {
 		var testData2 testMarshall
 		assert.NoError(t, json.Unmarshal(y, &testData2))
 		assert.Equal(t, testData, testData2)
+	}
+}
+
+func TestJSONUnMarshallOmitOption(t *testing.T) {
+	var unmarshalled testOptMarshall
+	var testData = `{ "name": "a name" }`
+	err := json.Unmarshal([]byte(testData), &unmarshalled)
+	if assert.NoError(t, err) {
+		assert.True(t, unmarshalled.Name.HasValue())
+		assert.False(t, unmarshalled.Value.HasValue())
+		assert.Equal(t, "a name", unmarshalled.Name.Get())
 	}
 }
 
@@ -226,5 +242,16 @@ func TestYAMLMarshallOmitOption(t *testing.T) {
 		var testData2 testMarshall
 		assert.NoError(t, yaml.Unmarshal(y, &testData2))
 		assert.Equal(t, testData, testData2)
+	}
+}
+
+func TestYAMLUnMarshallOmitOption(t *testing.T) {
+	var unmarshalled testOptMarshall
+	var testData = `name: "a name"`
+	err := yaml.Unmarshal([]byte(testData), &unmarshalled)
+	if assert.NoError(t, err) {
+		assert.True(t, unmarshalled.Name.HasValue())
+		assert.False(t, unmarshalled.Value.HasValue())
+		assert.Equal(t, "a name", unmarshalled.Name.Get())
 	}
 }
