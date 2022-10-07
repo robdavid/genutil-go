@@ -74,3 +74,33 @@ func Must[T any](t T, err error) T {
 	}
 	return t
 }
+
+type tryError struct {
+	err error
+}
+
+func (te tryError) Error() string {
+	return te.err.Error()
+}
+
+func (te tryError) Unwrap() error {
+	return te.err
+}
+
+func Try[T any](t T, err error) T {
+	if err != nil {
+		panic(tryError{err})
+	}
+	return t
+}
+
+func Catch(retErr *error) {
+	if err := recover(); err != nil {
+		if tryErr, ok := err.(tryError); ok {
+			*retErr = tryErr.err
+			return
+		} else {
+			panic(err)
+		}
+	}
+}
