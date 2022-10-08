@@ -19,23 +19,11 @@ func (o Option[_]) GetObj() any {
 	return o.Get()
 }
 
-func (o OptionRef[_]) GetObj() any {
-	return o.Ref()
-}
-
 func (o Option[_]) GetObjOK() (any, bool) {
 	return o.value, o.nonEmpty
 }
 
-func (o OptionRef[_]) GetObjOK() (any, bool) {
-	return o.GetOK()
-}
-
 func (o Option[T]) GetObjOr(a any) any {
-	return o.GetOr(a.(T))
-}
-
-func (o OptionRef[T]) GetObjOr(a any) any {
 	return o.GetOr(a.(T))
 }
 
@@ -43,16 +31,8 @@ func (o Option[_]) GetObjOrZero() any {
 	return o.GetOrZero()
 }
 
-func (o OptionRef[_]) GetObjOrZero() any {
-	return o.GetOrZero()
-}
-
 func (o Option[_]) IsObjEmpty() bool {
 	return !o.nonEmpty
-}
-
-func (o OptionRef[_]) IsObjEmpty() bool {
-	return o.ref == nil
 }
 
 func tmplOptionReflect(a any) (b any, isopt bool, ok bool) {
@@ -60,7 +40,7 @@ func tmplOptionReflect(a any) (b any, isopt bool, ok bool) {
 	t := r.Type()
 	m, ok := t.MethodByName("GetOK")
 	name := t.Name()
-	if ok && (strings.HasPrefix(name, "Option[") || strings.HasPrefix(name, "OptionRef[")) {
+	if ok && strings.HasPrefix(name, "Option[") {
 		valok := m.Func.Call([]reflect.Value{r})
 		isopt = true
 		ok = valok[1].Bool()
