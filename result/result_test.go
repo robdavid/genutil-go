@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime/debug"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,14 +36,28 @@ func TestSuccess(t *testing.T) {
 	assert.NotEmpty(t, content)
 }
 
+// Check that a panic raised in a function that defers to Catch
+// will just panic as expected, with a somewhat intelligible call
+// trace
 func TestActualPanic(t *testing.T) {
 	defer func() {
 		if pnk := recover(); pnk == nil {
 			assert.Fail(t, "function did not panic")
 		} else {
-			stack := string(debug.Stack())
-			fmt.Println(pnk)
-			fmt.Println(stack)
+			pnkText := fmt.Sprintf("%v", pnk)
+			assert.Contains(t, pnkText, "index out of range")
+			var callers []uintptr = make([]uintptr, 30)
+			ncallers := runtime.Callers(0, callers)
+			callers = callers[0:ncallers]
+			frames := runtime.CallersFrames(callers)
+			foundPanicSite := false
+			for frame, more := frames.Next(); more; frame, more = frames.Next() {
+				if frame.Function == "github.com/robdavid/genutil-go/result.testPanic" {
+					foundPanicSite = true
+					break
+				}
+			}
+			assert.True(t, foundPanicSite, "couldn't not find original panic site in stack trace")
 		}
 	}()
 	testPanic()
