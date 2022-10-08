@@ -1,8 +1,10 @@
 package result
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,5 +37,14 @@ func TestSuccess(t *testing.T) {
 }
 
 func TestActualPanic(t *testing.T) {
+	defer func() {
+		if pnk := recover(); pnk == nil {
+			assert.Fail(t, "function did not panic")
+		} else {
+			stack := string(debug.Stack())
+			fmt.Println(pnk)
+			fmt.Println(stack)
+		}
+	}()
 	testPanic()
 }
