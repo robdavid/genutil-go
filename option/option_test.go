@@ -14,8 +14,8 @@ func TestValue(t *testing.T) {
 	assert.False(t, v.IsEmpty())
 	assert.True(t, v.HasValue())
 	assert.Equal(t, 5, v.Get())
-	assert.Equal(t, 7, Map[int](v, func(x int) int { return x + 2 }).Get())
-	assert.Equal(t, 8, MapRef[int](&v, func(x *int) *int { var y = *x + 3; return &y }).Get())
+	assert.Equal(t, Value(7), Map(v, func(x int) int { return x + 2 }))
+	assert.Equal(t, 8, MapRef(&v, func(x *int) *int { var y = *x + 3; return &y }).Get())
 	v.Set(6)
 	assert.Equal(t, 6, v.Get())
 	assert.Equal(t, 6, *v.Ref())
@@ -25,13 +25,13 @@ func TestValue(t *testing.T) {
 
 func TestRef(t *testing.T) {
 	five := 5
-	var v OptionRef[int] = Ref(&five)
+	var v Option[int] = Ref(&five)
 	assert.False(t, v.IsEmpty())
 	assert.True(t, v.HasValue())
 	assert.Equal(t, 5, v.Get())
 	assert.Equal(t, &five, v.Ref())
-	assert.Equal(t, 7, MapRef[int](&v, func(x *int) *int { var y = *x + 2; return &y }).Get())
-	assert.Equal(t, 8, Map[int](v, func(x int) int { return x + 3 }).Get())
+	assert.Equal(t, 7, MapRef(&v, func(x *int) *int { var y = *x + 2; return &y }).Get())
+	assert.Equal(t, Value(8), Map(v, func(x int) int { return x + 3 }))
 	v.Set(6)
 	assert.Equal(t, 6, v.Get())
 	assert.Equal(t, 6, *v.Ref())
@@ -43,51 +43,22 @@ func TestEquality(t *testing.T) {
 	six := 6
 	val := Value(six)
 	ref := Ref(&six)
-	assert.True(t, Equal[int](val, ref))
+	assert.True(t, val == ref)
 	val.Set(7)
-	assert.False(t, Equal[int](val, ref))
+	assert.False(t, val == ref)
 	val.Set(6)
-	assert.True(t, Equal[int](val, ref))
+	assert.True(t, val == ref)
 	val.Clear()
-	assert.False(t, Equal[int](val, ref))
+	assert.False(t, val == ref)
 }
 
-func TestRefEquality(t *testing.T) {
-	six := 6
-	val := Value(six)
-	ref := Ref(&six)
-	assert.True(t, EqualRef[int](&val, &ref))
-	val.Set(7)
-	assert.False(t, EqualRef[int](&val, &ref))
-	val.Set(6)
-	assert.True(t, EqualRef[int](&val, &ref))
-	val.Clear()
-	assert.False(t, EqualRef[int](&val, &ref))
-}
 func TestEmpty(t *testing.T) {
 	v := Empty[int]()
 	assert.True(t, v.IsEmpty())
 	assert.False(t, v.HasValue())
 	assert.Equal(t, 0, v.GetOrZero())
-	vm := Map[int](v, func(x int) int { return x + 2 })
+	vm := Map(v, func(x int) int { return x + 2 })
 	assert.True(t, vm.IsEmpty())
-}
-
-type Wrapper[T any] struct {
-	Wrapped IOptionRef[T]
-}
-
-func TestInterfaceAssignment(t *testing.T) {
-	var io IOption[int]
-	var ior IOptionRef[int]
-	var wrapper Wrapper[int]
-	o := Value(123)
-	io = o
-	ior = &o
-	wrapper = Wrapper[int]{&o}
-	assert.Equal(t, io.Get(), 123)
-	assert.Equal(t, ior.Get(), 123)
-	assert.Equal(t, wrapper.Wrapped.Get(), 123)
 }
 
 type TestS1 struct {
@@ -95,7 +66,7 @@ type TestS1 struct {
 	value int
 }
 
-// It should be possile to copy an option
+// It should be possible to copy an option
 // without being exposed to hidden references
 func TestSafeCopy(t *testing.T) {
 	t1 := TestS1{"one", 1}
@@ -107,20 +78,8 @@ func TestSafeCopy(t *testing.T) {
 	assert.Equal(t, TestS1{"one", 1}, v1.Get())
 }
 
-// OptionRefs refer to the original item when copied
-func TestRefCopy(t *testing.T) {
-	t1 := TestS1{"one", 1}
-	v1 := Ref(&t1)
-	assert.Equal(t, TestS1{"one", 1}, v1.Get())
-	v2 := v1
-	v2.Ref().name = "two"
-	v2.Ref().value = 2
-	assert.Equal(t, TestS1{"two", 2}, v2.Get())
-	assert.Equal(t, TestS1{"two", 2}, v1.Get())
-}
-
 func TestOptionPtr(t *testing.T) {
-	var opt OptionRef[int]
+	var opt Option[int]
 	assert.True(t, opt.IsEmpty())
 	opt.SetRef(nil)
 	assert.True(t, opt.IsEmpty())
@@ -131,23 +90,6 @@ func TestOptionPtr(t *testing.T) {
 	opt.SetRef(&v)
 	assert.False(t, opt.IsEmpty())
 	r, ok = opt.GetOK()
-	assert.True(t, ok)
-	assert.Equal(t, r, 123)
-}
-
-func TestOptionInterface(t *testing.T) {
-	var opti IOptionRef[int]
-	ref := Ref[int](nil)
-	opti = &ref
-	assert.True(t, opti.IsEmpty())
-	r, ok := opti.GetOK()
-	assert.False(t, ok)
-	assert.Zero(t, r)
-	v := 123
-	opt := Value(v)
-	opti = &opt
-	assert.False(t, opti.IsEmpty())
-	r, ok = opti.GetOK()
 	assert.True(t, ok)
 	assert.Equal(t, r, 123)
 }
