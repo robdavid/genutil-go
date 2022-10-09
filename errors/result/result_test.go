@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/robdavid/genutil-go/errors/handler"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,6 +47,24 @@ func TestErrorResult(t *testing.T) {
 	v, e := returnResult(&res)
 	assert.True(t, v == "testValue", "got value %s", v)
 	assert.Errorf(t, e, "This raises an error")
+}
+
+func TestErrorMapTry(t *testing.T) {
+	defer handler.Handle(func(err error) {
+		assert.Errorf(t, err, "outer error: inner error")
+	})
+	value := New(arity1Err(fmt.Errorf("inner error"))).
+		MapErr(func(err error) error { return fmt.Errorf("outer error: %w", err) }).Try()
+	assert.Fail(t, "error not thrown; got value %v", value)
+}
+
+func TestErrorMapTrySuccess(t *testing.T) {
+	defer handler.Handle(func(err error) {
+		assert.NoError(t, err)
+	})
+	value := New(arity1Err(nil)).
+		MapErr(func(err error) error { return fmt.Errorf("outer error: %w", err) }).Try()
+	assert.Equal(t, "testValue", value)
 }
 
 func TestGoodResult2(t *testing.T) {
