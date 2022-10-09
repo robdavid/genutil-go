@@ -1,10 +1,11 @@
+// Iterators and generators
 package iterator
 
 import (
 	"fmt"
 
+	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/robdavid/genutil-go/option"
-	"github.com/robdavid/genutil-go/result"
 )
 
 // Generic iterator
@@ -35,9 +36,9 @@ func (i *Func[T, U]) Value() (u U, err error) {
 			return
 		}
 		u, err = i.mapping(t)
-		i.value.Set(result.Pair(u, err))
+		i.value.Set(result.From(u, err))
 	} else {
-		u, err = i.value.Ref().Pair()
+		u, err = i.value.Ref().Return()
 	}
 	return
 }
@@ -137,15 +138,15 @@ func (pi *PipeIter[T]) Next() bool {
 }
 
 func (pi *PipeIter[T]) Value() (T, error) {
-	return pi.value.Pair()
+	return pi.value.Return()
 }
 
 func (pi *PipeIter[T]) MustValue() T {
-	if v, err := pi.value.Pair(); err != nil {
+	v, err := pi.value.Return()
+	if err != nil {
 		panic(err)
-	} else {
-		return v
 	}
+	return v
 }
 
 // An object to which consecutive iterator values are supplied via the Yield
@@ -187,14 +188,14 @@ func runPipe[T any](y Yield[T], activity PipeFunc[T]) {
 	}
 }
 
-// Create an iterator from a function that yields a sequence of results
+// Create an iterator from a function, passed in activity, that yields a sequence of results
 // by making calls to Yield(), or Error(), on an object that will be passed to the function.
 // The function is run in a separate goroutine, and its yielded results are sent over a channel
 // to the iterator where they can be consumed in the normal way by calls to Next() and Value().
 // Any error result yielded, or returned by the function, cause that error to be returned by Value()
 // in the iterator.
 //
-// PipeFunc[T] is an alias for func(Yield[T]) error
+// The activity parameter is of type PipeFunc[T], which is an alias for func(Yield[T]) error
 func Pipe[T any](activity PipeFunc[T]) Iterator[T] {
 	ch := make(chan result.Result[T], 1)
 	yield := Yield[T]{ch}
