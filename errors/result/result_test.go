@@ -40,18 +40,18 @@ func TestErrorResult(t *testing.T) {
 	assert.Equal(t, "This raises an error", res.String())
 	// These asserts with == also designed to check compile time types
 	assert.True(t, res.Get() == "testValue", "got value %s", res.Get())
-	assert.Errorf(t, res.GetErr(), "This raises an error")
+	assert.EqualError(t, res.GetErr(), "This raises an error")
 	assert.Panics(t, func() {
 		assert.True(t, res.Must() == "testValue")
 	})
 	v, e := returnResult(&res)
 	assert.True(t, v == "testValue", "got value %s", v)
-	assert.Errorf(t, e, "This raises an error")
+	assert.EqualError(t, e, "This raises an error")
 }
 
 func TestErrorMapTry(t *testing.T) {
 	defer handler.Handle(func(err error) {
-		assert.Errorf(t, err, "outer error: inner error")
+		assert.EqualError(t, err, "outer error: inner error")
 	})
 	value := New(arity1Err(fmt.Errorf("inner error"))).
 		MapErr(func(err error) error { return fmt.Errorf("outer error: %w", err) }).Try()
@@ -85,7 +85,7 @@ func TestGoodResult2(t *testing.T) {
 func TestErrorResult2(t *testing.T) {
 	res := From2(arity2Err(fmt.Errorf("This raises an error")))
 	assert.Equal(t, "This raises an error", res.String())
-	assert.Errorf(t, res.GetErr(), "This raises an error")
+	assert.EqualError(t, res.GetErr(), "This raises an error")
 	// These asserts with == also designed to check compile time types
 	assert.Panics(t, func() {
 		assert.True(t, res.Must().First == "testValue")
@@ -94,5 +94,5 @@ func TestErrorResult2(t *testing.T) {
 	a, b, e := returnResult2(&res)
 	assert.True(t, a == "testValue", "got value %s", a)
 	assert.True(t, b == 123, "got value %d", b)
-	assert.Errorf(t, e, "This raises an error")
+	assert.EqualError(t, e, "This raises an error")
 }

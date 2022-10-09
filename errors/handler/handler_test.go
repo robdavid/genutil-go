@@ -48,18 +48,18 @@ func TestError(t *testing.T) {
 
 func TestWrappedError(t *testing.T) {
 	_, err := readFileWrapErr("nosuchfile")
-	assert.EqualError(t, err, "Error reading nosuchfile: open nosuchfile: no such file or directory")
+	assert.ErrorContains(t, err, "Error reading nosuchfile: open nosuchfile: ")
 }
 
 func TestSuccess(t *testing.T) {
-	content, err := readFileTest("/etc/passwd")
+	content, err := readFileTest("handler_test.go")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, content)
 }
 
 func TestTry0Error(t *testing.T) {
 	err := try0Failure()
-	assert.Errorf(t, err, "simple error")
+	assert.EqualError(t, err, "simple error")
 }
 
 // Check that a panic raised in a function that defers to Catch
