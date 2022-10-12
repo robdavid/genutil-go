@@ -88,3 +88,35 @@ func TestActualPanic(t *testing.T) {
 	}()
 	testPanic()
 }
+
+func recurseErrorCatch(depth int) (err error) {
+	defer Catch(&err)
+	if depth > 0 {
+		Check(recurseErrorCatch(depth - 1))
+	} else {
+		err = fmt.Errorf("Hit bottom")
+	}
+	return
+}
+
+func recurseErrorReturn(depth int) (err error) {
+	if depth > 0 {
+		return recurseErrorCatch(depth - 1)
+	} else {
+		return fmt.Errorf("Hit bottom")
+	}
+}
+
+func TestRewindTime(t *testing.T) {
+	for i := 0; i < 300; i++ {
+		err := recurseErrorCatch(10000)
+		assert.EqualError(t, err, "Hit bottom")
+	}
+}
+
+func TestReturnTime(t *testing.T) {
+	for i := 0; i < 300; i++ {
+		err := recurseErrorReturn(10000)
+		assert.EqualError(t, err, "Hit bottom")
+	}
+}
