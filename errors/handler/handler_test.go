@@ -43,12 +43,26 @@ func try0Failure() (err error) {
 
 func TestError(t *testing.T) {
 	_, err := readFileTest("nosuchfile")
-	assert.ErrorContains(t, err, "open nosuchfile: no such file or directory")
+	switch runtime.GOOS {
+	case "linux", "unix":
+		assert.ErrorContains(t, err, "open nosuchfile: no such file or directory")
+	case "windows":
+		assert.ErrorContains(t, err, "open nosuchfile: The system cannot find the file specified.")
+	default:
+		assert.ErrorContains(t, err, "open nosuchfile:")
+	}
 }
 
 func TestWrappedError(t *testing.T) {
 	_, err := readFileWrapErr("nosuchfile")
-	assert.ErrorContains(t, err, "Error reading nosuchfile: open nosuchfile: ")
+	switch runtime.GOOS {
+	case "linux", "unix":
+		assert.ErrorContains(t, err, "Error reading nosuchfile: open nosuchfile: no such file or directory")
+	case "windows":
+		assert.ErrorContains(t, err, "Error reading nosuchfile: open nosuchfile: The system cannot find the file specified.")
+	default:
+		assert.ErrorContains(t, err, "Error reading nosuchfile: open nosuchfile: ")
+	}
 }
 
 func TestSuccess(t *testing.T) {

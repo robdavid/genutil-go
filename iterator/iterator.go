@@ -216,40 +216,40 @@ func Collect[T any](iter Iterator[T]) ([]T, error) {
 	return result, nil
 }
 
-// An iterator that obtains values (or an error) from
-// a channel
-type PipeIter[T any] struct {
+// A generator pattern for an iterator, using
+// a go routine and channel
+type GenIter[T any] struct {
 	source chan result.Result[T]
 	value  result.Result[T]
 }
 
-func (pi *PipeIter[T]) Next() bool {
+func (pi *GenIter[T]) Next() bool {
 	var ok bool
 	pi.value, ok = <-pi.source
 	return ok
 }
 
-func (pi *PipeIter[T]) Value() (T, error) {
+func (pi *GenIter[T]) Value() (T, error) {
 	return pi.value.Return()
 }
 
-func (pi *PipeIter[T]) Must() T {
+func (pi *GenIter[T]) Must() T {
 	return pi.value.Must()
 }
 
-func (pi *PipeIter[T]) Try() T {
+func (pi *GenIter[T]) Try() T {
 	return pi.value.Must()
 }
 
-func (pi *PipeIter[T]) Chan() <-chan result.Result[T] {
+func (pi *GenIter[T]) Chan() <-chan result.Result[T] {
 	return pi.source
 }
 
-func (pi *PipeIter[T]) Abort() {
+func (pi *GenIter[T]) Abort() {
 	safeClose(pi.source)
 }
 
-type AbortPipe struct{}
+type AbortGenerator struct{}
 
 // An object to which consecutive iterator values are supplied via the Yield
 // method (or an error via the Error method), sent via a channel
@@ -259,7 +259,7 @@ type Yield[T any] struct {
 
 func (y Yield[T]) Yield(t T) {
 	if !safeSend(y.sink, result.Value(t)) {
-		panic(AbortPipe{})
+		panic(AbortGenerator{})
 	}
 }
 
@@ -268,24 +268,24 @@ func (y Yield[T]) Error(err error) {
 }
 
 // An error type indicating that a Pipe iterator function has panicked
-type PipePanic struct {
+type GeneratorPanic struct {
 	panic interface{}
 }
 
-func (pp PipePanic) Error() string {
+func (pp GeneratorPanic) Error() string {
 	return fmt.Sprintf("panic during pipe iterator: %#v", pp.panic)
 }
 
 // A type alias for a function taking a Yield object and returning
 // an error.
-type PipeFunc[T any] func(Yield[T]) error
+type GenFunc[T any] func(Yield[T]) error
 
-func runPipe[T any](y Yield[T], activity PipeFunc[T]) {
+func runGenerator[T any](y Yield[T], activity GenFunc[T]) {
 	defer safeClose(y.sink)
 	defer func() {
 		if p := recover(); p != nil {
-			if _, abort := p.(AbortPipe); !abort {
-				y.Error(PipePanic{p})
+			if _, abort := p.(AbortGenerator); !abort {
+				y.Error(GeneratorPanic{p})
 			}
 		}
 	}()
@@ -302,9 +302,9 @@ func runPipe[T any](y Yield[T], activity PipeFunc[T]) {
 // in the iterator.
 //
 // The activity parameter is of type PipeFunc[T], which is an alias for func(Yield[T]) error
-func Pipe[T any](activity PipeFunc[T]) Iterator[T] {
+func Generate[T any](activity GenFunc[T]) Iterator[T] {
 	ch := make(chan result.Result[T])
 	yield := Yield[T]{ch}
-	go runPipe(yield, activity)
-	return &PipeIter[T]{source: ch}
+	go runGenerator(yield, activity)
+	return &GenIter[T]{source: ch}
 }

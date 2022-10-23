@@ -61,8 +61,8 @@ func TestDoMapIter(t *testing.T) {
 	}
 }
 
-func TestPipeIter(t *testing.T) {
-	pipe := Pipe(func(y Yield[int]) error {
+func TestGeneratorIter(t *testing.T) {
+	pipe := Generate(func(y Yield[int]) error {
 		for i := 0; i < 10; i++ {
 			y.Yield(i)
 		}
@@ -76,8 +76,8 @@ func TestPipeIter(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestPipeIterChan(t *testing.T) {
-	pipe := Pipe(func(y Yield[int]) error {
+func TestGeneratorIterChan(t *testing.T) {
+	pipe := Generate(func(y Yield[int]) error {
 		for i := 0; i < 10; i++ {
 			y.Yield(i)
 		}
@@ -96,8 +96,8 @@ func TestPipeIterChan(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestPipeIterChanAbort(t *testing.T) {
-	pipe := Pipe(func(y Yield[int]) error {
+func TestGeneratorIterChanAbort(t *testing.T) {
+	pipe := Generate(func(y Yield[int]) error {
 		for i := 0; i < 10; i++ {
 			y.Yield(i)
 		}
@@ -120,8 +120,8 @@ func TestPipeIterChanAbort(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestPipeIterMap(t *testing.T) {
-	pipe := Pipe(func(y Yield[int]) error {
+func TestGeneratorIterMap(t *testing.T) {
+	pipe := Generate(func(y Yield[int]) error {
 		for i := 0; i < 10; i++ {
 			y.Yield(i)
 		}
@@ -135,8 +135,8 @@ func TestPipeIterMap(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestPipeIterError(t *testing.T) {
-	pipe := Pipe(func(y Yield[int]) error {
+func TestGeneratorIterError(t *testing.T) {
+	pipe := Generate(func(y Yield[int]) error {
 		for i := 0; i < 10; i++ {
 			y.Yield(i)
 		}
@@ -153,8 +153,8 @@ func TestPipeIterError(t *testing.T) {
 	}
 }
 
-func TestPipeIterPanic(t *testing.T) {
-	pipe := Pipe(func(y Yield[int]) error {
+func TestGeneratorIterPanic(t *testing.T) {
+	pipe := Generate(func(y Yield[int]) error {
 		for i := 0; i < 10; i++ {
 			y.Yield(i)
 		}
@@ -167,6 +167,6 @@ func TestPipeIterPanic(t *testing.T) {
 	}
 	assert.Equal(t, expected, actual)
 	if assert.Error(t, err) {
-		assert.Equal(t, PipePanic{"iterator failed"}, err)
+		assert.Equal(t, GeneratorPanic{"iterator failed"}, err)
 	}
 }
