@@ -43,7 +43,7 @@ func try0Failure() (err error) {
 
 func TestError(t *testing.T) {
 	_, err := readFileTest("nosuchfile")
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, "open nosuchfile: no such file or directory")
 }
 
 func TestWrappedError(t *testing.T) {
