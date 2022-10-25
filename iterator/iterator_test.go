@@ -165,3 +165,19 @@ func TestGeneratorError(t *testing.T) {
 	assert.Equal(t, expected, actual.Get())
 	assert.EqualError(t, actual.GetErr(), "iterator failed")
 }
+
+func TestGeneratorResultError(t *testing.T) {
+	gen := GenerateResults(func(y YieldResult[int]) error {
+		for i := 0; i < 10; i++ {
+			y.Value(i)
+		}
+		return fmt.Errorf("iterator failed")
+	})
+	actual := CollectResults(gen)
+	expected := make([]int, 10)
+	for i := range expected {
+		expected[i] = i
+	}
+	assert.Equal(t, expected, actual.Get())
+	assert.EqualError(t, actual.GetErr(), "iterator failed")
+}

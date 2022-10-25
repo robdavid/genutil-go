@@ -4,6 +4,7 @@ package iterator
 import (
 	"fmt"
 
+	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/robdavid/genutil-go/option"
 )
@@ -67,7 +68,6 @@ type Func[T, U any] struct {
 func (i *Func[T, U]) Next() bool {
 	ok, value := i.mapping(i.base)
 	if !ok {
-		i.value.Clear()
 		return false
 	} else {
 		i.value.Set(value)
@@ -225,13 +225,35 @@ func (y Yield[T]) Yield(t T) {
 	}
 }
 
+type YieldResult[T any] Yield[result.Result[T]]
+
+func (yr *YieldResult[T]) Yield(value result.Result[T]) {
+	(*Yield[result.Result[T]])(yr).Yield(value)
+}
+
+func (yr *YieldResult[T]) Value(value T) {
+	yr.Yield(result.Value(value))
+}
+
+func (yr *YieldResult[T]) Error(err error) {
+	yr.Yield(result.Error[T](err))
+}
+
 // An error type indicating that a Pipe iterator function has panicked
 type GeneratorPanic struct {
-	panic interface{}
+	panic any
 }
 
 func (pp GeneratorPanic) Error() string {
-	return fmt.Sprintf("panic during pipe iterator: %#v", pp.panic)
+	return fmt.Sprintf("panic in generator: %#v", pp.panic)
+}
+
+func (pp GeneratorPanic) Unwrap() error {
+	if err, ok := pp.panic.(error); ok {
+		return err
+	} else {
+		return nil
+	}
 }
 
 // A type alias for a function taking a Yield object and returning
@@ -250,6 +272,21 @@ func runGenerator[T any](y Yield[T], activity GenFunc[T]) {
 	activity(y)
 }
 
+type GenResultFunc[T any] func(YieldResult[T]) error
+
+func runResultGenerator[T any](y YieldResult[T], activity GenResultFunc[T]) {
+	defer safeClose(y.sink)
+	defer func() {
+		if p := recover(); p != nil {
+			if _, abort := p.(AbortGenerator); !abort {
+				y.Error(GeneratorPanic{p})
+			}
+		}
+	}()
+	defer eh.Handle(func(err error) { y.Error(err) })
+	eh.Check(activity(y))
+}
+
 // Create an iterator from a function, passed in activity, that yields a sequence of results
 // by making calls to Yield(), on an object that will be passed to the function.
 // The function is run in a separate goroutine, and its yielded results are sent over a channel
@@ -262,4 +299,11 @@ func Generate[T any](activity GenFunc[T]) Iterator[T] {
 	yield := Yield[T]{ch}
 	go runGenerator(yield, activity)
 	return &GenIter[T]{source: ch}
+}
+
+func GenerateResults[T any](activity GenResultFunc[T]) Iterator[result.Result[T]] {
+	ch := make(chan result.Result[T])
+	yield := YieldResult[T](Yield[result.Result[T]]{ch})
+	go runResultGenerator(yield, activity)
+	return &GenIter[result.Result[T]]{source: ch}
 }
