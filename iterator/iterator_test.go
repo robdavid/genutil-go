@@ -26,6 +26,34 @@ func TestSliceIterChan(t *testing.T) {
 	}
 }
 
+func TestRange(t *testing.T) {
+	r := Range(0, 10)
+	seq := Collect(r)
+	for i, v := range seq {
+		assert.Equal(t, i, v)
+	}
+}
+
+func TestEmptyRange(t *testing.T) {
+	r := Range(10, 9)
+	seq := Collect(r)
+	assert.Empty(t, seq)
+}
+
+func TestEmptyNegativeRange(t *testing.T) {
+	r := RangeBy(0, 10, -1)
+	seq := Collect(r)
+	assert.Empty(t, seq)
+}
+
+func TestRangeBy(t *testing.T) {
+	r := RangeBy(0, 9, 3)
+	seq := Collect(r)
+	for i, v := range seq {
+		assert.Equal(t, i*3, v)
+	}
+}
+
 func TestSliceIterChanAbort(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	iter := Slice(input)
@@ -67,10 +95,7 @@ func TestGenerator(t *testing.T) {
 		}
 	})
 	actual := Collect(gen)
-	expected := make([]int, 10)
-	for i := range expected {
-		expected[i] = i
-	}
+	expected := Collect(Range(0, 10))
 	assert.Equal(t, expected, actual)
 }
 
@@ -81,14 +106,11 @@ func TestGeneratorChan(t *testing.T) {
 		}
 	})
 	actual := make([]int, 10)
-	expected := make([]int, 10)
+	expected := Collect(Range(0, 10))
 	p := 0
 	for i := range gen.Chan() {
 		actual[p] = i
 		p++
-	}
-	for i := range expected {
-		expected[i] = i
 	}
 	assert.Equal(t, expected, actual)
 }
@@ -100,7 +122,7 @@ func TestGeneratorChanAbort(t *testing.T) {
 		}
 	})
 	actual := make([]int, 5)
-	expected := make([]int, 5)
+	expected := Collect(Range(0, 5))
 	p := 0
 	for i := range gen.Chan() {
 		actual[p] = i
@@ -108,9 +130,6 @@ func TestGeneratorChanAbort(t *testing.T) {
 		if p >= len(actual) {
 			gen.Abort()
 		}
-	}
-	for i := range expected {
-		expected[i] = i
 	}
 	assert.Equal(t, expected, actual)
 }
@@ -122,7 +141,7 @@ func TestGeneratorIterAbort(t *testing.T) {
 		}
 	})
 	actual := make([]int, 5)
-	expected := make([]int, 5)
+	expected := Collect(Range(0, 5))
 	p := 0
 	for gen.Next() {
 		actual[p] = gen.Value()
@@ -130,9 +149,6 @@ func TestGeneratorIterAbort(t *testing.T) {
 		if p >= len(actual) {
 			gen.Abort()
 		}
-	}
-	for i := range expected {
-		expected[i] = i
 	}
 	assert.Equal(t, expected, actual)
 }

@@ -94,6 +94,8 @@ func (i *Func[T, U]) Chan() <-chan U {
 	return i.outChan
 }
 
+// Create a new iterator from an existing operator and a function that consumes it, yielding
+// one element at a time.
 func WrapFunc[T any, U any](iterator Iterator[T], f FuncNext[T, U]) Iterator[U] {
 	return &Func[T, U]{base: iterator, mapping: f, value: option.Empty[U]()}
 }
@@ -146,6 +148,48 @@ func Of[T any](elements ...T) Iterator[T] {
 	return &SliceIter[T]{elements, 0, t, nil}
 }
 
+type RangeIter struct {
+	index, to, by, value int
+}
+
+func (ri *RangeIter) Next() bool {
+	if ri.by < 0 {
+		if ri.index <= ri.to {
+			return false
+		}
+	} else if ri.index >= ri.to {
+		return false
+	}
+	ri.value = ri.index
+	ri.index += ri.by
+	return true
+}
+
+func (ri *RangeIter) Value() int {
+	return ri.value
+}
+
+func (ri *RangeIter) Abort() {
+	ri.index = ri.to
+}
+
+func (ri *RangeIter) Chan() <-chan int {
+	return iterChan[int](ri)
+}
+
+// Create an iterator that ranges from `from` up to
+// `upto` exclusive
+func Range(from, upto int) Iterator[int] {
+	return &RangeIter{from, upto, 1, 0}
+}
+
+func RangeBy(from, upto, by int) Iterator[int] {
+	if by == 0 {
+		panic("Illegal range by zero")
+	}
+	return &RangeIter{from, upto, by, 0}
+}
+
 func wrapMap[T any, U any](mapping func(T) U) FuncNext[T, U] {
 	return func(iterator Iterator[T]) (ok bool, value U) {
 		if ok = iterator.Next(); ok {
@@ -159,6 +203,22 @@ func wrapMap[T any, U any](mapping func(T) U) FuncNext[T, U] {
 func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
 	action := wrapMap(func(t T) U { return mapping(t) })
 	return WrapFunc(iter, action)
+}
+
+func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
+	filter := func(i Iterator[T]) (ok bool, value T) {
+		for {
+			if ok = i.Next(); ok {
+				if !predicate(i.Value()) {
+					continue
+				} else {
+					value = i.Value()
+				}
+			}
+			return
+		}
+	}
+	return WrapFunc(iter, filter)
 }
 
 // Collects all elements from an iterator into a slice.
@@ -186,9 +246,16 @@ func CollectResults[T any](iter Iterator[result.Result[T]]) result.Result[[]T] {
 	return result.Value(collectResult)
 }
 
-// func FilterResults[T any](iter Iterator[result.Result[T]]) ([]T,[]error) {
-// 	return WrapFunc[result.Result[T],]()
-// }
+func FilterResults[T any](iter Iterator[result.Result[T]]) (values []T, errs []error) {
+	for iter.Next() {
+		if res := iter.Value(); res.IsError() {
+			errs = append(errs, res.GetErr())
+		} else {
+			values = append(values, res.Must())
+		}
+	}
+	return
+}
 
 // An iterator that obtains values (or an error) from
 // a channel
