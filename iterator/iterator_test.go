@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/stretchr/testify/assert"
 )
@@ -166,10 +167,12 @@ func TestGeneratorError(t *testing.T) {
 	assert.EqualError(t, actual.GetErr(), "iterator failed")
 }
 
+// A result generator will yield an error if the generator
+// function returns an error.
 func TestGeneratorResultError(t *testing.T) {
 	gen := GenerateResults(func(y YieldResult[int]) error {
 		for i := 0; i < 10; i++ {
-			y.Value(i)
+			y.YieldValue(i)
 		}
 		return fmt.Errorf("iterator failed")
 	})
@@ -180,4 +183,30 @@ func TestGeneratorResultError(t *testing.T) {
 	}
 	assert.Equal(t, expected, actual.Get())
 	assert.EqualError(t, actual.GetErr(), "iterator failed")
+}
+
+// It's possible to use Try without a handler in a result iterator;
+// an error result will be automatically yielded and the iterator
+// stopped.
+func TestGeneratorResultTry(t *testing.T) {
+	validate := func(x int) (int, error) {
+		if x == 7 {
+			return 0, fmt.Errorf("I don't like %d", x)
+		} else {
+			return x, nil
+		}
+	}
+	gen := GenerateResults(func(y YieldResult[int]) error {
+		for i := 0; i < 10; i++ {
+			y.YieldValue(eh.Try(validate(i)))
+		}
+		return nil
+	})
+	actual := CollectResults(gen)
+	expected := make([]int, 7)
+	for i := range expected {
+		expected[i] = i
+	}
+	assert.Equal(t, expected, actual.Get())
+	assert.EqualError(t, actual.GetErr(), "I don't like 7")
 }

@@ -186,6 +186,10 @@ func CollectResults[T any](iter Iterator[result.Result[T]]) result.Result[[]T] {
 	return result.Value(collectResult)
 }
 
+// func FilterResults[T any](iter Iterator[result.Result[T]]) ([]T,[]error) {
+// 	return WrapFunc[result.Result[T],]()
+// }
+
 // An iterator that obtains values (or an error) from
 // a channel
 type GenIter[T any] struct {
@@ -231,11 +235,11 @@ func (yr *YieldResult[T]) Yield(value result.Result[T]) {
 	(*Yield[result.Result[T]])(yr).Yield(value)
 }
 
-func (yr *YieldResult[T]) Value(value T) {
+func (yr *YieldResult[T]) YieldValue(value T) {
 	yr.Yield(result.Value(value))
 }
 
-func (yr *YieldResult[T]) Error(err error) {
+func (yr *YieldResult[T]) YieldError(err error) {
 	yr.Yield(result.Error[T](err))
 }
 
@@ -279,11 +283,11 @@ func runResultGenerator[T any](y YieldResult[T], activity GenResultFunc[T]) {
 	defer func() {
 		if p := recover(); p != nil {
 			if _, abort := p.(AbortGenerator); !abort {
-				y.Error(GeneratorPanic{p})
+				y.YieldError(GeneratorPanic{p})
 			}
 		}
 	}()
-	defer eh.Handle(func(err error) { y.Error(err) })
+	defer eh.Handle(func(err error) { y.YieldError(err) })
 	eh.Check(activity(y))
 }
 
