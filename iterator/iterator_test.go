@@ -75,6 +75,13 @@ func TestMapIter(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFilter(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4}
+	actual := Collect(Filter(Slice(input), func(n int) bool { return n&1 == 0 }))
+	assert.Equal(t, expected, actual)
+}
+
 func TestDoMapIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := result.From([]int{2, 4, 6}, fmt.Errorf("Value 4 too large"))
