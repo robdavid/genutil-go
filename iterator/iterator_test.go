@@ -40,6 +40,13 @@ func TestEmptyRange(t *testing.T) {
 	assert.Empty(t, seq)
 }
 
+func TestNegativeRange(t *testing.T) {
+	r := RangeBy(9, -1, -1)
+	seq := Collect(r)
+	expected := []int{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
+	assert.Equal(t, expected, seq)
+}
+
 func TestEmptyNegativeRange(t *testing.T) {
 	r := RangeBy(0, 10, -1)
 	seq := Collect(r)
@@ -84,8 +91,9 @@ func TestFilter(t *testing.T) {
 
 func TestDoMapIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
-	expected := result.From([]int{2, 4, 6}, fmt.Errorf("Value 4 too large"))
-	actual := CollectResults(Map(Slice(input), func(n int) result.Result[int] {
+	expected := []int{2, 4, 6}
+	expectedErr := "Value 4 too large"
+	actual, err := CollectResults(Map(Slice(input), func(n int) result.Result[int] {
 		if n < 4 {
 			return result.Value(n * 2)
 		} else {
@@ -93,6 +101,7 @@ func TestDoMapIter(t *testing.T) {
 		}
 	}))
 	assert.Equal(t, expected, actual)
+	assert.EqualError(t, err, expectedErr)
 }
 
 func TestGenerator(t *testing.T) {
@@ -181,13 +190,13 @@ func TestGeneratorError(t *testing.T) {
 		}
 		y.Yield(result.Error[int](fmt.Errorf("iterator failed")))
 	})
-	actual := CollectResults(gen)
-	expected := make([]int, 10)
+	actual, err := CollectResults(gen)
+	expected := Collect(Range(0, 10))
 	for i := range expected {
 		expected[i] = i
 	}
-	assert.Equal(t, expected, actual.Get())
-	assert.EqualError(t, actual.GetErr(), "iterator failed")
+	assert.Equal(t, expected, actual)
+	assert.EqualError(t, err, "iterator failed")
 }
 
 // A result generator will yield an error if the generator
@@ -199,13 +208,13 @@ func TestGeneratorResultError(t *testing.T) {
 		}
 		return fmt.Errorf("iterator failed")
 	})
-	actual := CollectResults(gen)
+	actual, err := CollectResults(gen)
 	expected := make([]int, 10)
 	for i := range expected {
 		expected[i] = i
 	}
-	assert.Equal(t, expected, actual.Get())
-	assert.EqualError(t, actual.GetErr(), "iterator failed")
+	assert.Equal(t, expected, actual)
+	assert.EqualError(t, err, "iterator failed")
 }
 
 // It's possible to use Try without a handler in a result iterator;
@@ -225,11 +234,47 @@ func TestGeneratorResultTry(t *testing.T) {
 		}
 		return nil
 	})
-	actual := CollectResults(gen)
-	expected := make([]int, 7)
-	for i := range expected {
-		expected[i] = i
+	actual, err := CollectResults(gen)
+	expected := Collect(Range(0, 7))
+	assert.Equal(t, expected, actual)
+	assert.EqualError(t, err, "I don't like 7")
+}
+
+// FilterResults will filter out error results
+// and just return good values
+func TestFilterSuccess(t *testing.T) {
+	validate := func(x int) (int, error) {
+		if x == 7 {
+			return 0, fmt.Errorf("I don't like %d", x)
+		} else {
+			return x, nil
+		}
 	}
-	assert.Equal(t, expected, actual.Get())
-	assert.EqualError(t, actual.GetErr(), "I don't like 7")
+	gen := GenerateResults(func(y YieldResult[int]) error {
+		for i := 0; i < 10; i++ {
+			y.Yield(result.From(validate(i)))
+		}
+		return nil
+	})
+	actual := Collect(FilterResults(gen))
+	expected := []int{0, 1, 2, 3, 4, 5, 6, 8, 9}
+	assert.Equal(t, expected, actual)
+}
+
+// PartitionResults will collect non-error and error results in two separate
+// slices.
+func TestPartitionResults(t *testing.T) {
+	validate := func(x int) (int, error) {
+		if x == 3 || x == 7 {
+			return 0, fmt.Errorf("I don't like %d", x)
+		} else {
+			return x, nil
+		}
+	}
+	gen := Map(Range(0, 10), func(i int) result.Result[int] { return result.From(validate(i)) })
+	actual, errs := PartitionResults(gen)
+	expected := []int{0, 1, 2, 4, 5, 6, 8, 9}
+	expectedErrs := []error{fmt.Errorf("I don't like 3"), fmt.Errorf("I don't like 7")}
+	assert.Equal(t, expected, actual)
+	assert.Equal(t, expectedErrs, errs)
 }
