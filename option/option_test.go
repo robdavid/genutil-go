@@ -61,6 +61,20 @@ func TestEmpty(t *testing.T) {
 	assert.True(t, vm.IsEmpty())
 }
 
+func TestNil(t *testing.T) {
+	var myInt int = 32
+	v := Empty[*int]()
+	assert.True(t, v.IsNil())
+	v = Value[*int](nil)
+	assert.True(t, v.IsNil())
+	v.Set(&myInt)
+	assert.False(t, v.IsNil())
+	v2 := Value(myInt)
+	assert.False(t, v2.IsNil())
+	vList := Value[[]int](nil)
+	assert.True(t, vList.IsNil())
+}
+
 type TestS1 struct {
 	name  string
 	value int

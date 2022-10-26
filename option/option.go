@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 var ErrOptionIsEmpty = errors.New("option is empty")
@@ -38,6 +39,27 @@ func (o *Option[T]) HasValue() bool {
 	return o.nonEmpty
 }
 
+// Returns true if the option is empty or the value
+// held is nil
+func (o *Option[T]) IsNil() bool {
+	if o.nonEmpty {
+		val := reflect.ValueOf(o.value)
+		switch val.Kind() {
+		case reflect.Pointer, reflect.Chan, reflect.Slice, reflect.Map, reflect.Interface, reflect.Func:
+			return val.IsNil()
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// Returns true iff the option is not empty and the contained
+// value is not nil.
+func (o *Option[T]) NonNil() bool {
+	return !o.IsNil()
+}
+
 func (o *Option[T]) GetOrZero() T {
 	return o.value
 }
@@ -60,6 +82,10 @@ func (o *Option[T]) Get() T {
 	} else {
 		return o.value
 	}
+}
+
+func (o Option[T]) ToRef() *Option[T] {
+	return &o
 }
 
 func (o Option[T]) String() string {
