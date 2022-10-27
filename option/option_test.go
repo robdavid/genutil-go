@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 )
@@ -113,6 +114,26 @@ func TestOptionList(t *testing.T) {
 	//assert.True(t, opt.IsEmpty())
 	opt.Set(append(opt.GetOrZero(), 1))
 	assert.Equal(t, []int{1}, opt.Get())
+}
+
+func TestOptionTry(t *testing.T) {
+	var err error
+	defer func() {
+		assert.ErrorIs(t, err, ErrOptionIsEmpty)
+	}()
+	defer eh.Catch(&err)
+	eo := Empty[int]()
+	assert.Equal(t, 0, eo.Try())
+}
+
+func TestOptionPointerTry(t *testing.T) {
+	var err error
+	defer func() {
+		assert.ErrorIs(t, err, ErrOptionIsNil)
+	}()
+	defer eh.Catch(&err)
+	eo := Value[*int](nil)
+	assert.Equal(t, nil, eo.TryNonNil())
 }
 
 type testMarshall struct {
