@@ -175,6 +175,22 @@ func TestJSONMarshallOmitOption(t *testing.T) {
 	}
 }
 
+func TestJSONMarshallOption(t *testing.T) {
+	testData := testMarshall{
+		Name:  "test1",
+		Value: 1,
+		Opt:   Value(testOpt{"Hello", nil}),
+	}
+	y, err := json.Marshal(&testData)
+	if assert.NoError(t, err) {
+		text := string(y)
+		assert.Contains(t, text, "\"opt\":{\"metadata\":\"Hello\"}")
+		var testData2 testMarshall
+		assert.NoError(t, json.Unmarshal(y, &testData2))
+		assert.Equal(t, testData, testData2)
+	}
+}
+
 func TestJSONUnMarshallOmitOption(t *testing.T) {
 	var unmarshalled testOptMarshall
 	var testData = `{ "name": "a name" }`

@@ -49,7 +49,7 @@ func (o *Option[T]) HasValue() bool {
 	return o.nonEmpty
 }
 
-func (o *Option[T]) NilErr() error {
+func (o *Option[T]) nilErr() error {
 	if o.IsEmpty() {
 		return ErrOptionIsEmpty
 	} else if o.IsNil() {
@@ -114,8 +114,14 @@ func (o *Option[T]) Get() T {
 }
 
 // Get the options' value. If the option is empty, this call will panic
-// with a try object that can be caught with Catch or Handle in
+// with a try value that can be caught with Catch or Handle in
 // errors/handler package.
+// e.g.
+//
+//	var err error
+//	defer handler.Catch(&err)
+//	ov := Empty[int]()
+//	v := ov.Try()
 func (o *Option[T]) Try() T {
 	if o.IsEmpty() {
 		eh.Check(ErrOptionIsEmpty)
@@ -123,21 +129,34 @@ func (o *Option[T]) Try() T {
 	return o.value
 }
 
-// Get the value of an option. Panics if the option is empty or nil.
-// Only useful if the type the option value is nillable, such as a pointer
-// interface, or slice. Otherwise, just use Get.
+// Get the value of an option. Panics if the option is empty or nil. Only useful
+// if the type the value held in the option value is nillable, such as a pointer
+// interface, or slice. Otherwise, just use Get().
 func (o *Option[T]) GetNonNil() T {
-	if err := o.NilErr(); err != nil {
+	if err := o.nilErr(); err != nil {
 		panic(err)
 	}
 	return o.value
 }
 
+// Get the value of an option. Panics with a try value if the option is empty or nil,
+// which can be caught with handler.Catch() or handler.Handle().
+// Only useful if the type the value held in the option value is nillable,
+// such as a pointer interface, or slice. Otherwise, just use Try().
+// e.g.
+//
+//	var err error
+//	defer handler.Catch(&err)
+//	eo := Value[*int](nil)
+//	e := eo.TryNonNil()
 func (o *Option[T]) TryNonNil() T {
-	eh.Check(o.NilErr())
+	eh.Check(o.nilErr())
 	return o.value
 }
 
+// Return a value and a boolean flag. The flag will be true if the option non-empty and
+// the value returned is non-nil. Only useful if the type the value held in the option
+// value is nillable, such as a pointer interface, or slice. Otherwise, just use GetOK().
 func (o *Option[T]) GetNonNilOK() (T, bool) {
 	return o.value, !o.IsNil()
 }
@@ -208,11 +227,16 @@ func (o *Option[T]) RefOK() (*T, bool) {
 	}
 }
 
+// Sets the value in the option to a new value. The option will then be
+// non-empty.
 func (o *Option[T]) Set(v T) {
 	o.value = v
 	o.nonEmpty = true
 }
 
+// Sets the value in the option to the value pointed to by the parameter.
+// If this is nil, the option will be set empty. Otherwise it will be
+// non-empty and contain the referenced value.
 func (o *Option[T]) SetRef(v *T) {
 	if v == nil {
 		o.nonEmpty = false
@@ -224,12 +248,17 @@ func (o *Option[T]) SetRef(v *T) {
 	}
 }
 
+// Sets the option empty
 func (o *Option[T]) Clear() {
 	var v T
 	o.value = v
 	o.nonEmpty = false
 }
 
+// If the option is non-empty, apply the supplied function
+// to it's value, and return an option containing the
+// resulting value. Otherwise, return an empty option of the
+// same type.
 func Map[T, U any](o Option[T], f func(T) U) Option[U] {
 	if val, ok := o.GetOK(); !ok {
 		return Empty[U]()
@@ -238,6 +267,9 @@ func Map[T, U any](o Option[T], f func(T) U) Option[U] {
 	}
 }
 
+// A variation on Map() in which the mapping function takes and
+// returns pointers to values. A pointer to the resultant
+// option type is returned.
 func MapRef[T, U any](o *Option[T], f func(*T) *U) *Option[U] {
 	var result Option[U]
 	if r := o.RefOrNil(); r == nil {
@@ -250,10 +282,9 @@ func MapRef[T, U any](o *Option[T], f func(*T) *U) *Option[U] {
 
 // Marshalling / unmarshalling support //
 
-func (o Option[T]) IsZero() bool {
-	return o.IsEmpty()
-}
-
+// JSON marshalling of an option. Empty options are
+// marshalled as "null". Non-empty options are marshalled
+// as their underlying value.
 func (o *Option[T]) MarshalJSON() ([]byte, error) {
 	if o.IsEmpty() {
 		return []byte("null"), nil
@@ -262,6 +293,7 @@ func (o *Option[T]) MarshalJSON() ([]byte, error) {
 	}
 }
 
+// JSON un-marshalling of an option.
 func (o *Option[T]) UnmarshalJSON(j []byte) error {
 	if len(j) == 0 || string(j) == "null" {
 		o.Clear()
@@ -272,6 +304,12 @@ func (o *Option[T]) UnmarshalJSON(j []byte) error {
 		o.nonEmpty = true
 	}
 	return nil
+}
+
+// Returns true if the option is empty. Used by the YAML
+// marshalling/un-marshalling interface.
+func (o Option[T]) IsZero() bool {
+	return o.IsEmpty()
 }
 
 func (o Option[T]) MarshalYAML() (interface{}, error) {
