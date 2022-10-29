@@ -10,7 +10,6 @@ import (
 )
 
 var ErrOptionIsEmpty = errors.New("option is empty")
-var ErrOptionIsNil = errors.New("option is nil")
 
 // A container for a value that might be empty
 type Option[T any] struct {
@@ -21,6 +20,10 @@ type Option[T any] struct {
 // Creates a non-empty option from a value
 func Value[T any](v T) Option[T] {
 	return Option[T]{v, true}
+}
+
+func Safe[T any](v T) Option[T] {
+	return Option[T]{v, !isNil[T](v)}
 }
 
 // Creates an option from a pointer to a value; a nil
@@ -49,36 +52,18 @@ func (o *Option[T]) HasValue() bool {
 	return o.nonEmpty
 }
 
-func (o *Option[T]) nilErr() error {
-	if o.IsEmpty() {
-		return ErrOptionIsEmpty
-	} else if o.IsNil() {
-		return ErrOptionIsNil
-	} else {
-		return nil
+// Returns true if the passed value is nil
+func isNil[T any](value T) bool {
+	typ := reflect.TypeOf(value)
+	if typ == nil { // Returns nil if nil interface
+		return true
 	}
-
-}
-
-// Returns true if the option is empty or the value
-// held is nil
-func (o *Option[T]) IsNil() bool {
-	if o.nonEmpty {
-		val := reflect.ValueOf(o.value)
-		switch val.Kind() {
-		case reflect.Pointer, reflect.Chan, reflect.Slice, reflect.Map, reflect.Interface, reflect.Func:
-			return val.IsNil()
-		default:
-			return false
-		}
+	switch typ.Kind() {
+	case reflect.Pointer, reflect.Chan, reflect.Slice, reflect.Interface, reflect.Map, reflect.Func:
+		return reflect.ValueOf(value).IsNil()
+	default:
+		return false
 	}
-	return true
-}
-
-// Returns true iff the option is not empty and the contained
-// value is not nil.
-func (o *Option[T]) NonNil() bool {
-	return !o.IsNil()
 }
 
 // Either return a value if non-empty, or return the value's
@@ -127,38 +112,6 @@ func (o *Option[T]) Try() T {
 		eh.Check(ErrOptionIsEmpty)
 	}
 	return o.value
-}
-
-// Get the value of an option. Panics if the option is empty or nil. Only useful
-// if the type the value held in the option value is nillable, such as a pointer
-// interface, or slice. Otherwise, just use Get().
-func (o *Option[T]) GetNonNil() T {
-	if err := o.nilErr(); err != nil {
-		panic(err)
-	}
-	return o.value
-}
-
-// Get the value of an option. Panics with a try value if the option is empty or nil,
-// which can be caught with handler.Catch() or handler.Handle().
-// Only useful if the type the value held in the option value is nillable,
-// such as a pointer interface, or slice. Otherwise, just use Try().
-// e.g.
-//
-//	var err error
-//	defer handler.Catch(&err)
-//	eo := Value[*int](nil)
-//	e := eo.TryNonNil()
-func (o *Option[T]) TryNonNil() T {
-	eh.Check(o.nilErr())
-	return o.value
-}
-
-// Return a value and a boolean flag. The flag will be true if the option non-empty and
-// the value returned is non-nil. Only useful if the type the value held in the option
-// value is nillable, such as a pointer interface, or slice. Otherwise, just use GetOK().
-func (o *Option[T]) GetNonNilOK() (T, bool) {
-	return o.value, !o.IsNil()
 }
 
 // Convert an option to a pointer to an option. Sometimes useful for fluent
@@ -232,6 +185,13 @@ func (o *Option[T]) RefOK() (*T, bool) {
 func (o *Option[T]) Set(v T) {
 	o.value = v
 	o.nonEmpty = true
+}
+
+// Sets the value in the option to a new value. If the value of v is nil,
+// the option will be empty. Otherwise it will be non-empty.
+func (o *Option[T]) SafeSet(v T) {
+	o.value = v
+	o.nonEmpty = !isNil(o.value)
 }
 
 // Sets the value in the option to the value pointed to by the parameter.

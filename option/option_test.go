@@ -62,18 +62,49 @@ func TestEmpty(t *testing.T) {
 	assert.True(t, vm.IsEmpty())
 }
 
-func TestNil(t *testing.T) {
+func TestSafe(t *testing.T) {
 	var myInt int = 32
-	v := Empty[*int]()
-	assert.True(t, v.IsNil())
-	v = Value[*int](nil)
-	assert.True(t, v.IsNil())
-	v.Set(&myInt)
-	assert.False(t, v.IsNil())
-	v2 := Value(myInt)
-	assert.False(t, v2.IsNil())
-	vList := Value[[]int](nil)
-	assert.True(t, vList.IsNil())
+	v := Safe[*int](nil)
+	assert.True(t, v.IsEmpty())
+	v = Safe(&myInt)
+	assert.False(t, v.IsEmpty())
+	vList := Safe[[]int](nil)
+	assert.True(t, vList.IsEmpty())
+	vList = Safe([]int{1, 2, 3})
+	assert.False(t, vList.IsEmpty())
+	var interf any = nil
+	v3 := Safe(interf)
+	assert.True(t, v3.IsEmpty())
+	interf = vList
+	v3.SafeSet(interf)
+	assert.False(t, v3.IsEmpty())
+	var stringInt map[string]int
+	v4 := Safe(stringInt)
+	assert.True(t, v4.IsEmpty())
+	interf = stringInt
+	v3 = Safe(interf)
+	assert.True(t, v3.IsEmpty())
+	stringInt = make(map[string]int)
+	v4 = Safe(stringInt)
+	assert.False(t, v4.IsEmpty())
+	var double func(int) int
+	v5 := Safe(double)
+	assert.True(t, v5.IsEmpty())
+	double = func(x int) int { return x * 2 }
+	v5.SafeSet(double)
+	assert.False(t, v5.IsEmpty())
+	var ch chan int
+	v6 := Safe(ch)
+	assert.True(t, v6.IsEmpty())
+	ch = make(chan int)
+	v6.SafeSet(ch)
+	assert.False(t, v6.IsEmpty())
+	var chin chan<- int
+	v7 := Safe(chin)
+	assert.True(t, v7.IsEmpty())
+	chin = ch
+	v7.SafeSet(chin)
+	assert.False(t, v7.IsEmpty())
 }
 
 type TestS1 struct {
@@ -129,11 +160,11 @@ func TestOptionTry(t *testing.T) {
 func TestOptionPointerTry(t *testing.T) {
 	var err error
 	defer func() {
-		assert.ErrorIs(t, err, ErrOptionIsNil)
+		assert.ErrorIs(t, err, ErrOptionIsEmpty)
 	}()
 	defer eh.Catch(&err)
-	eo := Value[*int](nil)
-	assert.Equal(t, nil, eo.TryNonNil())
+	eo := Safe[*int](nil)
+	assert.Equal(t, 0, eo.Try())
 }
 
 type testMarshall struct {
