@@ -278,3 +278,25 @@ func TestPartitionResults(t *testing.T) {
 	assert.Equal(t, expected, actual)
 	assert.Equal(t, expectedErrs, errs)
 }
+
+func TestAll(t *testing.T) {
+	trueInput := []rune("---------")
+	assert.True(t, All(Slice(trueInput), func(r rune) bool {
+		return r == '-'
+	}))
+	falseInput := []rune("-----!----")
+	assert.False(t, All(Slice(falseInput), func(r rune) bool {
+		return r == '-'
+	}))
+}
+
+func TestAny(t *testing.T) {
+	trueInput := []rune("-----!----")
+	assert.True(t, Any(Slice(trueInput), func(r rune) bool {
+		return r == '!'
+	}))
+	falseInput := []rune("---------")
+	assert.False(t, Any(Slice(falseInput), func(r rune) bool {
+		return r == '!'
+	}))
+}

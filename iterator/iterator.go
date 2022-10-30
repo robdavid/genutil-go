@@ -351,6 +351,34 @@ func PartitionResults[T any](iter Iterator[result.Result[T]]) ([]T, []error) {
 	return values, errs
 }
 
+// Returns true if `predicate` returns true for every value returned
+// by the iterator. This function short circuits and does not
+// execute in constant time; the iterator is aborted after the
+// first value for which the predicate returns false.
+func All[T any](iter Iterator[T], predicate func(v T) bool) bool {
+	for iter.Next() {
+		if !predicate(iter.Value()) {
+			iter.Abort()
+			return false
+		}
+	}
+	return true
+}
+
+// Returns true if `predicate` returns true for any value returned
+// by the iterator. This function short circuits and does not
+// execute in constant time; the iterator is aborted after the
+// first value for which the predicate returns true.
+func Any[T any](iter Iterator[T], predicate func(v T) bool) bool {
+	for iter.Next() {
+		if predicate(iter.Value()) {
+			iter.Abort()
+			return true
+		}
+	}
+	return false
+}
+
 // An iterator that obtains values (or an error) from
 // a channel
 type GenIter[T any] struct {
