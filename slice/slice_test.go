@@ -59,6 +59,14 @@ func TestFind(t *testing.T) {
 	assert.False(t, Contains(inputNF, '!'))
 }
 
+func TestFindFrom(t *testing.T) {
+	input := []rune("!----!---!-")
+	assert.Equal(t, 0, FindFrom(0, input, '!'))
+	assert.Equal(t, 5, FindFrom(1, input, '!'))
+	assert.Equal(t, 9, FindFrom(9, input, '!'))
+	assert.Equal(t, -1, FindFrom(10, input, '!'))
+}
+
 func TestRFind(t *testing.T) {
 	input := []rune("-----!---!-")
 	assert.Equal(t, 9, RFind(input, '!'))
