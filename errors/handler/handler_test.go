@@ -115,22 +115,22 @@ func recurseErrorCatch(depth int) (err error) {
 
 func recurseErrorReturn(depth int) (err error) {
 	if depth > 0 {
-		return recurseErrorCatch(depth - 1)
+		return recurseErrorReturn(depth - 1)
 	} else {
 		return fmt.Errorf("Hit bottom")
 	}
 }
 
-func TestRewindTime(t *testing.T) {
-	for i := 0; i < 300; i++ {
-		err := recurseErrorCatch(10000)
-		assert.EqualError(t, err, "Hit bottom")
+func BenchmarkRewindTime(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		recurseErrorCatch(1000)
+		//assert.EqualError(b, err, "Hit bottom")
 	}
 }
 
-func TestReturnTime(t *testing.T) {
-	for i := 0; i < 300; i++ {
-		err := recurseErrorReturn(10000)
-		assert.EqualError(t, err, "Hit bottom")
+func BenchmarkReturnTime(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		recurseErrorReturn(1000)
+		//assert.EqualError(b, err, "Hit bottom")
 	}
 }

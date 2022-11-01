@@ -96,3 +96,23 @@ func TestErrorResult2(t *testing.T) {
 	assert.True(t, b == 123, "got value %d", b)
 	assert.EqualError(t, e, "This raises an error")
 }
+
+type LargeData struct {
+	Data [1000000]int
+}
+
+var largeResult = Value(LargeData{})
+
+func BenchmarkLargeDataTest(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		if largeResult.IsError() {
+			b.Fatal(largeResult.GetErr())
+		}
+	}
+}
+
+func BenchmarkLargeDataGet(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		assert.Equal(b, 0, largeResult.Get().Data[0])
+	}
+}
