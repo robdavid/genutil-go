@@ -78,8 +78,8 @@ func FindUsing[T any](slice []T, predicate func(T) bool) int {
 // or -1 if none do.
 // This is a variation on FindUsing where the element is passed to the predicate
 // by reference.
-func FindUsingRef[T any](slice []T, predicate func(T) bool) int {
-	return FindFromUsing(0, slice, predicate)
+func FindUsingRef[T any](slice []T, predicate func(*T) bool) int {
+	return FindFromUsingRef(0, slice, predicate)
 }
 
 // Returns the first index in slice greater than or equal to start,
@@ -150,7 +150,7 @@ func RFindFromUsingRef[T any](start int, slice []T, predicate func(*T) bool) int
 // Returns the largest index in slice for which the element satisfies predicate,
 // or -1 if none do.
 func RFindUsing[T any](slice []T, predicate func(T) bool) int {
-	return RFindFromUsing(0, slice, predicate)
+	return RFindFromUsing(len(slice)-1, slice, predicate)
 }
 
 // Returns the largest index in slice for which the element satisfies predicate,
@@ -158,5 +158,5 @@ func RFindUsing[T any](slice []T, predicate func(T) bool) int {
 // This is a variation of RFindUsing where each element value is passed to the
 // predicate by reference.
 func RFindUsingRef[T any](slice []T, predicate func(*T) bool) int {
-	return RFindFromUsingRef(0, slice, predicate)
+	return RFindFromUsingRef(len(slice)-1, slice, predicate)
 }

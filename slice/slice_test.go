@@ -73,3 +73,13 @@ func TestRFind(t *testing.T) {
 	inputNF := []rune("----------")
 	assert.Equal(t, -1, RFind(inputNF, '!'))
 }
+
+func TestRFindUsing(t *testing.T) {
+	input := []rune("-----!---!-")
+	assert.Equal(t, 9, RFindUsing(input, func(r rune) bool { return r != '-' }))
+}
+
+func TestRFindUsingRef(t *testing.T) {
+	input := []rune("-----!---!-")
+	assert.Equal(t, 9, RFindUsingRef(input, func(r *rune) bool { return *r != '-' }))
+}
