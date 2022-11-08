@@ -1,4 +1,4 @@
-package function
+package functions
 
 // Identity function - returns the value passed
 func Id[T any](v T) T {

@@ -70,9 +70,10 @@ func Try3[A any, B any, C any](a A, b B, c C, err error) (A, B, C) {
 // A function that will recover a panic created by Try. This
 // should be called in a defer statement prior to calls to Try.
 // The parameter should be a pointer to the calling function's
-// error value the will be set to the error passwd into the
-// Try function.
-// e.g..
+// error return value which will be set to the error intercepted by
+// Try.
+//
+// e.g.
 //
 //	  func readFileTest(fname string) (content []byte, err error) {
 //		   defer Catch(&err)

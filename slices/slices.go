@@ -1,4 +1,4 @@
-package slice
+package slices
 
 // Returns true if predicate returns true for all elements in
 // slice.
