@@ -113,6 +113,19 @@ func recurseErrorCatch(depth int) (err error) {
 	return
 }
 
+func recurseErrorCatchOnce(depth int, maxDepth int) (err error) {
+	if depth == 0 {
+		defer Catch(&err)
+	}
+	if depth < maxDepth {
+		err = recurseErrorCatchOnce(depth+1, maxDepth)
+	} else {
+		err = fmt.Errorf("Hit bottom")
+		Check(err)
+	}
+	return
+}
+
 func recurseErrorReturn(depth int) (err error) {
 	if depth > 0 {
 		return recurseErrorReturn(depth - 1)
@@ -124,6 +137,13 @@ func recurseErrorReturn(depth int) (err error) {
 func BenchmarkRewindTime(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		recurseErrorCatch(1000)
+		//assert.EqualError(b, err, "Hit bottom")
+	}
+}
+
+func BenchmarkCatchOnce(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		recurseErrorCatchOnce(0, 1000)
 		//assert.EqualError(b, err, "Hit bottom")
 	}
 }
