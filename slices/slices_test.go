@@ -83,3 +83,10 @@ func TestRFindUsingRef(t *testing.T) {
 	input := []rune("-----!---!-")
 	assert.Equal(t, 9, RFindUsingRef(input, func(r *rune) bool { return *r != '-' }))
 }
+
+func TestMap(t *testing.T) {
+	sliceIn := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	actual := Map(sliceIn, func(x int) int { return x * 2 })
+	assert.Equal(t, expected, actual)
+}

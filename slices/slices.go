@@ -160,3 +160,13 @@ func RFindUsing[T any](slice []T, predicate func(T) bool) int {
 func RFindUsingRef[T any](slice []T, predicate func(*T) bool) int {
 	return RFindFromUsingRef(len(slice)-1, slice, predicate)
 }
+
+// Generates sliceOut from sliceIn, by applying function f to each element of
+// sliceIn.
+func Map[T any, U any](sliceIn []T, f func(T) U) (sliceOut []U) {
+	sliceOut = make([]U, len(sliceIn))
+	for i := range sliceIn {
+		sliceOut[i] = f(sliceIn[i])
+	}
+	return
+}
