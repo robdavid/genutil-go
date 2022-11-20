@@ -90,3 +90,10 @@ func TestMap(t *testing.T) {
 	actual := Map(sliceIn, func(x int) int { return x * 2 })
 	assert.Equal(t, expected, actual)
 }
+
+func TestMapRef(t *testing.T) {
+	sliceIn := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	actual := MapRef(sliceIn, func(x *int) int { return *x * 2 })
+	assert.Equal(t, expected, actual)
+}

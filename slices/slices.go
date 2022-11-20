@@ -170,3 +170,13 @@ func Map[T any, U any](sliceIn []T, f func(T) U) (sliceOut []U) {
 	}
 	return
 }
+
+// Generates sliceOut from sliceIn, by applying function f to
+// the address of each element of sliceIn.
+func MapRef[T any, U any](sliceIn []T, f func(*T) U) (sliceOut []U) {
+	sliceOut = make([]U, len(sliceIn))
+	for i := range sliceIn {
+		sliceOut[i] = f(&sliceIn[i])
+	}
+	return
+}
