@@ -1,13 +1,21 @@
 package tuple
 
-import "fmt"
+import (
+	"fmt"
+)
+
+type Tuple interface {
+	Slice() []any
+	RefSlice() []*any
+	Size() int
+}
 
 type Tuple2[A any, B any] struct {
 	First  A
 	Second B
 }
 
-func NewTuple2[A any, B any](a A, b B) Tuple2[A, B] {
+func Of2[A any, B any](a A, b B) Tuple2[A, B] {
 	return Tuple2[A, B]{a, b}
 }
 
@@ -30,6 +38,10 @@ func (t2 *Tuple2[A, B]) RefSlice() []any {
 type Tuple3[A any, B any, C any] struct {
 	Tuple2[A, B]
 	Third C
+}
+
+func Of3[A any, B any, C any](a A, b B, c C) Tuple3[A, B, C] {
+	return Tuple3[A, B, C]{Of2(a, b), c}
 }
 
 func (t3 *Tuple3[A, B, C]) String() string {
