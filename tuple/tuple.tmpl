@@ -1,0 +1,41 @@
+package tuple
+
+{{ define "typeConstraints" -}}
+{{ range seq 1 .}}{{if gt . 1}}, {{end}}T{{.}} any{{end -}}
+{{ end -}}
+
+{{ define "typeParams" -}}
+{{ range seq 1 .}}{{if gt . 1}}, {{end}}T{{.}}{{end -}}
+{{ end -}}
+
+{{ define "parameters" -}}
+{{ range seq 1 .}}{{if gt . 1}}, {{end}}t{{.}} T{{.}}{{end -}}
+{{ end -}}
+
+{{ define "arguments" -}}
+{{ range seq 1 .}}{{if gt . 1}}, {{end}}t{{.}}{{end -}}
+{{ end -}}
+
+{{ $fields := list "First" "Second" "Third" "Forth" "Fifth" -}}
+{{ range $i,$n := seq 1 (len $fields) -}}
+{{ $p := int (sub $n 1) -}}
+{{ $typeConstraints := include "typeConstraints" $n -}}
+{{ $typeParams := include "typeParams" $n -}}
+{{ $prevTypeParams := include "typeParams" $p -}}
+
+type Tuple{{$n}}[{{$typeConstraints}}] struct {
+	Tuple{{$p}}{{if gt $n 1}}[{{$prevTypeParams}}]{{end}}
+	{{index $fields (sub $n 1)}} T{{$n}}
+}
+
+func Of{{$n}}[{{$typeConstraints}}]({{include "parameters" $n}}) Tuple{{$n}}[{{$typeParams}}] {
+	return Tuple{{$n}}[{{$typeParams}}]{Of{{$p}}({{include "arguments" $p}}), t{{$n}}}
+}
+
+func (*Tuple{{$n}}[{{$typeParams}}]) Size() int         { return {{$n}} }
+func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Pre() Tuple     { return &t{{$n}}.Tuple{{$p}} }
+func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Last() any      { return t{{$n}}.{{ index $fields (sub $n 1) }} }
+func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Get(n int) any  { return tupleGet(t{{$n}}, n) }
+func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) String() string { return tupleString(t{{$n}}) }
+
+{{ end -}}
