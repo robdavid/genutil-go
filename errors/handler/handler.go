@@ -51,21 +51,7 @@ func Try0(err error) {
 // An alias for Try0
 func Check(err error) { Try0(err) }
 
-// Two non-error argument variant of Try()
-func Try2[A any, B any](a A, b B, err error) (A, B) {
-	if err != nil {
-		panic(tryError{err})
-	}
-	return a, b
-}
-
-// Three non-error argument variant of Try()
-func Try3[A any, B any, C any](a A, b B, c C, err error) (A, B, C) {
-	if err != nil {
-		panic(tryError{err})
-	}
-	return a, b, c
-}
+//go:generate code-template --set max=9 try.tmpl
 
 // A function that will recover a panic created by Try. This
 // should be called in a defer statement prior to calls to Try.
