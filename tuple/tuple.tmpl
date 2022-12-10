@@ -1,35 +1,22 @@
 package tuple
 
-{{ define "typeConstraints" -}}
-{{ range seq 1 .}}{{if gt . 1}}, {{end}}T{{.}} any{{end -}}
-{{ end -}}
-
-{{ define "typeParams" -}}
-{{ range seq 1 .}}{{if gt . 1}}, {{end}}T{{.}}{{end -}}
-{{ end -}}
-
-{{ define "parameters" -}}
-{{ range seq 1 .}}{{if gt . 1}}, {{end}}t{{.}} T{{.}}{{end -}}
-{{ end -}}
-
-{{ define "arguments" -}}
-{{ range seq 1 .}}{{if gt . 1}}, {{end}}t{{.}}{{end -}}
-{{ end -}}
-
-{{ $fields := list "First" "Second" "Third" "Forth" "Fifth" -}}
+{{ $fields := list "First" "Second" "Third" "Forth" "Fifth" "Sixth" "Seventh" "Eighth" "Ninth" -}}
 {{ range $i,$n := seq 1 (len $fields) -}}
 {{ $p := int (sub $n 1) -}}
-{{ $typeConstraints := include "typeConstraints" $n -}}
-{{ $typeParams := include "typeParams" $n -}}
-{{ $prevTypeParams := include "typeParams" $p -}}
+{{ $typeConstraints := mapTpl "T{{.}} any" (seq 1 $n) | join ", " -}}
+{{ $typeParams := mapTpl "T{{.}}" (seq 1 $n) | join ", " -}}
+{{ $prevTypeParams := mapTpl "T{{.}}" (seq 1 $p) | join ", " -}}
+{{ $parameters := mapTpl "t{{.}} T{{.}}" (seq 1 $n) | join ", " -}}
+{{ $arguments := mapTpl "t{{.}}" (seq 1 $p) | join ", " -}}
 
+// Tuple of {{$n}} fields
 type Tuple{{$n}}[{{$typeConstraints}}] struct {
 	Tuple{{$p}}{{if gt $n 1}}[{{$prevTypeParams}}]{{end}}
 	{{index $fields (sub $n 1)}} T{{$n}}
 }
 
-func Of{{$n}}[{{$typeConstraints}}]({{include "parameters" $n}}) Tuple{{$n}}[{{$typeParams}}] {
-	return Tuple{{$n}}[{{$typeParams}}]{Of{{$p}}({{include "arguments" $p}}), t{{$n}}}
+func Of{{$n}}[{{$typeConstraints}}]({{$parameters}}) Tuple{{$n}}[{{$typeParams}}] {
+	return Tuple{{$n}}[{{$typeParams}}]{Of{{$p}}({{$arguments}}), t{{$n}}}
 }
 
 func (*Tuple{{$n}}[{{$typeParams}}]) Size() int         { return {{$n}} }

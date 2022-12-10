@@ -51,7 +51,7 @@ func Try0(err error) {
 // An alias for Try0
 func Check(err error) { Try0(err) }
 
-//go:generate code-template --set max=9 try.tmpl
+//go:generate code-template --set max_params=9 try.tmpl
 
 // A function that will recover a panic created by Try. This
 // should be called in a defer statement prior to calls to Try.

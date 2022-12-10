@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/robdavid/genutil-go/errors/handler"
-	"github.com/robdavid/genutil-go/tuple"
 )
 
 //import "github.com"
@@ -97,34 +96,7 @@ func (r *Result[T]) String() string {
 	}
 }
 
-// Arity 2 result values
-type Result2[A any, B any] struct{ Result[tuple.Tuple2[A, B]] }
-
-func Value2[A any, B any](v tuple.Tuple2[A, B]) Result2[A, B] {
-	return Result2[A, B]{Value(v)}
-}
-
-func Error2[A any, B any](err error) Result2[A, B] {
-	var zero tuple.Tuple2[A, B]
-	return Result2[A, B]{From(zero, err)}
-}
-
-func From2[A any, B any](a A, b B, err error) Result2[A, B] {
-	return Result2[A, B]{From(tuple.Pair(a, b), err)}
-}
-
-func New2[A any, B any](a A, b B, err error) *Result2[A, B] {
-	r := From2(a, b, err)
-	return &r
-}
-
-func (r *Result2[A, B]) Return() (A, B, error) {
-	return r.value.First, r.value.Second, r.err
-}
-
-func (r Result2[A, B]) ToRef() *Result2[A, B] {
-	return &r
-}
+//go:generate code-template --set max_params=9 result.tmpl
 
 // Apply a map function `f` to the value part of a result `r`.
 // If `r` is an error return an error result, with a zero value.

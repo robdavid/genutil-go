@@ -1,13 +1,12 @@
 package handler
 
-{{ range $n := seq 2 (int .max) -}}
-{{ $seq := seq 1 $n -}}
-// Variant of try with {{$n}} non-error arguments
-func Try{{$n}}[{{ tplMap "T{{.}} any" $seq | join ", "}}]({{ tplMap "p{{.}} T{{.}}" $seq | join ", "}}, err error) ({{ tplMap "T{{.}}" $seq | join ", "}}) {
+{{ range $params := seq 2 .max_params -}}
+{{ $seq := seq 1 $params -}}
+// Variant of try with {{$params}} non-error arguments
+func Try{{$params}}[{{ mapTpl "T{{.}} any" $seq | join ", "}}]({{ mapTpl "p{{.}} T{{.}}" $seq | join ", "}}, err error) ({{ mapTpl "T{{.}}" $seq | join ", "}}) {
 	if err != nil {
 		panic(tryError{err})
 	}
-	return {{ tplMap "p{{.}}" $seq | join ", "}}
+	return {{ mapTpl "p{{.}}" $seq | join ", "}}
 }
-
 {{ end }}

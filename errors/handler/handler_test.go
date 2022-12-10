@@ -41,6 +41,10 @@ func try0Failure() (err error) {
 	return
 }
 
+func try9Success() (p1, p2, p3, p4, p5, p6, p7, p8, p9 int, err error) {
+	return 1, 2, 3, 4, 5, 6, 7, 8, 9, nil
+}
+
 func TestError(t *testing.T) {
 	_, err := readFileTest("nosuchfile")
 	switch runtime.GOOS {
@@ -74,6 +78,19 @@ func TestSuccess(t *testing.T) {
 func TestTry0Error(t *testing.T) {
 	err := try0Failure()
 	assert.EqualError(t, err, "simple error")
+}
+
+func TestTry9Error(t *testing.T) {
+	p1, p2, p3, p4, p5, p6, p7, p8, p9 := Try9(try9Success())
+	assert.Equal(t, 1, p1)
+	assert.Equal(t, 2, p2)
+	assert.Equal(t, 3, p3)
+	assert.Equal(t, 4, p4)
+	assert.Equal(t, 5, p5)
+	assert.Equal(t, 6, p6)
+	assert.Equal(t, 7, p7)
+	assert.Equal(t, 8, p8)
+	assert.Equal(t, 9, p9)
 }
 
 // Check that a panic raised in a function that defers to Catch
