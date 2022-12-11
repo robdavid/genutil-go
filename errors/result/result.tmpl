@@ -8,31 +8,45 @@ import "github.com/robdavid/genutil-go/tuple"
 {{ $arguments := mapTpl "t{{.}}" (seq 1 $params) | join ", " -}}
 {{ $tupleFields := list "First" "Second" "Third" "Forth" "Fifth" "Sixth" "Seventh" "Eighth" "Ninth" -}}
 
-// Arity {{$params}} result values
-type Result{{$params}}[{{$typeConstraints}}] struct{ Result[tuple.Tuple{{$params}}[{{$typeParams}}]] }
+// A wrapper around Result that contains a Tuple{{$params}} value.
+type Result{{$params}}[{{$typeConstraints}}] struct{ 
+	Result[tuple.Tuple{{$params}}[{{$typeParams}}]] 
+}
 
+// A non-error constructor that builds a Result{{$params}} value from 
+// {{$params}} parameters.
 func Value{{$params}}[{{$typeConstraints}}](v tuple.Tuple{{$params}}[{{$typeParams}}]) Result{{$params}}[{{$typeParams}}] {
 	return Result{{$params}}[{{$typeParams}}]{Value(v)}
 }
 
+// A non-error constructor that builds a Result{{$params}} value from 
+// an error parameter
 func Error{{$params}}[{{$typeConstraints}}](err error) Result{{$params}}[{{$typeParams}}] {
 	var zero tuple.Tuple{{$params}}[{{$typeParams}}]
 	return Result{{$params}}[{{$typeParams}}]{From(zero, err)}
 }
 
+// A constructor that builds a Result{{$params}} from {{$params}} parameters and an error value.
+// Can be used to create a Result{{$params}} from a function that returns {{$params}} values
+// and an error, as in:
+//
+//   result.From{{$params}}(functionReturning{{$params}}ParamsAndError())
 func From{{$params}}[{{$typeConstraints}}]({{$parameters}}, err error) Result{{$params}}[{{$typeParams}}] {
 	return Result{{$params}}[{{$typeParams}}]{From(tuple.Of{{$params}}({{$arguments}}), err)}
 }
 
+// Like From{{$params}} except that a reference to the constructed Result{{$params}} is returned
 func New{{$params}}[{{$typeConstraints}}]({{$parameters}}, err error) *Result{{$params}}[{{$typeParams}}] {
 	r := From{{$params}}({{$arguments}}, err)
 	return &r
 }
 
+// Returns the {{$params}} values and error held in the result.
 func (r *Result{{$params}}[{{$typeParams}}]) Return() ({{$typeParams}}, error) {
 	return {{mapTpl "r.value.{{.}}" (slice $tupleFields 0 $params) | join ", "}}, r.err
 }
 
+// Returns a reference to the Result{{$params}} 
 func (r Result{{$params}}[{{$typeParams}}]) ToRef() *Result{{$params}}[{{$typeParams}}] {
 	return &r
 }

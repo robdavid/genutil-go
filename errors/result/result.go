@@ -76,14 +76,18 @@ func (r *Result[T]) MapErr(f func(error) error) *Result[T] {
 	}
 }
 
+// Returns true if the Result holds an error
 func (r *Result[T]) IsError() bool {
 	return r.err != nil
 }
 
+// Returns true if the Result contains no error
 func (r *Result[T]) IsValue() bool {
 	return r.err == nil
 }
 
+// Renders either the value or the error in the case that the
+// Result contains an error.
 func (r *Result[T]) String() string {
 	if r.IsError() {
 		return r.err.Error()

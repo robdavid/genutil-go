@@ -75,6 +75,8 @@ func TestGoodResult2(t *testing.T) {
 	assert.True(t, res.Get().Second == 123, "got value %d", res.Get().Second)
 	assert.True(t, res.Must().First == "testValue", "got value %s", res.Get().First)
 	assert.True(t, res.Must().Second == 123, "got value %d", res.Get().Second)
+	assert.True(t, res.Try().First == "testValue", "got value %s", res.Get().First)
+	assert.True(t, res.Try().Second == 123, "got value %d", res.Get().Second)
 	assert.NoError(t, res.GetErr())
 	a, b, e := returnResult2(&res)
 	assert.True(t, a == "testValue", "got value %s", a)
@@ -95,6 +97,18 @@ func TestErrorResult2(t *testing.T) {
 	assert.True(t, a == "testValue", "got value %s", a)
 	assert.True(t, b == 123, "got value %d", b)
 	assert.EqualError(t, e, "This raises an error")
+}
+
+func TestFromResult3(t *testing.T) {
+	res := From3("one", 2, 3.4, nil)
+	assert.False(t, res.IsError())
+	assert.Equal(t, "one", res.Must().First)
+}
+
+func TestNewResult3(t *testing.T) {
+	res := New3("one", 2, 3.4, nil)
+	assert.False(t, res.IsError())
+	assert.Equal(t, "one", res.Must().First)
 }
 
 type LargeData struct {
