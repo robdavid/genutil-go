@@ -35,12 +35,15 @@ func From[T any](t T, err error) Result[T] {
 	return Result[T]{t, err}
 }
 
+// Like From, except returns a reference to the resulting
+// Result value.
 func New[T any](t T, err error) *Result[T] {
 	return &Result[T]{t, err}
 }
 
-func (r Result[T]) ToRef() *Result[T] {
-	return &r
+// Returns a reference to the give result object
+func (r *Result[T]) ToRef() *Result[T] {
+	return r
 }
 
 // Returns a result as a pair of values, suitable to be
@@ -49,18 +52,25 @@ func (r *Result[T]) Return() (T, error) {
 	return r.value, r.err
 }
 
+// Returns the associated error, or nil if there is no error
 func (r *Result[T]) GetErr() error {
 	return r.err
 }
 
+// Returns the underlying value. Does not panic.
 func (r *Result[T]) Get() T {
 	return r.value
 }
 
+// Returns the underlying value, or panics if the error is
+// non-nil
 func (r *Result[T]) Must() T {
 	return handler.Must(r.value, r.err)
 }
 
+// Returns the underlying value, or panics with a try value
+// if the error is. This can be handled by the Catch or Handle
+// functions in the handler package
 func (r *Result[T]) Try() T {
 	return handler.Try(r.value, r.err)
 }

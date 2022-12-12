@@ -1,3 +1,4 @@
+// Genric tuples, of size 0 to 9.
 package tuple
 
 import (
