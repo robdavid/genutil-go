@@ -1,0 +1,26 @@
+package test
+
+import (
+	"testing"
+
+	"github.com/robdavid/genutil-go/tuple"
+)
+
+{{ range $i,$n := seq 2 9 -}}
+{{ $typeConstraints := mapTpl "T{{.}} any" (seq 1 $n) | join  ", " -}}
+{{ $typeParameters := mapTpl "T{{.}}" (seq 1 $n) | join ", " -}}
+{{ $parameters := mapTpl "v{{.}} T{{.}}" (seq 1 $n) | join ", " -}}
+{{ $arguments := mapTpl "v{{.}}" (seq 1 $n) | join ", " -}}
+type TestableResult{{$n}}[{{$typeConstraints}}] struct {
+	TestableResult[tuple.Tuple{{$n}}[{{$typeParameters}}]]
+}
+
+func Result{{$n}}[{{$typeConstraints}}]({{$parameters}}, err error) *TestableResult{{$n}}[{{$typeParameters}}] {
+	return &TestableResult{{$n}}[{{$typeParameters}}]{resultFrom(tuple.Of{{$n}}({{$arguments}}), err)}
+}
+
+func (r *TestableResult{{$n}}[{{$typeParameters}}]) Must(t *testing.T) ({{$typeParameters}}) {
+	v := r.TestableResult.Must(t)
+	return v.Return()
+}
+{{ end -}}

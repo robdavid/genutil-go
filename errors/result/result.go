@@ -41,7 +41,7 @@ func New[T any](t T, err error) *Result[T] {
 	return &Result[T]{t, err}
 }
 
-// Returns a reference to the give result object
+// Returns a reference to the given result object
 func (r *Result[T]) ToRef() *Result[T] {
 	return r
 }

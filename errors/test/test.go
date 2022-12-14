@@ -33,3 +33,5 @@ func (r *TestableResult[T]) Must(t *testing.T) T {
 	}
 	return r.Get()
 }
+
+//go:generate code-template test.tmpl
