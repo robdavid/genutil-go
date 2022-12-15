@@ -1,8 +1,6 @@
 package test
 
 import (
-	"testing"
-
 	"github.com/robdavid/genutil-go/tuple"
 )
 
@@ -19,8 +17,14 @@ func Result{{$n}}[{{$typeConstraints}}]({{$parameters}}, err error) *TestableRes
 	return &TestableResult{{$n}}[{{$typeParameters}}]{resultFrom(tuple.Of{{$n}}({{$arguments}}), err)}
 }
 
-func (r *TestableResult{{$n}}[{{$typeParameters}}]) Must(t *testing.T) ({{$typeParameters}}) {
-	v := r.TestableResult.Must(t)
+func (r *TestableResult{{$n}}[{{$typeParameters}}]) Must{{$n}}(t TestReporting) ({{$typeParameters}}) {
+	v := r.Must(t)
 	return v.Return()
 }
+
+func (r *TestableResult{{$n}}[{{$typeParameters}}]) Try{{$n}}() ({{$typeParameters}}) {
+	v := r.Try()
+	return v.Return()
+}
+
 {{ end -}}

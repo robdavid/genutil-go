@@ -7,6 +7,8 @@
 //	import . "github.com/robdavid/genutil-go/errors/handler"
 package handler
 
+import "fmt"
+
 // Removes the error value from a return value.
 // Panics if err is non-nil, otherwise returns the value
 // e.g.
@@ -19,13 +21,20 @@ func Must[T any](t T, err error) T {
 	return t
 }
 
-type tryError struct {
-	err error
+// Simple error wrapper. Try will panic with a value of this type
+// when it encounters an error.
+type TryError struct {
+	Error error
+}
+
+// Display a messaging including the underlying error
+func (te TryError) String() string {
+	return fmt.Sprintf("uncaught error: %s", te.Error.Error())
 }
 
 // Removes the error component of a function's return value. If there is
 // no error, the non-error value is returned. Otherwise
-// the function panics with a value wrapping the error.
+// the function panics with a TryError wrapping the error.
 // The error can be recovered and returned by your function in conjunction
 // with defer and the Catch or Handle functions.
 // e.g.
@@ -33,7 +42,7 @@ type tryError struct {
 //	f := Try(os.Open("myfile"))
 func Try[T any](t T, err error) T {
 	if err != nil {
-		panic(tryError{err})
+		panic(TryError{err})
 	}
 	return t
 }
@@ -41,10 +50,10 @@ func Try[T any](t T, err error) T {
 // An alias for Try
 func Try1[T any](t T, err error) T { return Try(t, err) }
 
-// Zero argument variant of Try
+// Zero argument variant of Try (for functions that return an error value only)
 func Try0(err error) {
 	if err != nil {
-		panic(tryError{err})
+		panic(TryError{err})
 	}
 }
 
@@ -70,8 +79,8 @@ func Check(err error) { Try0(err) }
 //	  }
 func Catch(retErr *error) {
 	if err := recover(); err != nil {
-		if tryErr, ok := err.(tryError); ok {
-			*retErr = tryErr.err
+		if tryErr, ok := err.(TryError); ok {
+			*retErr = tryErr.Error
 		} else {
 			panic(err)
 		}
@@ -94,8 +103,8 @@ func Catch(retErr *error) {
 //	  }
 func Handle(handler func(err error)) {
 	if err := recover(); err != nil {
-		if tryErr, ok := err.(tryError); ok {
-			handler(tryErr.err)
+		if tryErr, ok := err.(TryError); ok {
+			handler(tryErr.Error)
 		} else {
 			panic(err)
 		}

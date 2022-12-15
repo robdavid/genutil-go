@@ -46,6 +46,20 @@ func (r *Result{{$params}}[{{$typeParams}}]) Return() ({{$typeParams}}, error) {
 	return {{mapTpl "r.value.{{.}}" (slice $tupleFields 0 $params) | join ", "}}, r.err
 }
 
+// Returns the underlying tuple value as a sequence of {{$params}} elements.
+// Panics with a try error if the result has an error
+func (r *Result{{$params}}[{{$typeParams}}]) Try{{$params}}() ({{$typeParams}}) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of {{$params}} elements.
+// Panics if the result has an error
+func (r *Result{{$params}}[{{$typeParams}}]) Must{{$params}}() ({{$typeParams}}) {
+	v := r.Must()
+	return v.Return()
+}
+
 // Returns a reference to the Result{{$params}} 
 func (r Result{{$params}}[{{$typeParams}}]) ToRef() *Result{{$params}}[{{$typeParams}}] {
 	return &r

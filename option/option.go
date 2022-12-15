@@ -22,8 +22,10 @@ func Value[T any](v T) Option[T] {
 	return Option[T]{v, true}
 }
 
+// Creates an option from a nilable value,
+// which will be empty of the value is nil.
 func Safe[T any](v T) Option[T] {
-	return Option[T]{v, !isNil[T](v)}
+	return Option[T]{v, !isNil(v)}
 }
 
 // Creates an option from a pointer to a value; a nil

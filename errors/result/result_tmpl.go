@@ -40,6 +40,20 @@ func (r *Result2[T1, T2]) Return() (T1, T2, error) {
 	return r.value.First, r.value.Second, r.err
 }
 
+// Returns the underlying tuple value as a sequence of 2 elements.
+// Panics with a try error if the result has an error
+func (r *Result2[T1, T2]) Try2() (T1, T2) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 2 elements.
+// Panics if the result has an error
+func (r *Result2[T1, T2]) Must2() (T1, T2) {
+	v := r.Must()
+	return v.Return()
+}
+
 // Returns a reference to the Result2 
 func (r Result2[T1, T2]) ToRef() *Result2[T1, T2] {
 	return &r
@@ -81,6 +95,20 @@ func New3[T1 any, T2 any, T3 any](t1 T1, t2 T2, t3 T3, err error) *Result3[T1, T
 // Returns the 3 values and error held in the result.
 func (r *Result3[T1, T2, T3]) Return() (T1, T2, T3, error) {
 	return r.value.First, r.value.Second, r.value.Third, r.err
+}
+
+// Returns the underlying tuple value as a sequence of 3 elements.
+// Panics with a try error if the result has an error
+func (r *Result3[T1, T2, T3]) Try3() (T1, T2, T3) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 3 elements.
+// Panics if the result has an error
+func (r *Result3[T1, T2, T3]) Must3() (T1, T2, T3) {
+	v := r.Must()
+	return v.Return()
 }
 
 // Returns a reference to the Result3 
@@ -126,6 +154,20 @@ func (r *Result4[T1, T2, T3, T4]) Return() (T1, T2, T3, T4, error) {
 	return r.value.First, r.value.Second, r.value.Third, r.value.Forth, r.err
 }
 
+// Returns the underlying tuple value as a sequence of 4 elements.
+// Panics with a try error if the result has an error
+func (r *Result4[T1, T2, T3, T4]) Try4() (T1, T2, T3, T4) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 4 elements.
+// Panics if the result has an error
+func (r *Result4[T1, T2, T3, T4]) Must4() (T1, T2, T3, T4) {
+	v := r.Must()
+	return v.Return()
+}
+
 // Returns a reference to the Result4 
 func (r Result4[T1, T2, T3, T4]) ToRef() *Result4[T1, T2, T3, T4] {
 	return &r
@@ -167,6 +209,20 @@ func New5[T1 any, T2 any, T3 any, T4 any, T5 any](t1 T1, t2 T2, t3 T3, t4 T4, t5
 // Returns the 5 values and error held in the result.
 func (r *Result5[T1, T2, T3, T4, T5]) Return() (T1, T2, T3, T4, T5, error) {
 	return r.value.First, r.value.Second, r.value.Third, r.value.Forth, r.value.Fifth, r.err
+}
+
+// Returns the underlying tuple value as a sequence of 5 elements.
+// Panics with a try error if the result has an error
+func (r *Result5[T1, T2, T3, T4, T5]) Try5() (T1, T2, T3, T4, T5) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 5 elements.
+// Panics if the result has an error
+func (r *Result5[T1, T2, T3, T4, T5]) Must5() (T1, T2, T3, T4, T5) {
+	v := r.Must()
+	return v.Return()
 }
 
 // Returns a reference to the Result5 
@@ -212,6 +268,20 @@ func (r *Result6[T1, T2, T3, T4, T5, T6]) Return() (T1, T2, T3, T4, T5, T6, erro
 	return r.value.First, r.value.Second, r.value.Third, r.value.Forth, r.value.Fifth, r.value.Sixth, r.err
 }
 
+// Returns the underlying tuple value as a sequence of 6 elements.
+// Panics with a try error if the result has an error
+func (r *Result6[T1, T2, T3, T4, T5, T6]) Try6() (T1, T2, T3, T4, T5, T6) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 6 elements.
+// Panics if the result has an error
+func (r *Result6[T1, T2, T3, T4, T5, T6]) Must6() (T1, T2, T3, T4, T5, T6) {
+	v := r.Must()
+	return v.Return()
+}
+
 // Returns a reference to the Result6 
 func (r Result6[T1, T2, T3, T4, T5, T6]) ToRef() *Result6[T1, T2, T3, T4, T5, T6] {
 	return &r
@@ -253,6 +323,20 @@ func New7[T1 any, T2 any, T3 any, T4 any, T5 any, T6 any, T7 any](t1 T1, t2 T2, 
 // Returns the 7 values and error held in the result.
 func (r *Result7[T1, T2, T3, T4, T5, T6, T7]) Return() (T1, T2, T3, T4, T5, T6, T7, error) {
 	return r.value.First, r.value.Second, r.value.Third, r.value.Forth, r.value.Fifth, r.value.Sixth, r.value.Seventh, r.err
+}
+
+// Returns the underlying tuple value as a sequence of 7 elements.
+// Panics with a try error if the result has an error
+func (r *Result7[T1, T2, T3, T4, T5, T6, T7]) Try7() (T1, T2, T3, T4, T5, T6, T7) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 7 elements.
+// Panics if the result has an error
+func (r *Result7[T1, T2, T3, T4, T5, T6, T7]) Must7() (T1, T2, T3, T4, T5, T6, T7) {
+	v := r.Must()
+	return v.Return()
 }
 
 // Returns a reference to the Result7 
@@ -298,6 +382,20 @@ func (r *Result8[T1, T2, T3, T4, T5, T6, T7, T8]) Return() (T1, T2, T3, T4, T5, 
 	return r.value.First, r.value.Second, r.value.Third, r.value.Forth, r.value.Fifth, r.value.Sixth, r.value.Seventh, r.value.Eighth, r.err
 }
 
+// Returns the underlying tuple value as a sequence of 8 elements.
+// Panics with a try error if the result has an error
+func (r *Result8[T1, T2, T3, T4, T5, T6, T7, T8]) Try8() (T1, T2, T3, T4, T5, T6, T7, T8) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 8 elements.
+// Panics if the result has an error
+func (r *Result8[T1, T2, T3, T4, T5, T6, T7, T8]) Must8() (T1, T2, T3, T4, T5, T6, T7, T8) {
+	v := r.Must()
+	return v.Return()
+}
+
 // Returns a reference to the Result8 
 func (r Result8[T1, T2, T3, T4, T5, T6, T7, T8]) ToRef() *Result8[T1, T2, T3, T4, T5, T6, T7, T8] {
 	return &r
@@ -339,6 +437,20 @@ func New9[T1 any, T2 any, T3 any, T4 any, T5 any, T6 any, T7 any, T8 any, T9 any
 // Returns the 9 values and error held in the result.
 func (r *Result9[T1, T2, T3, T4, T5, T6, T7, T8, T9]) Return() (T1, T2, T3, T4, T5, T6, T7, T8, T9, error) {
 	return r.value.First, r.value.Second, r.value.Third, r.value.Forth, r.value.Fifth, r.value.Sixth, r.value.Seventh, r.value.Eighth, r.value.Ninth, r.err
+}
+
+// Returns the underlying tuple value as a sequence of 9 elements.
+// Panics with a try error if the result has an error
+func (r *Result9[T1, T2, T3, T4, T5, T6, T7, T8, T9]) Try9() (T1, T2, T3, T4, T5, T6, T7, T8, T9) {
+	v := r.Try()
+	return v.Return()
+}
+
+// Returns the underlying tuple value as a sequence of 9 elements.
+// Panics if the result has an error
+func (r *Result9[T1, T2, T3, T4, T5, T6, T7, T8, T9]) Must9() (T1, T2, T3, T4, T5, T6, T7, T8, T9) {
+	v := r.Must()
+	return v.Return()
 }
 
 // Returns a reference to the Result9 

@@ -30,8 +30,28 @@ func TestSuccess(t *testing.T) {
 	assert.Equal(t, "success", result)
 }
 
+func BenchmarkSuccessful(b *testing.B) {
+	result := Result(dummySuccessFunction()).Must(b)
+	assert.Equal(b, "success", result)
+}
+
+func BenchmarkFailure2(b *testing.B) {
+	var s string
+	var i int
+	var err error
+	defer func() {
+		assert.ErrorContains(b, err, "dummyFailureFunction2 has failed")
+	}()
+	defer handler.Handle(func(e error) {
+		assert.Equal(b, "", s)
+		assert.Equal(b, 0, i)
+		err = e
+	})
+	s, i = Result2(dummyFailureFunction2()).Try2()
+}
+
 func TestSuccess5(t *testing.T) {
-	s, i, f, b, r := Result5(dummySuccessFunction5()).Must(t)
+	s, i, f, b, r := Result5(dummySuccessFunction5()).Must5(t)
 	assert.Equal(t, "success", s)
 	assert.Equal(t, 123, i)
 	assert.Equal(t, 4.56, f)
