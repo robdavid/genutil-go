@@ -1,5 +1,15 @@
 package slices
 
+// Concatenates a list of list of items into a list of items
+func Concat[T any](ss ...[]T) (result []T) {
+	cap := Fold(func(a int, s []T) int { return a + len(s) }, 0, ss)
+	result = make([]T, 0, cap)
+	for i := range ss {
+		result = append(result, ss[i]...)
+	}
+	return
+}
+
 // Returns true if predicate returns true for all elements in
 // slice.
 func All[T any](slice []T, predicate func(v T) bool) bool {
@@ -163,7 +173,7 @@ func RFindUsingRef[T any](slice []T, predicate func(*T) bool) int {
 
 // Generates sliceOut from sliceIn, by applying function f to each element of
 // sliceIn.
-func Map[T any, U any](sliceIn []T, f func(T) U) (sliceOut []U) {
+func Map[T any, U any](f func(T) U, sliceIn []T) (sliceOut []U) {
 	sliceOut = make([]U, len(sliceIn))
 	for i := range sliceIn {
 		sliceOut[i] = f(sliceIn[i])
@@ -173,10 +183,31 @@ func Map[T any, U any](sliceIn []T, f func(T) U) (sliceOut []U) {
 
 // Generates sliceOut from sliceIn, by applying function f to
 // the address of each element of sliceIn.
-func MapRef[T any, U any](sliceIn []T, f func(*T) U) (sliceOut []U) {
+func MapRef[T any, U any](f func(*T) U, sliceIn []T) (sliceOut []U) {
 	sliceOut = make([]U, len(sliceIn))
 	for i := range sliceIn {
 		sliceOut[i] = f(&sliceIn[i])
 	}
 	return
+}
+
+// Applies a function f to an accumulator, with initial value
+// a, and a slice element, returning a new accumulator, for each element
+// in the slice s. The final accumulator value is returned.
+func Fold[A any, T any](f func(A, T) A, a A, s []T) A {
+	for i := range s {
+		a = f(a, s[i])
+	}
+	return a
+}
+
+// Applies a function f to a reference to an accumulator, with initial value a,
+// and a reference to slice element, mutating the accumulator, for every element in the
+// slice s. The final value of the accumulator is returned.
+func FoldRef[A any, T any](f func(*A, *T), a A, s []T) A {
+	result := a
+	for i := range s {
+		f(&result, &s[i])
+	}
+	return result
 }

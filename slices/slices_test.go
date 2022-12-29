@@ -87,13 +87,37 @@ func TestRFindUsingRef(t *testing.T) {
 func TestMap(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
-	actual := Map(sliceIn, func(x int) int { return x * 2 })
+	actual := Map(func(x int) int { return x * 2 }, sliceIn)
 	assert.Equal(t, expected, actual)
 }
 
 func TestMapRef(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
-	actual := MapRef(sliceIn, func(x *int) int { return *x * 2 })
+	actual := MapRef(func(x *int) int { return *x * 2 }, sliceIn)
 	assert.Equal(t, expected, actual)
+}
+
+func TestFold(t *testing.T) {
+	sliceIn := make([]int, 10)
+	for i := range sliceIn {
+		sliceIn[i] = i + 1
+	}
+	total := Fold(func(a int, t int) int { return a + t }, 0, sliceIn)
+	assert.Equal(t, 55, total)
+}
+
+func TestRef(t *testing.T) {
+	sliceIn := make([]int, 10)
+	for i := range sliceIn {
+		sliceIn[i] = i + 1
+	}
+	total := FoldRef(func(a *int, t *int) { *a += *t }, 0, sliceIn)
+	assert.Equal(t, 55, total)
+}
+
+func TestConcat(t *testing.T) {
+	slicesIn := [][]int{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}
+	sliceOut := Concat(slicesIn...)
+	assert.Equal(t, []int{1, 2, 3, 4, 5, 6, 7, 8, 9}, sliceOut)
 }

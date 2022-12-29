@@ -9,19 +9,25 @@ import (
 {{ $typeParameters := mapTpl "T{{.}}" (seq 1 $n) | join ", " -}}
 {{ $parameters := mapTpl "v{{.}} T{{.}}" (seq 1 $n) | join ", " -}}
 {{ $arguments := mapTpl "v{{.}}" (seq 1 $n) | join ", " -}}
+
+// A wrapper type for a TestableResult that contains a value of type type.Tuple{{$n}}
 type TestableResult{{$n}}[{{$typeConstraints}}] struct {
 	TestableResult[tuple.Tuple{{$n}}[{{$typeParameters}}]]
 }
 
+// A constructor for TestableResult{{$n}} from the values returned by a function that returns {{$n}} values
+// plus an error.
 func Result{{$n}}[{{$typeConstraints}}]({{$parameters}}, err error) *TestableResult{{$n}}[{{$typeParameters}}] {
 	return &TestableResult{{$n}}[{{$typeParameters}}]{resultFrom(tuple.Of{{$n}}({{$arguments}}), err)}
 }
 
+// A variation of Must that returns {{$n}} non-error values
 func (r *TestableResult{{$n}}[{{$typeParameters}}]) Must{{$n}}(t TestReporting) ({{$typeParameters}}) {
 	v := r.Must(t)
 	return v.Return()
 }
 
+// A variation of Try that returns {{$n}} non-error values
 func (r *TestableResult{{$n}}[{{$typeParameters}}]) Try{{$n}}() ({{$typeParameters}}) {
 	v := r.Try()
 	return v.Return()
