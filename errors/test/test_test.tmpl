@@ -1,0 +1,38 @@
+package test
+import (
+  "testing"
+  "github.com/robdavid/genutil-go/errors/result"
+  "github.com/stretchr/testify/assert"
+)
+
+{{ $testTypes := list "string" "int" "float64" "bool" "rune" "byte" "int32" "float32" "complex64" }}
+{{ $testValues := list "\"success\"" "123" "4.56" "true" "'x'" "'y'" "789" "1.23" "1 + 3i" }}
+
+func dummySuccessFunction9() ({{$testTypes | join ", "}}, error) {
+	return {{$testValues | join ", " }}, nil
+}
+
+{{ range $i,$n := seq 2 9 -}}
+{{ $p := int (add $n 1) -}}
+{{ if ne $n 9 -}}
+{{ $paramTypes := slice $testTypes 0 $n | join ", " }}
+func dummySuccessFunction{{$n}}() ({{$paramTypes}}, error) {
+	r := result.From{{$p}}(dummySuccessFunction{{$p}}())
+	return result.Value{{$n}}(r.Get().Tuple{{$n}}).ToRef().Return()
+}
+
+{{ end -}}
+
+{{ $actual := mapTpl "a{{.}}" (seq 1 $n) | join ", " -}}
+
+func TestSuccess{{$n}}(t *testing.T) {
+  var err error
+  {{$actual}} := Result{{$n}}(dummySuccessFunction{{$n}}()).Must{{$n}}(t)
+  assert.Nil(t, err)
+  {{- range seq 1 $n }}
+  {{- $i := (sub . 1)}}
+  assert.Equal(t, {{printf "%s(%s)" (index $testTypes $i) (index $testValues $i)}}, a{{.}})
+  {{- end }}
+}
+
+{{ end -}}

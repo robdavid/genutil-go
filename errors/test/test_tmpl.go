@@ -4,6 +4,29 @@ import (
 	"github.com/robdavid/genutil-go/tuple"
 )
 
+// A wrapper type for a TestableResult that contains a value of type type.Tuple1
+type TestableResult1[T1 any] struct {
+	TestableResult[tuple.Tuple1[T1]]
+}
+
+// A constructor for TestableResult1 from the values returned by a function that returns 1 values
+// plus an error.
+func Result1[T1 any](v1 T1, err error) *TestableResult1[T1] {
+	return &TestableResult1[T1]{resultFrom(tuple.Of1(v1), err)}
+}
+
+// A variation of Must that returns 1 non-error values
+func (r *TestableResult1[T1]) Must1(t TestReporting) (T1) {
+	v := r.Must(t)
+	return v.Return()
+}
+
+// A variation of Try that returns 1 non-error values
+func (r *TestableResult1[T1]) Try1() (T1) {
+	v := r.Try()
+	return v.Return()
+}
+
 // A wrapper type for a TestableResult that contains a value of type type.Tuple2
 type TestableResult2[T1 any, T2 any] struct {
 	TestableResult[tuple.Tuple2[T1, T2]]
