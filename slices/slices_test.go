@@ -87,14 +87,14 @@ func TestRFindUsingRef(t *testing.T) {
 func TestMap(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
-	actual := Map(func(x int) int { return x * 2 }, sliceIn)
+	actual := Map(sliceIn, func(x int) int { return x * 2 })
 	assert.Equal(t, expected, actual)
 }
 
 func TestMapRef(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
-	actual := MapRef(func(x *int) int { return *x * 2 }, sliceIn)
+	actual := MapRef(sliceIn, func(x *int) int { return *x * 2 })
 	assert.Equal(t, expected, actual)
 }
 
@@ -103,7 +103,7 @@ func TestFold(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := Fold(func(a int, t int) int { return a + t }, 0, sliceIn)
+	total := Fold(0, sliceIn, func(a int, t int) int { return a + t })
 	assert.Equal(t, 55, total)
 }
 
@@ -112,7 +112,7 @@ func TestRef(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := FoldRef(func(a *int, t *int) { *a += *t }, 0, sliceIn)
+	total := FoldRef(0, sliceIn, func(a *int, t *int) { *a += *t })
 	assert.Equal(t, 55, total)
 }
 
