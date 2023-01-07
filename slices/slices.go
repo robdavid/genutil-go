@@ -191,6 +191,22 @@ func MapRef[T any, U any](sliceIn []T, f func(*T) U) (sliceOut []U) {
 	return
 }
 
+// Applies a mapping function to each element of a slice in place. The mapping function is
+// from type T to type T.
+func MapI[T any](slice []T, f func(T) T) {
+	for i := range slice {
+		slice[i] = f(slice[i])
+	}
+}
+
+// Applies a mapping function to each element of a slice in place. The mapping function is
+// from type T to type T, and each element is passed by reference.
+func MapRefI[T any](slice []T, f func(*T) T) {
+	for i := range slice {
+		slice[i] = f(&slice[i])
+	}
+}
+
 // Applies a function f to an accumulator, with initial value
 // a, and a slice element, returning a new accumulator, for each element
 // in the slice s. The final accumulator value is returned.
@@ -210,4 +226,71 @@ func FoldRef[A any, T any](a A, s []T, f func(*A, *T)) A {
 		f(&result, &s[i])
 	}
 	return result
+}
+
+// Accept only the elements of s that satisfy the predicate function f,
+// returning a new slice containing those elements.
+func Filter[T any](s []T, f func(T) bool) (result []T) {
+	result = make([]T, 0, len(s))
+	for _, v := range s {
+		if f(v) {
+			result = append(result, v)
+		}
+	}
+	return
+}
+
+// Accept only the elements of s that satisfy the predicate function f,
+// returning a new slice containing those elements. Similar to Filter()
+// except that the elements are passed to the predicate function by
+// reference.
+func FilterRef[T any](s []T, f func(*T) bool) (result []T) {
+	result = make([]T, 0, len(s))
+	for i := range s {
+		if f(&s[i]) {
+			result = append(result, s[i])
+		}
+	}
+	return
+}
+
+// A filter function that alters the provided slice in place.
+// The slice referenced by s is altered so that it contains only
+// elements that satisfy the predicate function f.
+//
+// eg.
+//
+//	slice := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+//	FilterI(&slice, func(i int) bool { return i%2 == 0 })
+//	fmt.Printf("%v",slice) // [2 4 6 8]
+func FilterI[T any](s *[]T, f func(T) bool) {
+	j := 0
+	for i := range *s {
+		if f((*s)[i]) {
+			(*s)[j] = (*s)[i]
+			j++
+		}
+	}
+	*s = (*s)[:j]
+}
+
+// A filter function that alters the provided slice in place.
+// The slice referenced by s is altered so that it contains only
+// elements that satisfy the predicate function f. Each element is
+// passed to f by reference.
+//
+// eg.
+//
+//	slice := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+//	FilterRefI(&slice, func(i *int) bool { return (*i)%2 == 0 })
+//	fmt.Printf("%v",slice) // [2 4 6 8]
+func FilterRefI[T any](s *[]T, f func(*T) bool) {
+	j := 0
+	for i := range *s {
+		if f(&(*s)[i]) {
+			(*s)[j] = (*s)[i]
+			j++
+		}
+	}
+	*s = (*s)[:j]
 }
