@@ -84,15 +84,6 @@ func BenchmarkFailure2(b *testing.B) {
 	s, i = Result2(dummyFailureFunction2()).Try2()
 }
 
-// func TestSuccess5(t *testing.T) {
-// 	s, i, f, b, r := Result5(dummySuccessFunction5()).Must5(t)
-// 	assert.Equal(t, "success", s)
-// 	assert.Equal(t, 123, i)
-// 	assert.Equal(t, 4.56, f)
-// 	assert.Equal(t, true, b)
-// 	assert.Equal(t, 'x', r)
-// }
-
 func TestATestableResult2IsAResult(t *testing.T) {
 	result := Result2(dummySuccessFunction2())
 	assert.False(t, result.IsError())

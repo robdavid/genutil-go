@@ -67,6 +67,18 @@ func TestFindFrom(t *testing.T) {
 	assert.Equal(t, -1, FindFrom(10, input, '!'))
 }
 
+func TestFindUsing(t *testing.T) {
+	input := []int{1, 3, 5, 8, 9}
+	assert.Equal(t, 3, FindUsing(input, func(x int) bool { return x%2 == 0 }))
+	assert.Equal(t, -1, FindUsing(input, func(x int) bool { return x%7 == 0 }))
+}
+
+func TestFindUsingRef(t *testing.T) {
+	input := []int{1, 3, 5, 8, 9}
+	assert.Equal(t, 3, FindUsingRef(input, func(x *int) bool { return (*x)%2 == 0 }))
+	assert.Equal(t, -1, FindUsingRef(input, func(x *int) bool { return (*x)%7 == 0 }))
+}
+
 func TestRFind(t *testing.T) {
 	input := []rune("-----!---!-")
 	assert.Equal(t, 9, RFind(input, '!'))
@@ -77,25 +89,48 @@ func TestRFind(t *testing.T) {
 func TestRFindUsing(t *testing.T) {
 	input := []rune("-----!---!-")
 	assert.Equal(t, 9, RFindUsing(input, func(r rune) bool { return r != '-' }))
+	assert.Equal(t, -1, RFindUsing(input, func(r rune) bool { return r == '*' }))
 }
 
 func TestRFindUsingRef(t *testing.T) {
 	input := []rune("-----!---!-")
 	assert.Equal(t, 9, RFindUsingRef(input, func(r *rune) bool { return *r != '-' }))
+	assert.Equal(t, -1, RFindUsingRef(input, func(r *rune) bool { return *r == '*' }))
 }
 
 func TestMap(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
-	actual := Map(func(x int) int { return x * 2 }, sliceIn)
+	actual := Map(sliceIn, func(x int) int { return x * 2 })
+	assert.Equal(t, expected, actual)
+}
+
+func TestMapDifferentTypes(t *testing.T) {
+	sliceIn := []string{"apple", "banana", "cherry", "strawberry"}
+	expected := []int{5, 6, 6, 10}
+	actual := Map(sliceIn, func(s string) int { return len(s) })
 	assert.Equal(t, expected, actual)
 }
 
 func TestMapRef(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
-	actual := MapRef(func(x *int) int { return *x * 2 }, sliceIn)
+	actual := MapRef(sliceIn, func(x *int) int { return *x * 2 })
 	assert.Equal(t, expected, actual)
+}
+
+func TestMapI(t *testing.T) {
+	slice := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	MapI(slice, func(x int) int { return x * 2 })
+	assert.Equal(t, expected, slice)
+}
+
+func TestMapRefI(t *testing.T) {
+	slice := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	MapRefI(slice, func(x *int) int { return *x * 2 })
+	assert.Equal(t, expected, slice)
 }
 
 func TestFold(t *testing.T) {
@@ -103,7 +138,7 @@ func TestFold(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := Fold(func(a int, t int) int { return a + t }, 0, sliceIn)
+	total := Fold(0, sliceIn, func(a int, t int) int { return a + t })
 	assert.Equal(t, 55, total)
 }
 
@@ -112,7 +147,7 @@ func TestRef(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := FoldRef(func(a *int, t *int) { *a += *t }, 0, sliceIn)
+	total := FoldRef(0, sliceIn, func(a *int, t *int) { *a += *t })
 	assert.Equal(t, 55, total)
 }
 
@@ -120,4 +155,27 @@ func TestConcat(t *testing.T) {
 	slicesIn := [][]int{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}
 	sliceOut := Concat(slicesIn...)
 	assert.Equal(t, []int{1, 2, 3, 4, 5, 6, 7, 8, 9}, sliceOut)
+}
+
+func TestFilterRef(t *testing.T) {
+	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	sliceOut := FilterRef(sliceIn, func(i *int) bool { return (*i)&1 == 0 })
+	assert.Equal(t, []int{2, 4, 6, 8}, sliceOut)
+}
+func TestFilter(t *testing.T) {
+	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	sliceOut := Filter(sliceIn, func(i int) bool { return i&1 == 0 })
+	assert.Equal(t, []int{2, 4, 6, 8}, sliceOut)
+}
+
+func TestFilterRefI(t *testing.T) {
+	sliceI := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	FilterRefI(&sliceI, func(i *int) bool { return (*i)&1 == 0 })
+	assert.Equal(t, []int{2, 4, 6, 8}, sliceI)
+}
+
+func TestFilterI(t *testing.T) {
+	sliceI := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	FilterI(&sliceI, func(i int) bool { return i%2 == 0 })
+	assert.Equal(t, []int{2, 4, 6, 8}, sliceI)
 }

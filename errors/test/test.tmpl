@@ -4,7 +4,7 @@ import (
 	"github.com/robdavid/genutil-go/tuple"
 )
 
-{{ range $i,$n := seq 1 9 -}}
+{{ range $i,$n := seq 2 9 -}}
 {{ $typeConstraints := mapTpl "T{{.}} any" (seq 1 $n) | join  ", " -}}
 {{ $typeParameters := mapTpl "T{{.}}" (seq 1 $n) | join ", " -}}
 {{ $parameters := mapTpl "v{{.}} T{{.}}" (seq 1 $n) | join ", " -}}
