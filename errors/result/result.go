@@ -8,7 +8,7 @@ import (
 
 //import "github.com"
 
-// Contains a value of type T, or an error
+// Contains a value of type T, and/or an error
 type Result[T any] struct {
 	value T
 	err   error
