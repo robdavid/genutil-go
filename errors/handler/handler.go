@@ -9,7 +9,8 @@
 // language changes. This has performance implications in error cases,
 // so it is not recommended to for use in situations where a high
 // frequency of error returns are expected, but rather for exceptional
-// cases. Fortunately, this likely covers a large number of situations.
+// cases. Fortunately, this is still likely to cover the majority of
+// situations.
 //
 // This package is intended to be imported unqualified, e.g.
 //
