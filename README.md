@@ -49,7 +49,7 @@ func readFileContent(fname string) (content []byte, err error) {
 }
 ```
 
-Each call to `Try` converts the value and error pair to the value only. However, if the error is non-nil, `Try` will panic. The `Catch` deferred function handles panics created by `Try` and will populate the `err` value with the error `Try` encountered. A panic created from another source will propagate as a further panic.
+Each call to `Try` converts the value and error pair to the value only. However, if the error is non-nil, `Try` will panic. The `Catch` deferred function handles panics created by `Try` and will populate the `err` value with the error `Try` encountered, which will then be the return value of the function. A panic created from another source will propagate as a further panic.
 
 If you want to augment the error, or perform other processing on the error, the `Handle` function can be used.
 ```go
