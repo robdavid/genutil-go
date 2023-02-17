@@ -49,4 +49,20 @@ func readFileContent(fname string) (content []byte, err error) {
 }
 ```
 
-Each call to `Try` converts the value and error pair to the value only. However, if the error is non-nil, `Try` will panic. The `Catch` deferred function handles panics, and will recognise a value created by `Try` and will populate the `err` value with the original error. Any other kind of panic will be re-raised.
+Each call to `Try` converts the value and error pair to the value only. However, if the error is non-nil, `Try` will panic. The `Catch` deferred function handles panics created by `Try` and will populate the `err` value with the error `Try` encountered. A panic created from another source will propagate as a further panic.
+
+If you want to augment the error, or perform other processing on the error, the `Handle` function can be used.
+```go
+import . "github.com/robdavid/genutil-go/errors/handler"
+
+func readFileContent(fname string) (content []byte, err error) {
+  defer Handle(func(e error) {
+    err = fmt.Errorf("%w: whilst opening %s", e, fname)
+  })
+  f := Try(os.Open(fname))
+  defer f.Close()
+  content = Try(io.ReadAll(f))
+  return
+}
+```
+

@@ -1,10 +1,29 @@
 // A Try/Handle/Catch error handling mechanism implemented
-// using generics, somewhat similar to previous proposals to
-// extend the language with error handling such as
-// https://github.com/golang/go/issues/32437
+// using generics, which provides an API similar to previous
+// error handling proposals for the language such as
+// https://github.com/golang/go/issues/32437.
+//
+// In contrast to previous proposals, however, this
+// implementation makes uses of calls to panic() to handle errors,
+// rather than implicit function returns, since the latter requires
+// language changes. This has performance implications in error cases,
+// so it is not recommended to for use in situations where a high
+// frequency of error returns are expected, but rather for exceptional
+// cases. Fortunately, this likely covers a large number of situations.
+//
 // This package is intended to be imported unqualified, e.g.
 //
 //	import . "github.com/robdavid/genutil-go/errors/handler"
+//
+// There are three main functions: Try(), Catch() and Handle(). Try can
+// be used to remove the error component from a function where the
+// function returns a value and an error, e.g.
+//
+//	f := Try(os.Open(fname))
+//
+// If the error non-nil, the function panics, with a value of
+// a particular type (TryError), which wraps the error. The error
+// can recovered via the Catch() or Handle() functions.
 package handler
 
 import "fmt"
@@ -34,9 +53,8 @@ func (te TryError) String() string {
 
 // Removes the error component of a function's return value. If there is
 // no error, the non-error value is returned. Otherwise
-// the function panics with a TryError wrapping the error.
-// The error can be recovered and returned by your function in conjunction
-// with defer and the Catch or Handle functions.
+// the function panics with a TryError value, wrapping the error.
+// The panic and the error can be recovered via Catch or Handle functions.
 // e.g.
 //
 //	f := Try(os.Open("myfile"))
@@ -59,6 +77,9 @@ func Try0(err error) {
 
 // An alias for Try0
 func Check(err error) { Try0(err) }
+
+// Raise an error. No-op if err is nil. An alias for Try0.
+func Raise(err error) { Try0(err) }
 
 //go:generate code-template --set max_params=9 try.tmpl
 
@@ -94,13 +115,13 @@ func Catch(retErr *error) {
 // such as wrapping the error in another error type.
 // e.g.
 //
-//	  func readFileWrapErr(fname string) (content []byte, err error) {
-//		   defer Handle(func(e error) {
-//			 err = fmt.Errorf("Error reading %s: %w", fname, e)
-//		   })
-//		   content = Try(os.ReadFile(fname))
-//		   return
-//	  }
+//    func readFileWrapErr(fname string) (content []byte, err error) {
+//      defer Handle(func(e error) {
+//        err = fmt.Errorf("Error reading %s: %w", fname, e)
+//      })
+//      content = Try(os.ReadFile(fname))
+//      return
+//    }
 func Handle(handler func(err error)) {
 	if err := recover(); err != nil {
 		if tryErr, ok := err.(TryError); ok {
