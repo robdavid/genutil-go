@@ -1,3 +1,8 @@
+// A value type that contains a value plus an error, typically used to represent the
+// return value of a function, including its error component. It has convenience methods
+// for constructing an instance from a function return, e.g.
+//
+//	r := result.From(os.Open(file))
 package result
 
 import (
