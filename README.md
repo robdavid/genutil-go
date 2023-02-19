@@ -49,7 +49,7 @@ func readFileContent(fname string) (content []byte, err error) {
 }
 ```
 
-Each call to `Try` converts the value and error pair to the value only. However, if the error is non-nil, `Try` will panic. The `Catch` deferred function handles panics created by `Try` and will populate the `err` value with the error `Try` encountered, which will then be the return value of the function. A panic created from another source will propagate as a further panic.
+Here we use `Try` to wrap function calls that return a value plus an error. `Try` removes the error part and returns just the single value. However, if the error is non-nil it will panic with a `TryError`. The `Catch` deferred function is used to recover from any panic created by `Try` and in this example will populate the `err` variable with the error that triggered the panic. This becomes our error return, as it is a named return value.
 
 If you want to augment the error, or perform other processing on the error, the `Handle` function can be used.
 ```go
@@ -65,4 +65,7 @@ func readFileContent(fname string) (content []byte, err error) {
   return
 }
 ```
+See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/errors/handler) for more details.
+
+
 
