@@ -1,8 +1,16 @@
 package functions
 
-// Identity function - returns the value passed
+// Identity function - returns the value passed.
 func Id[T any](v T) T {
 	return v
+}
+
+// Returns a pointer to a copy of the value passed.
+// eg.
+//
+//	hp := functions.Ref("hello") // *hp == "hello"
+func Ref[T any](v T) *T {
+	return &v
 }
 
 // Ternary logic function. If `cond` is true, `v` is returned.
