@@ -25,3 +25,9 @@ func TestId(t *testing.T) {
 	assert.Equal(t, 12.3, Id(12.3))
 	assert.Equal(t, "hello", Id("hello"))
 }
+
+func TestRef(t *testing.T) {
+	assert.Equal(t, 6, *Ref(6))
+	assert.Equal(t, 12.3, *Ref(12.3))
+	assert.Equal(t, "hello", *Ref("hello"))
+}
