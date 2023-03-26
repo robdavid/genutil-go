@@ -5,7 +5,7 @@ func Id[T any](v T) T {
 	return v
 }
 
-// Returns a pointer to a copy of the value passed.
+// Returns a pointer to a variable whose value is initialized to v.
 // eg.
 //
 //	hp := functions.Ref("hello") // *hp == "hello"
