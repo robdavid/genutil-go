@@ -2,6 +2,7 @@ package result
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/handler"
@@ -22,6 +23,10 @@ func arity1Err(err error) (string, error) {
 
 func returnResult[T any](res *Result[T]) (T, error) {
 	return res.Return()
+}
+
+func strResult(r int) Result[string] {
+	return Value(strconv.Itoa(r))
 }
 
 func TestGoodResult(t *testing.T) {
@@ -65,6 +70,10 @@ func TestErrorMapTrySuccess(t *testing.T) {
 	value := New(arity1Err(nil)).
 		MapErr(func(err error) error { return fmt.Errorf("outer error: %w", err) }).Try()
 	assert.Equal(t, "testValue", value)
+}
+
+func TestSuccessChain(t *testing.T) {
+	assert.Equal(t, Value("123"), AndThen(Value(123), strResult))
 }
 
 func TestGoodResult2(t *testing.T) {

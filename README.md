@@ -16,7 +16,7 @@ The library falls into a number of categories, subdivided into separate packages
 The `errors` package has a number of subpackages related to error handling.
 
 ### Handler
-The `errors.handler` package provides a way to handle errors in Go more ergonomically, at the expense of less efficient runtime handling of error cases. It works by turning errors into `panic`s which can later be recovered easily. This is less efficient that the traditional Go form of manual checking and returning of error values. If the error condition is likely to be anything other than an infrequent occurance, the traditional method is more appropriate. That said, it is likely no less efficient than languages that provide exception handling.
+The `errors.handler` package provides a way to handle errors in Go more ergonomically, at the expense of less efficient runtime handling of error cases. It works by turning errors into `panic`s which can later be recovered easily. This is less efficient that the traditional Go form of manual checking and returning of error values. If the error condition is likely to be anything other than an infrequent occurrence, the traditional method is more appropriate. That said, it is likely no less efficient than languages that have native try/catch exception handling.
 
 The advantage is that it can condense repetitive multi line error checking boilerplate to a single call to a `Try` function.
 
@@ -49,7 +49,7 @@ func readFileContent(fname string) (content []byte, err error) {
 }
 ```
 
-Here we use `Try` to wrap function calls that return a value plus an error. `Try` removes the error part and returns just the single value. However, if the error is non-nil it will panic with a `TryError`. The `Catch` deferred function is used to recover from any panic created by `Try` and in this example will populate the `err` variable with the error that triggered the panic. This becomes our error return, as it is a named return value.
+Here the `Try` function is used to wrap the function calls that return a value plus an error. `Try` removes the error part and returns just the single value. However, if the error is non-nil it will panic with a `TryError`. The `Catch` deferred function will recover from this type of panic and in this example will populate the `err` variable with the error before the function returns, allowing it to be returned to the caller.
 
 If you want to augment the error, or perform other processing on the error, the `Handle` function can be used.
 ```go
