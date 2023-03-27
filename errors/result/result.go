@@ -47,8 +47,8 @@ func New[T any](t T, err error) *Result[T] {
 }
 
 // Returns a reference to the given result object
-func (r *Result[T]) ToRef() *Result[T] {
-	return r
+func (r Result[T]) ToRef() *Result[T] {
+	return &r
 }
 
 // Returns a result as a pair of values, suitable to be
@@ -125,6 +125,18 @@ func Map[T, U any](r Result[T], f func(T) U) Result[U] {
 		return Error[U](r.GetErr())
 	} else {
 		return Value(f(r.Get()))
+	}
+}
+
+func Then[T, U any](r Result[T], f func(T) U) Result[U] {
+	return Map(r, f)
+}
+
+func AndThen[T, U any](r Result[T], f func(T) Result[U]) Result[U] {
+	if r.IsError() {
+		return Error[U](r.GetErr())
+	} else {
+		return f(r.Get())
 	}
 }
 
