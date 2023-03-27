@@ -3,6 +3,8 @@ package maps
 import (
 	"errors"
 	"fmt"
+
+	"github.com/robdavid/genutil-go/slices"
 )
 
 var ErrPathConflict = errors.New("conflict between object and non-object types")
@@ -81,6 +83,8 @@ func GetPath[K comparable, T any](path []K, top map[K]T) (result T, err error) {
 	return
 }
 
+// Returns the keys of a map as a slice. The order of
+// the keys is undefined.
 func Keys[K comparable, T any](m map[K]T) []K {
 	result := make([]K, len(m))
 	i := 0
@@ -91,6 +95,8 @@ func Keys[K comparable, T any](m map[K]T) []K {
 	return result
 }
 
+// Returns the values of a map as a slice. The order of the values
+// is undefined.
 func Values[K comparable, T any](m map[K]T) []T {
 	result := make([]T, len(m))
 	i := 0
@@ -99,4 +105,25 @@ func Values[K comparable, T any](m map[K]T) []T {
 		i++
 	}
 	return result
+}
+
+// Returns the keys of a map as a slice. The keys are sorted in their
+// natural order, as defined by the < operator.
+func SortedKeys[K slices.Sortable, T any](m map[K]T) []K {
+	keys := Keys(m)
+	slices.Sort(keys)
+	return keys
+}
+
+// Returns the values of a map as a slice, sorted in the order
+// of the associated key.
+func SortedValuesByKey[K slices.Sortable, T any](m map[K]T) []T {
+	return slices.Map(SortedKeys(m), AsFunc(m))
+}
+
+// Generate a function equivalent to a map, mapping keys to values.
+func AsFunc[K comparable, T any](m map[K]T) func(K) T {
+	return func(k K) (v T) {
+		return m[k]
+	}
 }

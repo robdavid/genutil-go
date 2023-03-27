@@ -70,6 +70,26 @@ func TestKeys(t *testing.T) {
 	assert.ElementsMatch(t, []string{"one", "two", "three"}, keys)
 }
 
+func TestSortedKeys(t *testing.T) {
+	mymap := map[string]int{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	}
+	keys := SortedKeys(mymap)
+	assert.Equal(t, []string{"one", "three", "two"}, keys)
+}
+
+func TestSortedValuesByKey(t *testing.T) {
+	mymap := map[int]string{
+		1: "one",
+		2: "two",
+		3: "three",
+	}
+	values := SortedValuesByKey(mymap)
+	assert.Equal(t, []string{"one", "two", "three"}, values)
+}
+
 func TestEmptyKeys(t *testing.T) {
 	mymap := map[string]int{}
 	keys := Keys(mymap)
@@ -79,8 +99,8 @@ func TestEmptyKeys(t *testing.T) {
 func TestValues(t *testing.T) {
 	mymap := map[string]int{
 		"one":   1,
-		"two":   2,
-		"three": 3,
+		"three": 2,
+		"two":   3,
 	}
 	values := Values(mymap)
 	assert.ElementsMatch(t, []int{1, 2, 3}, values)
