@@ -59,3 +59,29 @@ func TestInsertPathConflictInterior(t *testing.T) {
 	err := PutPath([]string{"a", "b", "c", "d"}, 456, m)
 	assert.EqualError(t, err, "conflict between object and non-object types at key path [a b c]")
 }
+
+func TestKeys(t *testing.T) {
+	mymap := map[string]int{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	}
+	keys := Keys(mymap)
+	assert.ElementsMatch(t, []string{"one", "two", "three"}, keys)
+}
+
+func TestEmptyKeys(t *testing.T) {
+	mymap := map[string]int{}
+	keys := Keys(mymap)
+	assert.Empty(t, keys)
+}
+
+func TestValues(t *testing.T) {
+	mymap := map[string]int{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	}
+	values := Values(mymap)
+	assert.ElementsMatch(t, []int{1, 2, 3}, values)
+}
