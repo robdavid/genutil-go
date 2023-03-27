@@ -179,3 +179,21 @@ func TestFilterI(t *testing.T) {
 	FilterI(&sliceI, func(i int) bool { return i%2 == 0 })
 	assert.Equal(t, []int{2, 4, 6, 8}, sliceI)
 }
+
+func TestSortInt(t *testing.T) {
+	sortableSlice := []int{9, 8, 7, 6, 5, 4, 3, 2, 1}
+	Sort(sortableSlice)
+	assert.Equal(t, []int{1, 2, 3, 4, 5, 6, 7, 8, 9}, sortableSlice)
+}
+
+func TestSortByte(t *testing.T) {
+	sortableSlice := []byte{9, 8, 7, 6, 5, 4, 3, 2, 1}
+	Sort(sortableSlice)
+	assert.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}, sortableSlice)
+}
+
+func TestSortString(t *testing.T) {
+	sortableSlice := []string{"dates", "banana", "apple", "coconut"}
+	Sort(sortableSlice)
+	assert.Equal(t, []string{"apple", "banana", "coconut", "dates"}, sortableSlice)
+}

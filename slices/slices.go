@@ -1,5 +1,7 @@
 package slices
 
+import "sort"
+
 // Concatenates a list of list of items into a list of items
 func Concat[T any](ss ...[]T) (result []T) {
 	cap := Fold(0, ss, func(a int, s []T) int { return a + len(s) })
@@ -293,4 +295,47 @@ func FilterRefI[T any](s *[]T, f func(*T) bool) {
 		}
 	}
 	*s = (*s)[:j]
+}
+
+// A type constraint for types that can be compared
+// via the < operator
+type Sortable interface {
+	int | int8 | int16 | int32 | int64 |
+		uint | uint8 | uint16 | uint32 | uint64 |
+		float32 | float64 |
+		string
+}
+
+// A wrapper type around a slice that satisfies the
+// sort.Interface interface. The element type of the
+// slice must satisfy Sortable, meaning that the elements
+// must be comparable by the < operator
+type SortableSlice[T Sortable] []T
+
+func (ss SortableSlice[T]) Len() int {
+	return len(ss)
+}
+
+func (ss SortableSlice[T]) Less(i, j int) bool {
+	return ss[i] < ss[j]
+}
+
+func (ss SortableSlice[T]) Swap(i, j int) {
+	tmp := ss[i]
+	ss[i] = ss[j]
+	ss[j] = tmp
+}
+
+// Sorts slice in place
+func Sort[T Sortable](slice []T) {
+	sort.Sort(SortableSlice[T](slice))
+}
+
+// Creates a copy of slice, sorted. The
+// slice parameter remains unchanged.
+func Sorted[T Sortable](slice []T) []T {
+	sorted := make([]T, len(slice))
+	copy(sorted, slice)
+	sort.Sort(SortableSlice[T](sorted))
+	return sorted
 }
