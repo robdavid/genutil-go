@@ -80,3 +80,23 @@ func GetPath[K comparable, T any](path []K, top map[K]T) (result T, err error) {
 	}
 	return
 }
+
+func Keys[K comparable, T any](m map[K]T) []K {
+	result := make([]K, len(m))
+	i := 0
+	for k := range m {
+		result[i] = k
+		i++
+	}
+	return result
+}
+
+func Values[K comparable, T any](m map[K]T) []T {
+	result := make([]T, len(m))
+	i := 0
+	for _, v := range m {
+		result[i] = v
+		i++
+	}
+	return result
+}
