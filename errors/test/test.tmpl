@@ -23,6 +23,7 @@ func Result{{$n}}[{{$typeConstraints}}]({{$parameters}}, err error) *TestableRes
 
 // A variation of Must that returns {{$n}} non-error values
 func (r *TestableResult{{$n}}[{{$typeParameters}}]) Must{{$n}}(t TestReporting) ({{$typeParameters}}) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
