@@ -49,6 +49,9 @@ func (mt *mockTesting) FailNow() {
 	mt.fatal = true
 }
 
+func (mt *mockTesting) Helper() {
+}
+
 func (mt *mockTesting) message() string {
 	return fmt.Sprint(mt.lastError...)
 }

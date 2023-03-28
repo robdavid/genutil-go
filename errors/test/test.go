@@ -15,6 +15,7 @@ import (
 type TestReporting interface {
 	Error(args ...any)
 	FailNow()
+	Helper()
 }
 
 // A wrapper around result.Result that supports test assertions.
@@ -53,6 +54,7 @@ func Result[T any](value T, err error) *TestableResult[T] {
 // Checks if a given error value is nil. If not, report the
 // error and fail the test.
 func Check(t TestReporting, err error) {
+	t.Helper()
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -62,6 +64,7 @@ func Check(t TestReporting, err error) {
 // Either return the value of a TestableResult, or if
 // an error has occurred, report it and fail the test.
 func (r *TestableResult[T]) Must(t TestReporting) T {
+	t.Helper()
 	if r.IsError() {
 		Check(t, r.GetErr())
 	}
@@ -70,6 +73,7 @@ func (r *TestableResult[T]) Must(t TestReporting) T {
 
 // Expects an error; marks the test as failed if the result is not an error
 func (r *TestableResult[T]) Fails(t TestReporting) *TestableResult[T] {
+	t.Helper()
 	if !r.IsError() {
 		t.Error(fmt.Errorf("an error was expected, but did not occur"))
 	}
@@ -79,6 +83,7 @@ func (r *TestableResult[T]) Fails(t TestReporting) *TestableResult[T] {
 // Expects a specific error; marks the test as failed if the result is not the error
 // provided in expected.
 func (r *TestableResult[T]) FailsWith(t TestReporting, expected error) *TestableResult[T] {
+	t.Helper()
 	if !r.IsError() {
 		t.Error(fmt.Errorf("an error was expected, but did not occur"))
 	} else if expected != r.GetErr() {
@@ -90,6 +95,7 @@ func (r *TestableResult[T]) FailsWith(t TestReporting, expected error) *Testable
 // Expects a specific error; marks the test as failed if the result is not an
 // error whose Error() return contains the string provided in expected.
 func (r *TestableResult[T]) FailsContaining(t TestReporting, expected string) *TestableResult[T] {
+	t.Helper()
 	if !r.IsError() {
 		t.Error(fmt.Errorf("an error was expected, but did not occur"))
 	} else if !strings.Contains(r.GetErr().Error(), expected) {
@@ -105,6 +111,7 @@ func (r *TestableResult[T]) FailsContaining(t TestReporting, expected string) *T
 //	defer ReportErr(t)
 //	f := Try(os.Open(myfile))
 func ReportErr(t TestReporting) {
+	t.Helper()
 	if err := recover(); err != nil {
 		if tryErr, ok := err.(handler.TryError); ok {
 			t.Error(tryErr.Error)

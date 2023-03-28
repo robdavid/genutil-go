@@ -17,6 +17,7 @@ func Result2[T1 any, T2 any](v1 T1, v2 T2, err error) *TestableResult2[T1, T2] {
 
 // A variation of Must that returns 2 non-error values
 func (r *TestableResult2[T1, T2]) Must2(t TestReporting) (T1, T2) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
@@ -40,6 +41,7 @@ func Result3[T1 any, T2 any, T3 any](v1 T1, v2 T2, v3 T3, err error) *TestableRe
 
 // A variation of Must that returns 3 non-error values
 func (r *TestableResult3[T1, T2, T3]) Must3(t TestReporting) (T1, T2, T3) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
@@ -63,6 +65,7 @@ func Result4[T1 any, T2 any, T3 any, T4 any](v1 T1, v2 T2, v3 T3, v4 T4, err err
 
 // A variation of Must that returns 4 non-error values
 func (r *TestableResult4[T1, T2, T3, T4]) Must4(t TestReporting) (T1, T2, T3, T4) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
@@ -86,6 +89,7 @@ func Result5[T1 any, T2 any, T3 any, T4 any, T5 any](v1 T1, v2 T2, v3 T3, v4 T4,
 
 // A variation of Must that returns 5 non-error values
 func (r *TestableResult5[T1, T2, T3, T4, T5]) Must5(t TestReporting) (T1, T2, T3, T4, T5) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
@@ -109,6 +113,7 @@ func Result6[T1 any, T2 any, T3 any, T4 any, T5 any, T6 any](v1 T1, v2 T2, v3 T3
 
 // A variation of Must that returns 6 non-error values
 func (r *TestableResult6[T1, T2, T3, T4, T5, T6]) Must6(t TestReporting) (T1, T2, T3, T4, T5, T6) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
@@ -132,6 +137,7 @@ func Result7[T1 any, T2 any, T3 any, T4 any, T5 any, T6 any, T7 any](v1 T1, v2 T
 
 // A variation of Must that returns 7 non-error values
 func (r *TestableResult7[T1, T2, T3, T4, T5, T6, T7]) Must7(t TestReporting) (T1, T2, T3, T4, T5, T6, T7) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
@@ -155,6 +161,7 @@ func Result8[T1 any, T2 any, T3 any, T4 any, T5 any, T6 any, T7 any, T8 any](v1 
 
 // A variation of Must that returns 8 non-error values
 func (r *TestableResult8[T1, T2, T3, T4, T5, T6, T7, T8]) Must8(t TestReporting) (T1, T2, T3, T4, T5, T6, T7, T8) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
@@ -178,6 +185,7 @@ func Result9[T1 any, T2 any, T3 any, T4 any, T5 any, T6 any, T7 any, T8 any, T9 
 
 // A variation of Must that returns 9 non-error values
 func (r *TestableResult9[T1, T2, T3, T4, T5, T6, T7, T8, T9]) Must9(t TestReporting) (T1, T2, T3, T4, T5, T6, T7, T8, T9) {
+	t.Helper()
 	v := r.Must(t)
 	return v.Return()
 }
