@@ -339,3 +339,33 @@ func Sorted[T Sortable](slice []T) []T {
 	sort.Sort(SortableSlice[T](sorted))
 	return sorted
 }
+
+// A implementation of the `sort.Interface` interface
+// based on a slice and a predicate over two elements
+// that should return true if the first element should
+// be ordered before the second
+type SortableByFunction[T any] struct {
+	Slice     []T
+	Predicate func(T, T) bool
+}
+
+func (sbf SortableByFunction[T]) Len() int {
+	return len(sbf.Slice)
+}
+
+func (sbf SortableByFunction[T]) Swap(i, j int) {
+	tmp := sbf.Slice[i]
+	sbf.Slice[i] = sbf.Slice[j]
+	sbf.Slice[j] = tmp
+}
+
+func (sbf SortableByFunction[T]) Less(i, j int) bool {
+	return sbf.Predicate(sbf.Slice[i], sbf.Slice[j])
+}
+
+// Sorts a slice by using a function to determine ordering. The
+// less parameter is a function of two elements of type T that should
+// return true if the first is less then (should be ordered before) the second.
+func SortUsing[T any](slice []T, less func(T, T) bool) {
+	sort.Sort(SortableByFunction[T]{slice, less})
+}

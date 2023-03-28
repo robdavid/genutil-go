@@ -1,7 +1,9 @@
 package slices
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -196,4 +198,48 @@ func TestSortString(t *testing.T) {
 	sortableSlice := []string{"dates", "banana", "apple", "coconut"}
 	Sort(sortableSlice)
 	assert.Equal(t, []string{"apple", "banana", "coconut", "dates"}, sortableSlice)
+}
+
+func TestSortUsing(t *testing.T) {
+	dates := []time.Time{
+		time.Date(1988, 9, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(1985, 9, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(1966, time.July, 30, 0, 0, 0, 0, time.UTC),
+		time.Date(1974, time.August, 9, 0, 0, 0, 0, time.UTC),
+	}
+	SortUsing(dates, func(d1, d2 time.Time) bool { return d1.Before(d2) })
+	fmt.Printf("%v\n", dates)
+	for i := range dates {
+		if i > 0 {
+			assert.True(t, dates[i-1].Before(dates[i]))
+		}
+	}
+}
+
+var sorted []int
+
+func BenchmarkSortUsing(b *testing.B) {
+	var s []int
+	for j := 0; j < b.N; j++ {
+		items := make([]int, 100)
+		for i := range items {
+			items[i] = len(items) - i
+		}
+		SortUsing(items, func(i, j int) bool { return i < j })
+		s = items
+	}
+	sorted = s
+}
+
+func BenchmarkSort(b *testing.B) {
+	var s []int
+	for j := 0; j < b.N; j++ {
+		items := make([]int, 100)
+		for i := range items {
+			items[i] = len(items) - i
+		}
+		Sort(items)
+		s = items
+	}
+	sorted = s
 }
