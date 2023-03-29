@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/slices"
 )
 
@@ -126,4 +127,22 @@ func AsFunc[K comparable, T any](m map[K]T) func(K) T {
 	return func(k K) (v T) {
 		return m[k]
 	}
+}
+
+func FindUsing[K comparable, T any](m map[K]T, p func(T) bool) option.Option[K] {
+	for k, v := range m {
+		if p(v) {
+			return option.Value(k)
+		}
+	}
+	return option.Empty[K]()
+}
+
+func FindUsingRef[K comparable, T any](m map[K]T, p func(*T) bool) option.Option[K] {
+	for k, v := range m {
+		if p(&v) {
+			return option.Value(k)
+		}
+	}
+	return option.Empty[K]()
 }
