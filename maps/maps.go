@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/slices"
+	"github.com/robdavid/genutil-go/tuple"
 )
 
 var ErrPathConflict = errors.New("conflict between object and non-object types")
@@ -108,6 +110,25 @@ func Values[K comparable, T any](m map[K]T) []T {
 	return result
 }
 
+// Returns keys and values as a slice of 2-tuples. The order of the
+// items is undefined
+func Items[K comparable, T any](m map[K]T) []tuple.Tuple2[K, T] {
+	result := make([]tuple.Tuple2[K, T], len(m))
+	i := 0
+	for k, v := range m {
+		result[i] = tuple.Of2(k, v)
+		i++
+	}
+	return result
+}
+
+// Returns keys and values as a slice of 2-tuples, sorted in key order
+func SortedItems[K slices.Sortable, T any](m map[K]T) []tuple.Tuple2[K, T] {
+	result := Items(m)
+	slices.SortUsing(result, func(i1, i2 tuple.Tuple2[K, T]) bool { return i1.First < i2.First })
+	return result
+}
+
 // Returns the keys of a map as a slice. The keys are sorted in their
 // natural order, as defined by the < operator.
 func SortedKeys[K slices.Sortable, T any](m map[K]T) []K {
@@ -145,4 +166,28 @@ func FindUsingRef[K comparable, T any](m map[K]T, p func(*T) bool) option.Option
 		}
 	}
 	return option.Empty[K]()
+}
+
+func IterKeys[K comparable, T any](m map[K]T) iterator.Iterator[K] {
+	return iterator.Generate(func(y iterator.Yield[K]) {
+		for k := range m {
+			y.Yield(k)
+		}
+	})
+}
+
+func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
+	return iterator.Generate(func(y iterator.Yield[T]) {
+		for _, v := range m {
+			y.Yield(v)
+		}
+	})
+}
+
+func IterItems[K comparable, T any](m map[K]T) iterator.Iterator[tuple.Tuple2[K, T]] {
+	return iterator.Generate(func(y iterator.Yield[tuple.Tuple2[K, T]]) {
+		for k, v := range m {
+			y.Yield(tuple.Of2(k, v))
+		}
+	})
 }
