@@ -2,10 +2,13 @@ package maps
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/test"
+	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/slices"
+	"github.com/robdavid/genutil-go/tuple"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -99,9 +102,57 @@ func TestEmptyKeys(t *testing.T) {
 func TestValues(t *testing.T) {
 	mymap := map[string]int{
 		"one":   1,
-		"three": 2,
-		"two":   3,
+		"three": 3,
+		"two":   2,
 	}
 	values := Values(mymap)
 	assert.ElementsMatch(t, []int{1, 2, 3}, values)
+}
+
+func TestIterKeys(t *testing.T) {
+	mymap := map[string]int{
+		"one":   1,
+		"three": 3,
+		"two":   2,
+	}
+	keys := iterator.Collect(IterKeys(mymap))
+	assert.ElementsMatch(t, []string{"one", "two", "three"}, keys)
+}
+
+func BenchmarkKeyIterator(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		mymap := make(map[string]int)
+		for j := 0; j < 100; j++ {
+			mymap[fmt.Sprintf("key-%d", j)] = j
+		}
+		keys := iterator.Collect(IterKeys(mymap))
+		assert.Equal(b, 100, len(keys))
+	}
+}
+
+func BenchmarkKeys(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		mymap := make(map[string]int)
+		for j := 0; j < 100; j++ {
+			mymap[fmt.Sprintf("key-%d", j)] = j
+		}
+		keys := Keys(mymap)
+		assert.Equal(b, 100, len(keys))
+	}
+}
+
+func TestSortedItems(t *testing.T) {
+	mymap := make(map[string]int)
+	for j := 0; j < 5; j++ {
+		mymap[fmt.Sprintf("key-%d", j)] = j
+	}
+	items := SortedItems(mymap)
+	expected := []tuple.Tuple2[string, int]{
+		tuple.Of2("key-0", 0),
+		tuple.Of2("key-1", 1),
+		tuple.Of2("key-2", 2),
+		tuple.Of2("key-3", 3),
+		tuple.Of2("key-4", 4),
+	}
+	assert.Equal(t, expected, items)
 }

@@ -13,15 +13,23 @@ import (
 // iterators of uncertain size.
 const maxUncertainAllocation = 100000
 
-// Generic iterator
-type Iterator[T any] interface {
+type SimpleIterator[T any] interface {
 	// Set the iterator's current value to be the first, and subsequent, iterator elements.
 	// False is returned when there are no more elements (the current value remains unchanged)
 	Next() bool
-	Value() T           // Get the current iterator value.
-	Abort()             // Stop the iterator; subsequent calls to Next() will return false.
-	Chan() <-chan T     // Return iterator as a channel.
+	Value() T // Get the current iterator value.
+	Abort()   // Stop the iterator; subsequent calls to Next() will return false.
+}
+
+type SizedIterator[T any] interface {
+	SimpleIterator[T]
 	Size() IteratorSize // Size estimate, where possible, of the number of elements remaining.
+}
+
+// Generic iterator
+type Iterator[T any] interface {
+	SizedIterator[T]
+	Chan() <-chan T // Return iterator as a channel.
 }
 
 // Iterator sizing information
@@ -82,7 +90,8 @@ func safeSend[T any](ch chan<- T, val T) (ok bool) {
 	return true
 }
 
-// Generic channel implementation
+// Generic channel implementation. Produces a channel yielding
+// values from the iterator
 func iterChan[T any](iter Iterator[T]) (out chan T) {
 	out = make(chan T)
 	go func() {
@@ -96,8 +105,48 @@ func iterChan[T any](iter Iterator[T]) (out chan T) {
 	return
 }
 
+type unknownSizeIterator[T any] struct {
+	SimpleIterator[T]
+}
+
+func (usi unknownSizeIterator[T]) Size() IteratorSize {
+	return SizeUnknown{}
+}
+
+func MakeSizedIterator[T any](si SimpleIterator[T]) SizedIterator[T] {
+	return unknownSizeIterator[T]{si}
+}
+
+type autoChannelIterator[T any] struct {
+	SizedIterator[T]
+	OutChan chan T
+}
+
+func MakeIterator[T any](base SizedIterator[T]) Iterator[T] {
+	return &autoChannelIterator[T]{base, nil}
+}
+
+func MakeIteratorFromSimple[T any](base SimpleIterator[T]) Iterator[T] {
+	return MakeIterator(MakeSizedIterator(base))
+}
+
+func (ei *autoChannelIterator[T]) Chan() <-chan T {
+	if ei.OutChan == nil {
+		ei.OutChan = iterChan[T](ei)
+	}
+	return ei.OutChan
+}
+
+func (ei *autoChannelIterator[T]) Abort() {
+	ei.SizedIterator.Abort()
+	if ei.OutChan != nil {
+		safeClose(ei.OutChan)
+		ei.OutChan = nil
+	}
+}
+
 // Wraps an iterator and adds a mapping function
-type Func[T, U any] struct {
+type mapIter[T, U any] struct {
 	base    Iterator[T]
 	mapping FuncNext[T, U]
 	value   option.Option[U]
@@ -105,7 +154,7 @@ type Func[T, U any] struct {
 	size    IteratorSize
 }
 
-func (i *Func[T, U]) Next() bool {
+func (i *mapIter[T, U]) Next() bool {
 	ok, value := i.mapping(i.base)
 	if !ok {
 		return false
@@ -115,11 +164,11 @@ func (i *Func[T, U]) Next() bool {
 	}
 }
 
-func (i *Func[T, U]) Value() U {
+func (i *mapIter[T, U]) Value() U {
 	return i.value.GetOrZero()
 }
 
-func (i *Func[T, U]) Abort() {
+func (i *mapIter[T, U]) Abort() {
 	if i.outChan != nil {
 		safeClose(i.outChan)
 		i.outChan = nil
@@ -127,32 +176,31 @@ func (i *Func[T, U]) Abort() {
 	i.base.Abort()
 }
 
-func (i *Func[T, U]) Chan() <-chan U {
+func (i *mapIter[T, U]) Chan() <-chan U {
 	if i.outChan == nil {
 		i.outChan = iterChan[U](i)
 	}
 	return i.outChan
 }
 
-func (i *Func[T, U]) Size() IteratorSize {
+func (i *mapIter[T, U]) Size() IteratorSize {
 	return i.size
 }
 
 // Create a new iterator from an existing operator and a function that consumes it, yielding
 // one element at a time.
-func WrapFunc[T any, U any](iterator Iterator[T], f FuncNext[T, U], size IteratorSize) Iterator[U] {
-	return &Func[T, U]{base: iterator, mapping: f, value: option.Empty[U](), size: size}
+func wrapFunc[T any, U any](iterator Iterator[T], f FuncNext[T, U], size IteratorSize) Iterator[U] {
+	return &mapIter[T, U]{base: iterator, mapping: f, value: option.Empty[U](), size: size}
 }
 
 // Iterator over a slice
-type SliceIter[T any] struct {
-	slice   []T
-	index   int
-	value   T
-	outChan chan T
+type sliceIter[T any] struct {
+	slice []T
+	index int
+	value T
 }
 
-func (si *SliceIter[T]) Next() bool {
+func (si *sliceIter[T]) Next() bool {
 	if si.index < len(si.slice) {
 		si.value = si.slice[si.index]
 		si.index++
@@ -162,25 +210,15 @@ func (si *SliceIter[T]) Next() bool {
 	}
 }
 
-func (si *SliceIter[T]) Value() T {
+func (si *sliceIter[T]) Value() T {
 	return si.value
 }
 
-func (si *SliceIter[T]) Abort() {
+func (si *sliceIter[T]) Abort() {
 	si.index = len(si.slice)
-	if si.outChan != nil {
-		safeClose(si.outChan)
-	}
 }
 
-func (si *SliceIter[T]) Chan() <-chan T {
-	if si.outChan == nil {
-		si.outChan = iterChan[T](si)
-	}
-	return si.outChan
-}
-
-func (si *SliceIter[T]) Size() IteratorSize {
+func (si *sliceIter[T]) Size() IteratorSize {
 	return SizeKnown{len(si.slice) - si.index}
 }
 
@@ -188,20 +226,19 @@ func (si *SliceIter[T]) Size() IteratorSize {
 // from the slice in order.
 func Slice[T any](slice []T) Iterator[T] {
 	var t T
-	return &SliceIter[T]{slice, 0, t, nil}
+	return MakeIterator[T](&sliceIter[T]{slice, 0, t})
 }
 
 // Makes an Iterator[T] containing the variadic arguments of type T
 func Of[T any](elements ...T) Iterator[T] {
-	var t T
-	return &SliceIter[T]{elements, 0, t, nil}
+	return Slice(elements)
 }
 
-type RangeIter struct {
+type rangeIter struct {
 	index, to, by, value int
 }
 
-func (ri *RangeIter) Next() bool {
+func (ri *rangeIter) Next() bool {
 	if ri.by < 0 {
 		if ri.index <= ri.to {
 			return false
@@ -214,19 +251,19 @@ func (ri *RangeIter) Next() bool {
 	return true
 }
 
-func (ri *RangeIter) Value() int {
+func (ri *rangeIter) Value() int {
 	return ri.value
 }
 
-func (ri *RangeIter) Abort() {
+func (ri *rangeIter) Abort() {
 	ri.index = ri.to
 }
 
-func (ri *RangeIter) Chan() <-chan int {
+func (ri *rangeIter) Chan() <-chan int {
 	return iterChan[int](ri)
 }
 
-func (ri *RangeIter) Size() IteratorSize {
+func (ri *rangeIter) Size() IteratorSize {
 	size := (ri.to - ri.index) / ri.by
 	if size < 0 {
 		size = 0
@@ -237,7 +274,7 @@ func (ri *RangeIter) Size() IteratorSize {
 // Create an iterator that ranges from `from` up to
 // `upto` exclusive
 func Range(from, upto int) Iterator[int] {
-	return &RangeIter{from, upto, 1, 0}
+	return &rangeIter{from, upto, 1, 0}
 }
 
 // Create an iterator that ranges from `from` up to
@@ -248,7 +285,7 @@ func RangeBy(from, upto, by int) Iterator[int] {
 	if by == 0 {
 		panic("Illegal range by zero")
 	}
-	return &RangeIter{from, upto, by, 0}
+	return &rangeIter{from, upto, by, 0}
 }
 
 // Applies function `mapping` of type `func(T) U` to each value, producing
@@ -260,7 +297,7 @@ func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
 		}
 		return
 	}
-	return WrapFunc(iter, mapNext, iter.Size())
+	return wrapFunc(iter, mapNext, iter.Size())
 }
 
 // Applies a filter function `predicate` of type `func(T) bool`, producing
@@ -278,7 +315,7 @@ func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
 			return
 		}
 	}
-	return WrapFunc(iter, filterNext, iter.Size().Filtered())
+	return wrapFunc(iter, filterNext, iter.Size().Filtered())
 }
 
 // Applies both transformation and filtering logic to an iterator. The function `mapping` is
@@ -296,7 +333,7 @@ func FilterMap[T any, U any](iter Iterator[T], mapping func(T) option.Option[U])
 			return
 		}
 	}
-	return WrapFunc(iter, filterMapNext, iter.Size().Filtered())
+	return wrapFunc(iter, filterMapNext, iter.Size().Filtered())
 }
 
 // Takes an iterator of results and returns an iterator of the underlying
@@ -381,30 +418,30 @@ func Any[T any](iter Iterator[T], predicate func(v T) bool) bool {
 
 // An iterator that obtains values (or an error) from
 // a channel
-type GenIter[T any] struct {
+type genIter[T any] struct {
 	source chan T
 	value  T
 }
 
-func (pi *GenIter[T]) Next() bool {
+func (pi *genIter[T]) Next() bool {
 	var ok bool
 	pi.value, ok = <-pi.source
 	return ok
 }
 
-func (pi *GenIter[T]) Value() T {
+func (pi *genIter[T]) Value() T {
 	return pi.value
 }
 
-func (pi *GenIter[T]) Chan() <-chan T {
+func (pi *genIter[T]) Chan() <-chan T {
 	return pi.source
 }
 
-func (pi *GenIter[T]) Abort() {
+func (pi *genIter[T]) Abort() {
 	safeClose(pi.source)
 }
 
-func (pi *GenIter[T]) Size() IteratorSize {
+func (pi *genIter[T]) Size() IteratorSize {
 	return SizeUnknown{}
 }
 
@@ -502,7 +539,7 @@ func Generate[T any](activity GenFunc[T]) Iterator[T] {
 	ch := make(chan T)
 	yield := Yield[T]{ch}
 	go runGenerator(yield, activity)
-	return &GenIter[T]{source: ch}
+	return &genIter[T]{source: ch}
 }
 
 // A variation on Generate that produces an iterator of result types.
@@ -510,5 +547,5 @@ func GenerateResults[T any](activity GenResultFunc[T]) Iterator[result.Result[T]
 	ch := make(chan result.Result[T])
 	yield := YieldResult[T](Yield[result.Result[T]]{ch})
 	go runResultGenerator(yield, activity)
-	return &GenIter[result.Result[T]]{source: ch}
+	return &genIter[result.Result[T]]{source: ch}
 }
