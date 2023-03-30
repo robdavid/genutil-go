@@ -150,24 +150,34 @@ func AsFunc[K comparable, T any](m map[K]T) func(K) T {
 	}
 }
 
-func FindUsing[K comparable, T any](m map[K]T, p func(T) bool) option.Option[K] {
+// Finds a key value pair in a map which satisfies the predicate p which can match
+// against both key and value. The return value is an option that either contains a
+// 2-tuple of a matching key and value, or is empty. If there are multiple matching
+// key value pairs, then which of those are returned is indeterminate.
+func FindUsing[K comparable, T any](m map[K]T, p func(K, T) bool) option.Option[tuple.Tuple2[K, T]] {
 	for k, v := range m {
-		if p(v) {
-			return option.Value(k)
+		if p(k, v) {
+			return option.Value(tuple.Of2(k, v))
 		}
 	}
-	return option.Empty[K]()
+	return option.Empty[tuple.Tuple2[K, T]]()
 }
 
-func FindUsingRef[K comparable, T any](m map[K]T, p func(*T) bool) option.Option[K] {
+// Finds a key value pair in a map which satisfies the predicate p which can match
+// against both key and value. The key and value are passed to the predicate function
+// by reference. The return value is an option that either contains a 2-tuple of
+// references to a matching key and value, or is empty. If there are multiple matching
+// key value pairs, then which of those are returned is indeterminate.
+func FindUsingRef[K comparable, T any](m map[K]T, p func(*K, *T) bool) option.Option[tuple.Tuple2[*K, *T]] {
 	for k, v := range m {
-		if p(&v) {
-			return option.Value(k)
+		if p(&k, &v) {
+			return option.Value(tuple.Of2(&k, &v))
 		}
 	}
-	return option.Empty[K]()
+	return option.Empty[tuple.Tuple2[*K, *T]]()
 }
 
+// Returns an iterator over the keys of a map.
 func IterKeys[K comparable, T any](m map[K]T) iterator.Iterator[K] {
 	return iterator.Generate(func(y iterator.Yield[K]) {
 		for k := range m {
@@ -176,6 +186,7 @@ func IterKeys[K comparable, T any](m map[K]T) iterator.Iterator[K] {
 	})
 }
 
+// Returns an iterator over the values of a map.
 func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
 	return iterator.Generate(func(y iterator.Yield[T]) {
 		for _, v := range m {
@@ -184,6 +195,8 @@ func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
 	})
 }
 
+// Returns an iterator over the keys and values of a map, returning each pair
+// as 2-tuple
 func IterItems[K comparable, T any](m map[K]T) iterator.Iterator[tuple.Tuple2[K, T]] {
 	return iterator.Generate(func(y iterator.Yield[tuple.Tuple2[K, T]]) {
 		for k, v := range m {

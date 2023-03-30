@@ -3,6 +3,7 @@ package maps
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/test"
@@ -119,12 +120,46 @@ func TestIterKeys(t *testing.T) {
 	assert.ElementsMatch(t, []string{"one", "two", "three"}, keys)
 }
 
+func generateMap(size int) map[string]int {
+	mymap := make(map[string]int)
+	for j := 0; j < size; j++ {
+		mymap[fmt.Sprintf("key-%d", j)] = j
+	}
+	return mymap
+}
+
+type testMapValue struct {
+	intValue     int
+	floatValue   float64
+	strValue     string
+	complexValue complex128
+}
+
+func generateLargeMap(size int) map[int]testMapValue {
+	mymap := make(map[int]testMapValue)
+	for j := 0; j < size; j++ {
+		f := float64(j)
+		mymap[j] = testMapValue{j, f, strconv.Itoa(j), complex(f, f*2)}
+	}
+	return mymap
+}
+
+func TestFindUsing(t *testing.T) {
+	mymap := generateMap(10)
+	match := FindUsing(mymap, func(k string, v int) bool { return v == 5 })
+	assert.Equal(t, match.Get(), tuple.Of2("key-5", 5))
+}
+
+func TestFindUsingRef(t *testing.T) {
+	mymap := generateMap(10)
+	match := FindUsingRef(mymap, func(k *string, v *int) bool { return *v == 5 })
+	assert.Equal(t, *match.Get().First, "key-5")
+	assert.Equal(t, *match.Get().Second, 5)
+}
+
 func BenchmarkKeyIterator(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		mymap := make(map[string]int)
-		for j := 0; j < 100; j++ {
-			mymap[fmt.Sprintf("key-%d", j)] = j
-		}
+		mymap := generateMap(100)
 		keys := iterator.Collect(IterKeys(mymap))
 		assert.Equal(b, 100, len(keys))
 	}
@@ -132,20 +167,30 @@ func BenchmarkKeyIterator(b *testing.B) {
 
 func BenchmarkKeys(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		mymap := make(map[string]int)
-		for j := 0; j < 100; j++ {
-			mymap[fmt.Sprintf("key-%d", j)] = j
-		}
+		mymap := generateMap(100)
 		keys := Keys(mymap)
 		assert.Equal(b, 100, len(keys))
 	}
 }
 
-func TestSortedItems(t *testing.T) {
-	mymap := make(map[string]int)
-	for j := 0; j < 5; j++ {
-		mymap[fmt.Sprintf("key-%d", j)] = j
+func BenchmarkFindUsing(b *testing.B) {
+	mymap := generateLargeMap(100)
+	for i := 0; i < b.N; i++ {
+		match := FindUsing(mymap, func(k int, v testMapValue) bool { return v.intValue == 50 })
+		assert.Equal(b, match.Get().First, 50)
 	}
+}
+
+func BenchmarkFindUsingRef(b *testing.B) {
+	mymap := generateLargeMap(100)
+	for i := 0; i < b.N; i++ {
+		match := FindUsingRef(mymap, func(k *int, v *testMapValue) bool { return v.intValue == 50 })
+		assert.Equal(b, *match.Get().First, 50)
+	}
+}
+
+func TestSortedItems(t *testing.T) {
+	mymap := generateMap(5)
 	items := SortedItems(mymap)
 	expected := []tuple.Tuple2[string, int]{
 		tuple.Of2("key-0", 0),
