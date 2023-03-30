@@ -18,7 +18,7 @@ func dummySuccessFunction9() ({{$testTypes | join ", "}}, error) {
 {{ $paramTypes := slice $testTypes 0 $n | join ", " }}
 func dummySuccessFunction{{$n}}() ({{$paramTypes}}, error) {
 	r := result.From{{$p}}(dummySuccessFunction{{$p}}())
-	return result.Value{{$n}}(r.Get().Tuple{{$n}}).ToRef().Return()
+	return result.Value{{$n}}(r.Get().ToRef().Tuple{{$n}}()).ToRef().Return()
 }
 
 {{ end -}}

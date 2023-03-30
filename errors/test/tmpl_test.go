@@ -15,7 +15,7 @@ func dummySuccessFunction9() (string, int, float64, bool, rune, byte, int32, flo
 
 func dummySuccessFunction2() (string, int, error) {
 	r := result.From3(dummySuccessFunction3())
-	return result.Value2(r.Get().Tuple2).ToRef().Return()
+	return result.Value2(r.Get().ToRef().Tuple2()).ToRef().Return()
 }
 
 func TestSuccess2(t *testing.T) {
@@ -29,7 +29,7 @@ func TestSuccess2(t *testing.T) {
 
 func dummySuccessFunction3() (string, int, float64, error) {
 	r := result.From4(dummySuccessFunction4())
-	return result.Value3(r.Get().Tuple3).ToRef().Return()
+	return result.Value3(r.Get().ToRef().Tuple3()).ToRef().Return()
 }
 
 func TestSuccess3(t *testing.T) {
@@ -44,7 +44,7 @@ func TestSuccess3(t *testing.T) {
 
 func dummySuccessFunction4() (string, int, float64, bool, error) {
 	r := result.From5(dummySuccessFunction5())
-	return result.Value4(r.Get().Tuple4).ToRef().Return()
+	return result.Value4(r.Get().ToRef().Tuple4()).ToRef().Return()
 }
 
 func TestSuccess4(t *testing.T) {
@@ -60,7 +60,7 @@ func TestSuccess4(t *testing.T) {
 
 func dummySuccessFunction5() (string, int, float64, bool, rune, error) {
 	r := result.From6(dummySuccessFunction6())
-	return result.Value5(r.Get().Tuple5).ToRef().Return()
+	return result.Value5(r.Get().ToRef().Tuple5()).ToRef().Return()
 }
 
 func TestSuccess5(t *testing.T) {
@@ -77,7 +77,7 @@ func TestSuccess5(t *testing.T) {
 
 func dummySuccessFunction6() (string, int, float64, bool, rune, byte, error) {
 	r := result.From7(dummySuccessFunction7())
-	return result.Value6(r.Get().Tuple6).ToRef().Return()
+	return result.Value6(r.Get().ToRef().Tuple6()).ToRef().Return()
 }
 
 func TestSuccess6(t *testing.T) {
@@ -95,7 +95,7 @@ func TestSuccess6(t *testing.T) {
 
 func dummySuccessFunction7() (string, int, float64, bool, rune, byte, int32, error) {
 	r := result.From8(dummySuccessFunction8())
-	return result.Value7(r.Get().Tuple7).ToRef().Return()
+	return result.Value7(r.Get().ToRef().Tuple7()).ToRef().Return()
 }
 
 func TestSuccess7(t *testing.T) {
@@ -114,7 +114,7 @@ func TestSuccess7(t *testing.T) {
 
 func dummySuccessFunction8() (string, int, float64, bool, rune, byte, int32, float32, error) {
 	r := result.From9(dummySuccessFunction9())
-	return result.Value8(r.Get().Tuple8).ToRef().Return()
+	return result.Value8(r.Get().ToRef().Tuple8()).ToRef().Return()
 }
 
 func TestSuccess8(t *testing.T) {

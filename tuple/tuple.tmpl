@@ -1,27 +1,33 @@
 package tuple
 
 {{ $fields := list "First" "Second" "Third" "Forth" "Fifth" "Sixth" "Seventh" "Eighth" "Ninth" -}}
-{{ range $i,$n := seq 1 (len $fields) -}}
+{{ range $n := seq 1 (len $fields) -}}
 {{ $p := int (sub $n 1) -}}
 {{ $typeConstraints := mapTpl "T{{.}} any" (seq 1 $n) | join ", " -}}
 {{ $typeParams := mapTpl "T{{.}}" (seq 1 $n) | join ", " -}}
-{{ $prevTypeParams := mapTpl "T{{.}}" (seq 1 $p) | join ", " -}}
+{{ $prevTypeParams := "" -}}
+{{ if gt $p 0 -}}
+{{ $prevTypeParams = printf "[%s]" (mapTpl "T{{.}}" (seq 1 $p) | join ", ") -}}
+{{ end -}}
 {{ $parameters := mapTpl "t{{.}} T{{.}}" (seq 1 $n) | join ", " -}}
-{{ $arguments := mapTpl "t{{.}}" (seq 1 $p) | join ", " -}}
+{{ $arguments := mapTpl "t{{.}}" (seq 1 $n) | join ", " -}}
+{{ $preFields := mapTpl (printf "t%d.{{.}}" $n) (slice $fields 0 $p) | join ", " -}}
 
 // Tuple of {{$n}} fields
 type Tuple{{$n}}[{{$typeConstraints}}] struct {
-	Tuple{{$p}}{{if gt $n 1}}[{{$prevTypeParams}}]{{end}}
-	{{index $fields (sub $n 1)}} T{{$n}}
+{{- range $f := seq 1 $n }}
+	{{index $fields (sub $f 1)}} T{{$f}}
+{{- end }}
 }
 
 func Of{{$n}}[{{$typeConstraints}}]({{$parameters}}) Tuple{{$n}}[{{$typeParams}}] {
-	return Tuple{{$n}}[{{$typeParams}}]{Of{{$p}}({{$arguments}}), t{{$n}}}
+	return Tuple{{$n}}[{{$typeParams}}] { {{$arguments}} }
 }
 
 // Interface implementation
+func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Tuple{{$p}}() Tuple{{$p}}{{$prevTypeParams}}  { return Tuple{{$p}}{{$prevTypeParams}}{ {{ $preFields }} } }
 func (*Tuple{{$n}}[{{$typeParams}}]) Size() int         { return {{$n}} }
-func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Pre() Tuple     { return &t{{$n}}.Tuple{{$p}} }
+func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Pre() Tuple     { return &Tuple{{$p}}{{ $prevTypeParams }}{ {{ $preFields }} } }
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Last() any      { return t{{$n}}.{{ index $fields (sub $n 1) }} }
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Get(n int) any  { return tupleGet(t{{$n}}, n) }
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) String() string { return tupleString(t{{$n}}) }
