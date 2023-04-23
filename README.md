@@ -8,8 +8,11 @@
 
 A library of utility functions made possible by Go generics, providing features missing from the standard libraries. This library is still in its early stages, and breaking changes are still possible. Additional functionality is likely to be added.
 
+See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/errors/handler) for more details.
+
 The library falls into a number of categories, subdivided into separate packages.
 
+- [Tuple](#tuple)
 - [Errors](#errors)
   - [Handler](#handler)
     - [Example](#example)
@@ -136,4 +139,4 @@ func readFileContent(fname string) (content []byte, err error) {
 }
 ```
 
-See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/errors/handler) for more details.
+
