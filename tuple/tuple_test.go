@@ -8,6 +8,8 @@ import (
 
 func TestTuple0(t *testing.T) {
 	t0 := Of0()
+	u := Unit()
+	assert.Equal(t, t0, u)
 	assert.Equal(t, t0.Size(), 0)
 	assert.Equal(t, t0.String(), "()")
 	assert.Panics(t, func() { t0.Get(0) })
@@ -24,10 +26,14 @@ func TestTuple1(t *testing.T) {
 	assert.Equal(t, ta, tb)
 	tb = Of1(11)
 	assert.NotEqual(t, ta, tb)
+	assert.Equal(t, Unit(), tb.Tuple0())
+	assert.Equal(t, Unit(), *tb.Pre().(*Tuple0))
 }
 
 func TestTuple2(t *testing.T) {
 	t2 := Of2(10, 11)
+	p := Pair(10, 11)
+	assert.Equal(t, t2, p)
 	assert.Equal(t, t2.Size(), 2)
 	assert.Equal(t, t2.String(), "(10,11)")
 	assert.Equal(t, t2.Get(0), 10)
@@ -38,6 +44,12 @@ func TestTuple2(t *testing.T) {
 	assert.True(t, t2 == Of2(10, 11))
 	assert.True(t, t2 != Of2(11, 12))
 	assert.NotEqual(t, t2, Of1(11))
+	assert.Equal(t, Of1(10), t2.Tuple1())
+}
+
+func TestTupleString(t *testing.T) {
+	t5 := Of5(1, "two", 3.1, false, 'e')
+	assert.Equal(t, "(1,\"two\",3.1,false,101)", t5.String())
 }
 
 func TestTuple3(t *testing.T) {

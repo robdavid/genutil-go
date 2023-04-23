@@ -7,13 +7,22 @@ import (
 	"strings"
 )
 
-var ErrIndex = errors.New("Index error")
+var ErrIndex = errors.New("index error")
 
+/*
+General tuple interface, implemented by all *TupleN
+types
+*/
 type Tuple interface {
+	// Get the nth element of the tuple
 	Get(int) any
+	// Return the number of elements in the tuple
 	Size() int
+	// Return the tuple as a string, formatted (e1,e2,...)
 	String() string
-	Pre() Tuple // Tuple of first size-1 elements
+	// Tuple of first size-1 elements
+	Pre() Tuple
+	// Return the last element in the tuple
 	Last() any
 }
 
@@ -24,7 +33,7 @@ func tupleString(tuple Tuple) string {
 		if i > 0 {
 			result.WriteString(",")
 		}
-		fmt.Fprintf(&result, "%v", tuple.Get(i))
+		fmt.Fprintf(&result, "%#v", tuple.Get(i))
 	}
 	result.WriteString(")")
 	return result.String()

@@ -24,14 +24,20 @@ func Of{{$n}}[{{$typeConstraints}}]({{$parameters}}) Tuple{{$n}}[{{$typeParams}}
 	return Tuple{{$n}}[{{$typeParams}}] { {{$arguments}} }
 }
 
-// Interface implementation
+// Returns a reference to a copy of this tuple. The reference returned will implement the Tuple interface
+func (t{{$n}} Tuple{{$n}}[{{$typeParams}}]) ToRef() *Tuple{{$n}}[{{$typeParams}}] { return &t{{$n}} }
+
+// A type safe implementation of Pre - returns a Tuple{{$p}}
+{{- if gt $p 0 }} consisting of the first {{if gt $p 1}}{{$p}} elements{{else}}element{{end}} of this tuple
+{{- end }}
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Tuple{{$p}}() Tuple{{$p}}{{$prevTypeParams}}  { return Tuple{{$p}}{{$prevTypeParams}}{ {{ $preFields }} } }
+
+// Interface implementation
 func (*Tuple{{$n}}[{{$typeParams}}]) Size() int         { return {{$n}} }
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Pre() Tuple     { return &Tuple{{$p}}{{ $prevTypeParams }}{ {{ $preFields }} } }
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Last() any      { return t{{$n}}.{{ index $fields (sub $n 1) }} }
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Get(n int) any  { return tupleGet(t{{$n}}, n) }
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) String() string { return tupleString(t{{$n}}) }
-func (t{{$n}} Tuple{{$n}}[{{$typeParams}}]) ToRef() *Tuple{{$n}}[{{$typeParams}}] { return &t{{$n}} }
 
 // Returns the values in the tuple as a sequence of {{$n}} values
 func (t{{$n}} *Tuple{{$n}}[{{$typeParams}}]) Return() ({{$typeParams}}) {
