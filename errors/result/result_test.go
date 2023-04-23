@@ -78,7 +78,7 @@ func TestSuccessChain(t *testing.T) {
 
 func TestGoodResult2(t *testing.T) {
 	res := From2(arity2Err(nil))
-	assert.Equal(t, "(testValue,123)", res.String())
+	assert.Equal(t, "(\"testValue\",123)", res.String())
 	// These asserts with == also designed to check compile time types
 	assert.True(t, res.Get().First == "testValue", "got value %s", res.Get().First)
 	assert.True(t, res.Get().Second == 123, "got value %d", res.Get().Second)
