@@ -16,6 +16,7 @@ The library falls into a number of categories, subdivided into separate packages
 - [Errors](#errors)
   - [Handler](#handler)
     - [Example](#example)
+  - [Result](#result)
 
 ## Tuple
 
@@ -139,4 +140,44 @@ func readFileContent(fname string) (content []byte, err error) {
 }
 ```
 
+### Result
 
+The `errors.result` package defines a `result.Result` type that contains a value plus an error, typically used to represent the return value of a function, including its error component. It has convenience methods for constructing an instance from a function return, e.g.
+
+```go
+import "github.com/robdavid/genutil-go/errors/result"
+r := result.From(os.Open(file))
+```
+
+It has `Get` and `GetError` methods to get the value part and error part of the result, either or both of which may be present.
+
+```go
+if (r.GetErr() != nil) {
+  return nil, r.GetErr()
+}
+return io.ReadAll(r.Get())
+
+```
+
+The `Result` type also supports a `Try` method similar to the `Try`
+method in error handler package, which can be used in conjunction with the error handling methods of that package.
+
+```go
+import (
+  . "github.com/robdavid/genutil-go/errors/handler"
+  "github.com/robdavid/genutil-go/errors/result"
+  "fmt"
+  "os"
+)
+
+func openFile(file string) result.Result[*os.File] {
+ return result.From(os.Open(file))
+}
+
+func printFile(file string) (err error) {
+ defer Catch(&err)
+ f := openFile(file)                          // returns result.Result[*os.File]
+ fmt.Printf("%s\n", Try(io.ReadAll(f.Try()))) // Call Try on result f
+ return nil
+}
+```
