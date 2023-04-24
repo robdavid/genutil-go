@@ -159,8 +159,7 @@ return io.ReadAll(r.Get())
 
 ```
 
-The `Result` type also supports a `Try` method similar to the `Try`
-method in error handler package, which can be used in conjunction with the error handling methods of that package.
+The `Result` type also supports a `Try` method similar to the `Try` method in error handler package. This method transforms the result instance to the underlying value only, if the error is nil. Otherwise, if the error is non-nil, the function creates a panic that can be handled using the error handling methods of that package.
 
 ```go
 import (
@@ -176,8 +175,10 @@ func openFile(file string) result.Result[*os.File] {
 
 func printFile(file string) (err error) {
  defer Catch(&err)
- f := openFile(file)                          // returns result.Result[*os.File]
- fmt.Printf("%s\n", Try(io.ReadAll(f.Try()))) // Call Try on result f
+ f := openFile(file)                          // Returns result.Result[*os.File]
+ fmt.Printf("%s\n", Try(io.ReadAll(f.Try()))) // Call Try on result f 
  return nil
 }
 ```
+
+Results that contain more than one value are covered by the variants of `result.Result`; `result.Result2`, `result.Result3` etc. Each of these hold a `tuple.Tuple` value of the appropriate size.
