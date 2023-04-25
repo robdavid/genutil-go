@@ -17,6 +17,7 @@ The library falls into a number of categories, subdivided into separate packages
   - [Handler](#handler)
     - [Example](#example)
   - [Result](#result)
+  - [Test](#test)
 
 ## Tuple
 
@@ -181,4 +182,26 @@ func printFile(file string) (err error) {
 }
 ```
 
-Results that contain more than one value are covered by the variants of `result.Result`; `result.Result2`, `result.Result3` etc. Each of these hold a `tuple.Tuple` value of the appropriate size.
+Results that contain more than one value are covered by the variants of `result.Result`; `result.Result2`, `result.Result3` etc. Each of these hold a `tuple.Tuple2` or `tuple.Tuple3` etc. value respectively. There is also a `result.Result0` type for results that consist of an error only.
+
+### Test
+
+The `test` package contains some error reporting methods to help with unit tests that need to assert that an error should or should not occur. It builds on top of `result.Result` to create a `test.TestableResult` type that can assert against and report errors in a test.
+
+```go
+import (
+  "github.com/robdavid/genutil-go/errors/test"
+  "testing"
+  "os"
+)
+
+func TestOpen(t *testing.T) {
+  f := test.Result(os.Open("myfile")).Must(t)
+  // Test assertions
+}
+
+```
+
+The above builds a `test.TestResult` value from the return value of the call to `os.Open`. It then calls a method `Must` that asserts the result must have a nil error. If it is non-nil, the error is reported to the test framework, and the test is terminated.
+
+Various other methods and types exist to handle return values with errors only or multiple non-error values, such as `test.Result0` and `test.Result2`.
