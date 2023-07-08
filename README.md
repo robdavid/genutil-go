@@ -93,7 +93,7 @@ It works by removing the error component from a function call's return values, c
 
 #### Example
 
-Consider the following function to read the contents of a file.
+Consider the following function to read the contents of a file. This is using typical Go error handling patterns, with explicit testing for non-nil error values.
 
 ```go
 func readFileContent(fname string) (content []byte, err error){
@@ -109,7 +109,7 @@ func readFileContent(fname string) (content []byte, err error){
 }
 ```
 
-This is using typical Go error handling, testing each error value explicitly. The following version uses the `Try` and `Catch` error handling functions.
+The following version instead uses the `Try` and `Catch` error handling functions.
 
 ```go
 import . "github.com/robdavid/genutil-go/errors/handler"
@@ -123,7 +123,7 @@ func readFileContent(fname string) (content []byte, err error) {
 }
 ```
 
-Here the `Try` function is used to wrap the function calls that return a value and an error. `Try` removes the error part and returns just the single value. However, if the error is non-nil it will panic with a `TryError` value, wrapping the error. The `Catch` deferred function will recover from this type of panic and in this example will populate the `err` return value with the original error, thus causing it to be returned to the caller.
+Here the `Try` generic function is used to strip the error part from the io function returns, leaving just a simple value. However, if the error is non-nil it will panic with a `TryError` value, wrapping the error. The `Catch` deferred function will recover from this type of panic and in this example will populate the `err` return value with the original error, thus causing it to be returned to the caller of our function.
 
 If you want to augment the error, or perform other processing on the error, the `Handle` deferred function can be used instead of `Catch`.
 
@@ -160,7 +160,7 @@ return io.ReadAll(r.Get())
 
 ```
 
-The `Result` type also supports a `Try` method similar to the `Try` method in error handler package. This method transforms the result instance to the underlying value only, if the error is nil. Otherwise, if the error is non-nil, the function creates a panic that can be handled using the error handling methods of that package.
+The `Result` type also supports a `Try` method similar to the `Try` method in error handler package. This method transforms the result instance to the underlying value only, if the error is nil. Otherwise, if the error is non-nil, the function creates a panic that can be handled using the error handling package's error handling methods, such as `Catch` or `Handle` .
 
 ```go
 import (
