@@ -13,6 +13,7 @@ import (
 // iterators of uncertain size.
 const maxUncertainAllocation = 100000
 
+// An iterator that supports a simple sequence of elements
 type SimpleIterator[T any] interface {
 	// Set the iterator's current value to be the first, and subsequent, iterator elements.
 	// False is returned when there are no more elements (the current value remains unchanged)
@@ -21,6 +22,7 @@ type SimpleIterator[T any] interface {
 	Abort()   // Stop the iterator; subsequent calls to Next() will return false.
 }
 
+// An extension of SimpleIterator that also holds some sizing information
 type SizedIterator[T any] interface {
 	SimpleIterator[T]
 	Size() IteratorSize // Size estimate, where possible, of the number of elements remaining.
@@ -113,6 +115,8 @@ func (usi unknownSizeIterator[T]) Size() IteratorSize {
 	return SizeUnknown{}
 }
 
+// Makes a sized iterator from a simple iterator; the iterator size will
+// be unknown.
 func MakeSizedIterator[T any](si SimpleIterator[T]) SizedIterator[T] {
 	return unknownSizeIterator[T]{si}
 }
@@ -122,10 +126,14 @@ type autoChannelIterator[T any] struct {
 	OutChan chan T
 }
 
+// Create a generic iterator from a simple iterator. Provides an implementation
+// of a source of elements over a channel.
 func MakeIterator[T any](base SizedIterator[T]) Iterator[T] {
 	return &autoChannelIterator[T]{base, nil}
 }
 
+// Create a generic iterator from a sized iterator. Provides an implementation
+// of a source of elements over a channel.
 func MakeIteratorFromSimple[T any](base SimpleIterator[T]) Iterator[T] {
 	return MakeIterator(MakeSizedIterator(base))
 }
