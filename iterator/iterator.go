@@ -92,7 +92,7 @@ func safeSend[T any](ch chan<- T, val T) (ok bool) {
 
 // Generic channel implementation. Produces a channel yielding
 // values from the iterator
-func iterChan[T any](iter Iterator[T]) (out chan T) {
+func iterChan[T any](iter SimpleIterator[T]) (out chan T) {
 	out = make(chan T)
 	go func() {
 		defer safeClose(out)
