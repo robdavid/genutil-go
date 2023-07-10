@@ -243,3 +243,29 @@ func BenchmarkSort(b *testing.B) {
 	}
 	sorted = s
 }
+
+func TestEqual(t *testing.T) {
+	var l []int = nil
+	var r []int = nil
+	assert.True(t, Equal(l, r))
+	r = []int{}
+	assert.True(t, Equal(l, r))
+	r = append(r, 1)
+	l = append(l, 1)
+	assert.True(t, Equal(l, r))
+	r = append(r, 2)
+	l = append(l, 2)
+	assert.True(t, Equal(l, r))
+	r = append(r, 3)
+	l = append(l, 4)
+	assert.False(t, Equal(l, r))
+	assert.False(t, Equal([]int{1, 2, 3}, []int{1, 2}))
+}
+
+func TestCompare(t *testing.T) {
+	assert.Equal(t, 0, Compare([]int{}, nil))
+	assert.Equal(t, 0, Compare([]int{}, []int{}))
+	assert.Equal(t, -1, Compare([]int{1, 2}, []int{1, 3}))
+	assert.Equal(t, 0, Compare([]int{1, 2}, []int{1, 2}))
+	assert.Equal(t, 1, Compare([]int{1, 2, 4}, []int{1, 2, 3}))
+}

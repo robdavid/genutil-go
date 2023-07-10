@@ -63,6 +63,60 @@ func Contains[T comparable](slice []T, value T) bool {
 	return Find(slice, value) != -1
 }
 
+// Returns true if the two slices provided are the same length
+// and contain the same elements in the same order. The nil slice
+// and the empty slice are regarded as equivalent and therefore
+// equal.
+func Equal[T comparable](left []T, right []T) bool {
+	var i int
+	if len(left) != len(right) {
+		return false
+	}
+	for i = 0; i < len(left); i++ {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// Types that have a well defined ordering, comparable with
+// `<` and `>` operators.
+type OrderComparable interface {
+	int | int8 | int16 | int32 | int64 |
+		uint | uint8 | uint16 | uint32 | uint64 |
+		float32 | float64
+}
+
+// Compare two slices of `OrderComparable` elements, most significant item first.
+// It will return a value less than 0 if the left slice is smaller than the right
+// slice, a value greater than 0 if the left slice is greater than the right slice,
+// and 0 if they are equal. The nil slice and the empty slice are regarded as equivalent,
+// and therefore equal.
+// Examples:
+//
+//	slices.Compare([]int{1,2},[]int{1,3}) < 0 // true
+//	slices.Compare([]int{1,3},[]int{1,3}) == 0 // true
+//	slices.Compare([]int{1,3,4},[]int{1,3}) > 0 // true
+func Compare[T OrderComparable](left []T, right []T) int {
+	var i int
+	lenR := len(right)
+	lenL := len(left)
+	for i = 0; i < lenL && i < lenR; i++ {
+		if left[i] < right[i] {
+			return -1
+		} else if left[i] > right[i] {
+			return 1
+		}
+	}
+	if lenL < lenR {
+		return -1
+	} else if lenL > lenR {
+		return 1
+	}
+	return 0
+}
+
 // Returns the smallest index in slice for which the element equals value, or -1
 // none do.
 func Find[T comparable](slice []T, value T) int {
