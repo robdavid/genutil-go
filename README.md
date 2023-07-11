@@ -18,6 +18,7 @@ The library falls into a number of categories, subdivided into separate packages
     - [Example](#example)
   - [Result](#result)
   - [Test](#test)
+- [Iterator](#iterator)
 
 ## Tuple
 
@@ -205,3 +206,23 @@ func TestOpen(t *testing.T) {
 The above builds a `test.TestResult` value from the return value of the call to `os.Open`. It then calls a method `Must` that asserts the result must have a nil error. If it is non-nil, the error is reported to the test framework, and the test is terminated.
 
 Various other methods and types exist to handle return values with errors only or multiple non-error values, such as `test.Result0` and `test.Result2`.
+
+## Iterator
+
+An `Iterator` is a generic type equivalent to the following definition
+
+```go
+type Iterator[T any] interface {
+  // Set the iterator's current value to be the first, and subsequent, iterator elements.
+  // False is returned when there are no more elements (the current value remains unchanged)
+  Next() bool
+  // Get the current iterator value.
+  Value() T
+  // Stop the iterator; subsequent calls to Next() will return false.
+  Abort()
+  // Size estimate, where possible, of the number of elements remaining.
+  Size() IteratorSize
+  // Return iterator as a channel.
+  Chan() <-chan T
+}
+```
