@@ -9,8 +9,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestCollectInto(t *testing.T) {
+	iter := Range(0, 5)
+	var output []int = nil
+	CollectInto(iter, &output)
+	iter2 := Range(10, 15)
+	CollectInto(iter2, &output)
+	expected := []int{0, 1, 2, 3, 4, 10, 11, 12, 13, 14}
+	assert.Equal(t, expected, output)
+}
+
+func TestFloatingRange(t *testing.T) {
+	iter := RangeBy(0.0, 5.0, 0.5)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}
+	assert.Equal(t, expected, output)
+}
+
 func TestSliceIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
+	iter := Slice(input)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	output := Collect(iter)
+	assert.Equal(t, input, output)
+}
+
+func TestSliceIterString(t *testing.T) {
+	input := []string{"one", "two", "three", "four"}
 	iter := Slice(input)
 	output := Collect(iter)
 	assert.Equal(t, input, output)
@@ -34,6 +61,24 @@ func TestRange(t *testing.T) {
 	}
 }
 
+func TestRangeChan(t *testing.T) {
+	r := Range(0, 10)
+	i := 0
+	for v := range r.Chan() {
+		assert.Equal(t, i, v)
+		i += 1
+	}
+}
+
+func TestRangeFor(t *testing.T) {
+	r := Range(0, 10)
+	i := 0
+	for r.Next() {
+		assert.Equal(t, i, r.Value())
+		i += 1
+	}
+}
+
 func TestEmptyRange(t *testing.T) {
 	r := Range(10, 9)
 	seq := Collect(r)
@@ -42,6 +87,8 @@ func TestEmptyRange(t *testing.T) {
 
 func TestNegativeRange(t *testing.T) {
 	r := RangeBy(9, -1, -1)
+	assert.True(t, IsSizeKnown(r.Size()))
+	assert.Equal(t, 10, r.Size().(SizeKnown).Size)
 	seq := Collect(r)
 	expected := []int{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
 	assert.Equal(t, expected, seq)
@@ -85,7 +132,9 @@ func TestMapIter(t *testing.T) {
 func TestFilter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4}
-	actual := Collect(Filter(Slice(input), func(n int) bool { return n&1 == 0 }))
+	iter := Filter(Slice(input), func(n int) bool { return n&1 == 0 })
+	assert.True(t, IsSizeAtMost(iter.Size()))
+	actual := Collect(iter)
 	assert.Equal(t, expected, actual)
 }
 
@@ -105,9 +154,9 @@ func TestDoMapIter(t *testing.T) {
 }
 
 func TestGenerator(t *testing.T) {
-	gen := Generate(func(y Yield[int]) {
+	gen := Generate(func(g Generator[int]) {
 		for i := 0; i < 10; i++ {
-			y.Yield(i)
+			g.Yield(i)
 		}
 	})
 	actual := Collect(gen)
@@ -116,9 +165,9 @@ func TestGenerator(t *testing.T) {
 }
 
 func TestGeneratorChan(t *testing.T) {
-	gen := Generate(func(y Yield[int]) {
+	gen := Generate(func(g Generator[int]) {
 		for i := 0; i < 10; i++ {
-			y.Yield(i)
+			g.Yield(i)
 		}
 	})
 	actual := make([]int, 10)
@@ -132,9 +181,9 @@ func TestGeneratorChan(t *testing.T) {
 }
 
 func TestGeneratorChanAbort(t *testing.T) {
-	gen := Generate(func(y Yield[int]) {
+	gen := Generate(func(g Generator[int]) {
 		for i := 0; i < 10; i++ {
-			y.Yield(i)
+			g.Yield(i)
 		}
 	})
 	actual := make([]int, 5)
@@ -151,9 +200,9 @@ func TestGeneratorChanAbort(t *testing.T) {
 }
 
 func TestGeneratorIterAbort(t *testing.T) {
-	gen := Generate(func(y Yield[int]) {
+	gen := Generate(func(g Generator[int]) {
 		for i := 0; i < 10; i++ {
-			y.Yield(i)
+			g.Yield(i)
 		}
 	})
 	actual := make([]int, 5)
@@ -170,9 +219,9 @@ func TestGeneratorIterAbort(t *testing.T) {
 }
 
 func TestGeneratorMap(t *testing.T) {
-	gen := Generate(func(y Yield[int]) {
+	gen := Generate(func(g Generator[int]) {
 		for i := 0; i < 10; i++ {
-			y.Yield(i)
+			g.Yield(i)
 		}
 	})
 	actual := Collect(Map(gen, func(x int) int { return x * 3 }))
@@ -184,11 +233,11 @@ func TestGeneratorMap(t *testing.T) {
 }
 
 func TestGeneratorError(t *testing.T) {
-	gen := Generate(func(y Yield[result.Result[int]]) {
+	gen := Generate(func(g Generator[result.Result[int]]) {
 		for i := 0; i < 10; i++ {
-			y.Yield(result.Value(i))
+			g.Yield(result.Value(i))
 		}
-		y.Yield(result.Error[int](fmt.Errorf("iterator failed")))
+		g.Yield(result.Error[int](fmt.Errorf("iterator failed")))
 	})
 	actual, err := CollectResults(gen)
 	expected := Collect(Range(0, 10))
@@ -202,9 +251,9 @@ func TestGeneratorError(t *testing.T) {
 // A result generator will yield an error if the generator
 // function returns an error.
 func TestGeneratorResultError(t *testing.T) {
-	gen := GenerateResults(func(y YieldResult[int]) error {
+	gen := GenerateResults(func(g ResultGenerator[int]) error {
 		for i := 0; i < 10; i++ {
-			y.YieldValue(i)
+			g.YieldValue(i)
 		}
 		return fmt.Errorf("iterator failed")
 	})
@@ -228,9 +277,9 @@ func TestGeneratorResultTry(t *testing.T) {
 			return x, nil
 		}
 	}
-	gen := GenerateResults(func(y YieldResult[int]) error {
+	gen := GenerateResults(func(g ResultGenerator[int]) error {
 		for i := 0; i < 10; i++ {
-			y.YieldValue(eh.Try(validate(i)))
+			g.YieldValue(eh.Try(validate(i)))
 		}
 		return nil
 	})
@@ -250,9 +299,9 @@ func TestFilterSuccess(t *testing.T) {
 			return x, nil
 		}
 	}
-	gen := GenerateResults(func(y YieldResult[int]) error {
+	gen := GenerateResults(func(g ResultGenerator[int]) error {
 		for i := 0; i < 10; i++ {
-			y.Yield(result.From(validate(i)))
+			g.Yield(result.From(validate(i)))
 		}
 		return nil
 	})
