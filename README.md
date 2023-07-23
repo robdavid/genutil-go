@@ -226,3 +226,46 @@ type Iterator[T any] interface {
   Chan() <-chan T
 }
 ```
+
+Iterators can be consumed in a `for` loop in two ways. The first is to use `Next()` and `Value()`.
+
+```go
+  var iter iterator.Iterator[int] // Iterator of integers
+  // instantiate iterator
+  for iter.Next() {
+    fmt.Sprintf("%d",iter.Value())
+  }
+```
+
+The other is to range over the channel that the iterator provides. Each element in the iterator is sent over the channel in sequence, and closed when the iterator has no more elements.
+
+```go
+  var iter iterator.Iterator[int] // Iterator of integers
+  // instantiate iterator
+  for v := range iter.Chan() {
+    fmt.Sprintf("%d",v)
+  }
+```
+
+### Constructing iterators
+
+Aside from just implementing the `Iterator` interface, iterators can be constructed in various ways. A number of ways of creating iterators are provided.
+
+#### Slices
+
+An iterator over a slice of values is easily created with the `Slice` function.
+
+
+
+The `Abort` method can be used to stop the iterator; once called the `Next` method will return `false` and the channel (if used) will be closed. Eg.
+
+```go
+  for v := range iter.Chan() {
+    fmt.Sprintf("%d",v)
+    if v == 0 {
+      iter.Abort() // loop will end after current iteration
+    } 
+  }
+```
+
+
