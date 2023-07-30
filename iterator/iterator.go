@@ -6,6 +6,7 @@ import (
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/option"
 )
 
@@ -631,24 +632,24 @@ func GenerateResults[T any](generator ResultGenerator[T]) Iterator[result.Result
 }
 
 // Iterators over iterators
-type TakeIterator[T any] struct {
+type takeIterator[T any] struct {
 	count, max int
 	aborted    bool
 	iterator   Iterator[T]
 }
 
-func (ti *TakeIterator[T]) Value() T {
+func (ti *takeIterator[T]) Value() T {
 	return ti.iterator.Value()
 }
 
-func (ti *TakeIterator[T]) Abort() {
+func (ti *takeIterator[T]) Abort() {
 	if !ti.aborted {
 		ti.iterator.Abort()
 	}
 	ti.aborted = true
 }
 
-func (ti *TakeIterator[T]) Next() bool {
+func (ti *takeIterator[T]) Next() bool {
 	if ti.count < ti.max {
 		ti.count++
 		next := ti.iterator.Next()
@@ -659,4 +660,22 @@ func (ti *TakeIterator[T]) Next() bool {
 	} else {
 		return false
 	}
+}
+
+func (ti *takeIterator[T]) Size() IteratorSize {
+	switch s := ti.iterator.Size().(type) {
+	case SizeKnown:
+		return NewSize(functions.Min(s.Size, ti.max))
+	case SizeAtMost:
+		return NewSizeAtMost(functions.Min(s.Size, ti.max))
+	default:
+		return NewSizeAtMost(ti.max)
+	}
+}
+
+// Take transforms an iterator into an iterator the returns the
+// first n elements of the original iterator. If there are less
+// than n elements available, they are all returned.
+func Take[T any](n int, iter Iterator[T]) Iterator[T] {
+	return MakeIterator[T](&takeIterator[T]{0, n, false, iter})
 }
