@@ -402,9 +402,9 @@ func FilterMap[T any, U any](iter Iterator[T], mapping func(T) option.Option[U])
 	return wrapFunc(iter, filterMapNext, iter.Size().Subset())
 }
 
-// FilterResults takes an iterator of results and returns an iterator of the underlying
-// result type for only those results that have no error.
-func FilterResults[T any](iter Iterator[result.Result[T]]) Iterator[T] {
+// FilterValues takes an iterator of results and returns an iterator of the underlying
+// result value type for only those results that have no error.
+func FilterValues[T any](iter Iterator[result.Result[T]]) Iterator[T] {
 	return FilterMap(iter, func(res result.Result[T]) option.Option[T] {
 		if res.IsError() {
 			return option.Empty[T]()
@@ -518,38 +518,40 @@ func (pi *genIter[T]) Size() IteratorSize {
 	return SizeUnknown
 }
 
+// AbortGenerator is a panic type that will be raised if a Generator function is to be
+// aborted.
 type AbortGenerator struct{}
 
-// Generator is a type, an instance of which is passed to a GenFunc generator
+// Consumer is a type, an instance of which is passed to a Generator generator
 // function. Values from the function can be yielded to the generator
 // via the Yield method (or an error via the YieldError method).
-type Generator[T any] struct {
+type Consumer[T any] struct {
 	sink chan T
 }
 
 // Yield yields the next value to the generator
-func (y Generator[T]) Yield(t T) {
+func (y Consumer[T]) Yield(t T) {
 	if !safeSend(y.sink, t) {
 		panic(AbortGenerator{})
 	}
 }
 
-// ResultGenerator is a variation on `Yield` which is used to yield only result types. It adds
+// ResultConsumer is a variation on `Consumer` which is used to yield only result types. It adds
 // dedicated methods to yield non-error values and errors.
-type ResultGenerator[T any] Generator[result.Result[T]]
+type ResultConsumer[T any] Consumer[result.Result[T]]
 
-// Yield yields the next result to the result generator
-func (yr *ResultGenerator[T]) Yield(value result.Result[T]) {
-	(*Generator[result.Result[T]])(yr).Yield(value)
+// Yield yields the next result to the result consumer
+func (yr *ResultConsumer[T]) Yield(value result.Result[T]) {
+	(*Consumer[result.Result[T]])(yr).Yield(value)
 }
 
-// YieldValue yields the next successful value to the generator
-func (yr *ResultGenerator[T]) YieldValue(value T) {
+// YieldValue yields the next successful value to the consumer
+func (yr *ResultConsumer[T]) YieldValue(value T) {
 	yr.Yield(result.Value(value))
 }
 
-// YieldError yields an error to the generator
-func (yr *ResultGenerator[T]) YieldError(err error) {
+// YieldError yields an error to the consumer
+func (yr *ResultConsumer[T]) YieldError(err error) {
 	yr.Yield(result.Error[T](err))
 }
 
@@ -570,11 +572,11 @@ func (pp GeneratorPanic) Unwrap() error {
 	}
 }
 
-// GenFunc is a function taking a Generator, to which values can be yielded.
-type GenFunc[T any] func(Generator[T])
+// Generator is a function taking a Consumer. The function is expected to yield values to the consumer.
+type Generator[T any] func(Consumer[T])
 
-func runGenerator[T any](y Generator[T], activity GenFunc[T]) {
-	defer safeClose(y.sink)
+func runGenerator[T any](c Consumer[T], activity Generator[T]) {
+	defer safeClose(c.sink)
 	defer func() {
 		if p := recover(); p != nil {
 			if _, abort := p.(AbortGenerator); !abort {
@@ -582,45 +584,48 @@ func runGenerator[T any](y Generator[T], activity GenFunc[T]) {
 			}
 		}
 	}()
-	activity(y)
+	activity(c)
 }
 
-// GenResultFunc is a function taking a ResultGenerator object to which results to be yielded.
+// ResultGenerator is a function taking a ResultConsumer object to which results may be yielded.
 // If a non-nil error is returned, it will be yielded as an error result.
-type GenResultFunc[T any] func(ResultGenerator[T]) error
+type ResultGenerator[T any] func(ResultConsumer[T]) error
 
-func runResultGenerator[T any](y ResultGenerator[T], activity GenResultFunc[T]) {
-	defer safeClose(y.sink)
+func runResultGenerator[T any](c ResultConsumer[T], activity ResultGenerator[T]) {
+	defer safeClose(c.sink)
 	defer func() {
 		if p := recover(); p != nil {
 			if _, abort := p.(AbortGenerator); !abort {
-				y.YieldError(GeneratorPanic{p})
+				c.YieldError(GeneratorPanic{p})
 			}
 		}
 	}()
-	defer eh.Handle(func(err error) { y.YieldError(err) })
-	eh.Check(activity(y))
+	defer eh.Handle(func(err error) { c.YieldError(err) })
+	eh.Check(activity(c))
 }
 
-// Generate creates an iterator from a function, passed in activity, that yields a sequence of values
-// by making calls to Yield(), on a Generator object that will be passed to the function.
-// The function is run in a separate goroutine, and its yielded values are sent over a channel
-// to the iterator where they can be consumed in an iterative way by calls to Next() and Value().
-// The channel itself is available via the Chan() method. A call to Abort() will cause the channel
-// to close and no further elements will be produced by Next() or a read of the channel. Any attempt
-// to subsequently yield a value in the activity function will cause it to abort (via a panic).
-// The activity parameter is of type PipeFunc[T], which is an alias for func(Yield[T])
-func Generate[T any](activity GenFunc[T]) Iterator[T] {
+/*
+Generate creates an Iterator from a Generator function. A Consumer is created and passed to the function.
+The function is run in a separate goroutine, and its yielded values are sent over a channel
+to the iterator where they may be consumed in an iterative way by calls to Next() and Value().
+Alternatively, the channel itself is available via the Chan() method.
+A call to Abort() will cause the channel to close and no further elements will be produced by
+Next() or a read of the channel. Any attempt to subsequently yield a value in the generator
+will cause it to terminate, via an AbortGenerator panic.
+*/
+func Generate[T any](generator Generator[T]) Iterator[T] {
 	ch := make(chan T)
-	yield := Generator[T]{ch}
-	go runGenerator(yield, activity)
+	yield := Consumer[T]{ch}
+	go runGenerator(yield, generator)
 	return &genIter[T]{source: ch}
 }
 
-// GenerateResults is a variation on Generate that produces an iterator of result types.
-func GenerateResults[T any](activity GenResultFunc[T]) Iterator[result.Result[T]] {
+// GenerateResults is a variation on Generate that produces an iterator of result types. If the
+// generator function panics, an error result of type GeneratorPanic is produced prior to closing
+// the consumer channel.
+func GenerateResults[T any](generator ResultGenerator[T]) Iterator[result.Result[T]] {
 	ch := make(chan result.Result[T])
-	yield := ResultGenerator[T](Generator[result.Result[T]]{ch})
-	go runResultGenerator(yield, activity)
+	yield := ResultConsumer[T](Consumer[result.Result[T]]{ch})
+	go runResultGenerator(yield, generator)
 	return &genIter[result.Result[T]]{source: ch}
 }

@@ -154,9 +154,9 @@ func TestDoMapIter(t *testing.T) {
 }
 
 func TestGenerator(t *testing.T) {
-	gen := Generate(func(g Generator[int]) {
+	gen := Generate(func(c Consumer[int]) {
 		for i := 0; i < 10; i++ {
-			g.Yield(i)
+			c.Yield(i)
 		}
 	})
 	actual := Collect(gen)
@@ -165,9 +165,9 @@ func TestGenerator(t *testing.T) {
 }
 
 func TestGeneratorChan(t *testing.T) {
-	gen := Generate(func(g Generator[int]) {
+	gen := Generate(func(c Consumer[int]) {
 		for i := 0; i < 10; i++ {
-			g.Yield(i)
+			c.Yield(i)
 		}
 	})
 	actual := make([]int, 10)
@@ -181,9 +181,9 @@ func TestGeneratorChan(t *testing.T) {
 }
 
 func TestGeneratorChanAbort(t *testing.T) {
-	gen := Generate(func(g Generator[int]) {
+	gen := Generate(func(c Consumer[int]) {
 		for i := 0; i < 10; i++ {
-			g.Yield(i)
+			c.Yield(i)
 		}
 	})
 	actual := make([]int, 5)
@@ -200,9 +200,9 @@ func TestGeneratorChanAbort(t *testing.T) {
 }
 
 func TestGeneratorIterAbort(t *testing.T) {
-	gen := Generate(func(g Generator[int]) {
+	gen := Generate(func(c Consumer[int]) {
 		for i := 0; i < 10; i++ {
-			g.Yield(i)
+			c.Yield(i)
 		}
 	})
 	actual := make([]int, 5)
@@ -219,9 +219,9 @@ func TestGeneratorIterAbort(t *testing.T) {
 }
 
 func TestGeneratorMap(t *testing.T) {
-	gen := Generate(func(g Generator[int]) {
+	gen := Generate(func(c Consumer[int]) {
 		for i := 0; i < 10; i++ {
-			g.Yield(i)
+			c.Yield(i)
 		}
 	})
 	actual := Collect(Map(gen, func(x int) int { return x * 3 }))
@@ -233,11 +233,11 @@ func TestGeneratorMap(t *testing.T) {
 }
 
 func TestGeneratorError(t *testing.T) {
-	gen := Generate(func(g Generator[result.Result[int]]) {
+	gen := Generate(func(c Consumer[result.Result[int]]) {
 		for i := 0; i < 10; i++ {
-			g.Yield(result.Value(i))
+			c.Yield(result.Value(i))
 		}
-		g.Yield(result.Error[int](fmt.Errorf("iterator failed")))
+		c.Yield(result.Error[int](fmt.Errorf("iterator failed")))
 	})
 	actual, err := CollectResults(gen)
 	expected := Collect(Range(0, 10))
@@ -251,9 +251,9 @@ func TestGeneratorError(t *testing.T) {
 // A result generator will yield an error if the generator
 // function returns an error.
 func TestGeneratorResultError(t *testing.T) {
-	gen := GenerateResults(func(g ResultGenerator[int]) error {
+	gen := GenerateResults(func(c ResultConsumer[int]) error {
 		for i := 0; i < 10; i++ {
-			g.YieldValue(i)
+			c.YieldValue(i)
 		}
 		return fmt.Errorf("iterator failed")
 	})
@@ -277,9 +277,9 @@ func TestGeneratorResultTry(t *testing.T) {
 			return x, nil
 		}
 	}
-	gen := GenerateResults(func(g ResultGenerator[int]) error {
+	gen := GenerateResults(func(c ResultConsumer[int]) error {
 		for i := 0; i < 10; i++ {
-			g.YieldValue(eh.Try(validate(i)))
+			c.YieldValue(eh.Try(validate(i)))
 		}
 		return nil
 	})
@@ -299,13 +299,13 @@ func TestFilterSuccess(t *testing.T) {
 			return x, nil
 		}
 	}
-	gen := GenerateResults(func(g ResultGenerator[int]) error {
+	gen := GenerateResults(func(c ResultConsumer[int]) error {
 		for i := 0; i < 10; i++ {
-			g.Yield(result.From(validate(i)))
+			c.Yield(result.From(validate(i)))
 		}
 		return nil
 	})
-	actual := Collect(FilterResults(gen))
+	actual := Collect(FilterValues(gen))
 	expected := []int{0, 1, 2, 3, 4, 5, 6, 8, 9}
 	assert.Equal(t, expected, actual)
 }
