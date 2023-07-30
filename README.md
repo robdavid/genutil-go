@@ -19,6 +19,8 @@ The library falls into a number of categories, subdivided into separate packages
   - [Result](#result)
   - [Test](#test)
 - [Iterator](#iterator)
+  - [Constructing iterators](#constructing-iterators)
+    - [Slices](#slices)
 
 ## Tuple
 
@@ -247,16 +249,6 @@ The other is to range over the channel that the iterator provides. Each element 
   }
 ```
 
-### Constructing iterators
-
-Aside from just implementing the `Iterator` interface, iterators can be constructed in various ways. A number of ways of creating iterators are provided.
-
-#### Slices
-
-An iterator over a slice of values is easily created with the `Slice` function.
-
-
-
 The `Abort` method can be used to stop the iterator; once called the `Next` method will return `false` and the channel (if used) will be closed. Eg.
 
 ```go
@@ -268,4 +260,19 @@ The `Abort` method can be used to stop the iterator; once called the `Next` meth
   }
 ```
 
+### Constructing iterators
+
+Aside from just implementing the `Iterator` interface, there are a number of way available for constructing iterators.
+
+#### Slices
+
+An iterator over a slice of values is easily created with the `Slice` function.
+
+```go
+input := []int{1, 2, 3, 4}
+iter := Slice(input)
+for iter.Next() {
+  fmt.Sprintf("%d ",iter.Value()) // 1 2 3 4
+}
+```
 
