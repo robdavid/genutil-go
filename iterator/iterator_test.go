@@ -36,6 +36,14 @@ func TestSliceIter(t *testing.T) {
 	assert.Equal(t, input, output)
 }
 
+func TestTakeMore(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := Take(10, Slice(input))
+	assert.True(t, IsSizeKnown(iter.Size()))
+	output := Collect(iter)
+	assert.Equal(t, input, output)
+}
+
 func TestSliceIterString(t *testing.T) {
 	input := []string{"one", "two", "three", "four"}
 	iter := Slice(input)
@@ -164,8 +172,8 @@ func TestGenerator(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestGenerateFib(t *testing.T) {
-	fib := Generate(func(c Consumer[int]) {
+func fib() Iterator[int] {
+	return Generate(func(c Consumer[int]) {
 		tail := [2]int{0, 1}
 		c.Yield(tail[0])
 		c.Yield(tail[1])
@@ -176,12 +184,58 @@ func TestGenerateFib(t *testing.T) {
 			tail[1] = next
 		}
 	})
-	var result [10]int
-	var expected = [10]int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
-	for i := 0; fib.Next() && i < len(result); i++ {
-		result[i] = fib.Value()
+}
+
+func TestGenerateFib(t *testing.T) {
+	result := Collect(Take(10, fib()))
+	var expected = []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
+	assert.Equal(t, expected, result)
+}
+
+func TestGenerateFibChan(t *testing.T) {
+	var result []int
+	var expected = []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
+	for e := range Take(10, fib()).Chan() {
+		result = append(result, e)
 	}
 	assert.Equal(t, expected, result)
+}
+
+func BenchmarkGenerateFib(b *testing.B) {
+	iter := Take(b.N, fib())
+	var sum uint64 = 0
+	for iter.Next() {
+		sum += uint64(iter.Value())
+	}
+}
+
+func BenchmarkGenerateFib2(b *testing.B) {
+	iter := fib()
+	defer iter.Abort()
+	var sum uint64 = 0
+	for i := 0; i < b.N && iter.Next(); i++ {
+		sum += uint64(iter.Value())
+	}
+}
+
+func BenchmarkGenerateFibChan(b *testing.B) {
+	var sum uint64 = 0
+	for v := range Take(b.N, fib()).Chan() {
+		sum += uint64(v)
+	}
+}
+
+func BenchmarkGenerateFibChan2(b *testing.B) {
+	var sum uint64 = 0
+	i := 0
+	iter := fib()
+	for v := range iter.Chan() {
+		sum += uint64(v)
+		i++
+		if i > b.N {
+			iter.Abort()
+		}
+	}
 }
 
 func TestGeneratorChan(t *testing.T) {
