@@ -629,3 +629,34 @@ func GenerateResults[T any](generator ResultGenerator[T]) Iterator[result.Result
 	go runResultGenerator(yield, generator)
 	return &genIter[result.Result[T]]{source: ch}
 }
+
+// Iterators over iterators
+type TakeIterator[T any] struct {
+	count, max int
+	aborted    bool
+	iterator   Iterator[T]
+}
+
+func (ti *TakeIterator[T]) Value() T {
+	return ti.iterator.Value()
+}
+
+func (ti *TakeIterator[T]) Abort() {
+	if !ti.aborted {
+		ti.iterator.Abort()
+	}
+	ti.aborted = true
+}
+
+func (ti *TakeIterator[T]) Next() bool {
+	if ti.count < ti.max {
+		ti.count++
+		next := ti.iterator.Next()
+		if next && ti.count == ti.max {
+			ti.Abort()
+		}
+		return next
+	} else {
+		return false
+	}
+}

@@ -164,6 +164,26 @@ func TestGenerator(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestGenerateFib(t *testing.T) {
+	fib := Generate(func(c Consumer[int]) {
+		tail := [2]int{0, 1}
+		c.Yield(tail[0])
+		c.Yield(tail[1])
+		for {
+			next := tail[0] + tail[1]
+			c.Yield(next)
+			tail[0] = tail[1]
+			tail[1] = next
+		}
+	})
+	var result [10]int
+	var expected = [10]int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
+	for i := 0; fib.Next() && i < len(result); i++ {
+		result[i] = fib.Value()
+	}
+	assert.Equal(t, expected, result)
+}
+
 func TestGeneratorChan(t *testing.T) {
 	gen := Generate(func(c Consumer[int]) {
 		for i := 0; i < 10; i++ {
