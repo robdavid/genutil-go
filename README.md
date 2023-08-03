@@ -21,6 +21,7 @@ The library falls into a number of categories, subdivided into separate packages
 - [Iterator](#iterator)
   - [Constructing iterators](#constructing-iterators)
     - [Slices](#slices)
+    - [Ranges](#ranges)
 
 ## Tuple
 
@@ -276,3 +277,21 @@ for iter.Next() {
 }
 ```
 
+An iterator can also be collected into a slice with `Collect`
+
+```go
+input := []int{1, 2, 3, 4}
+iter := Slice(input)
+output := Collect(iter) // output is equal to input
+
+```
+
+#### Ranges
+
+An iterator over a range of numeric values can be build using the `Range` function.
+
+```go
+iter := Range(1,5)
+slice := Collect(iter) // []int{1,2,3,4}
+
+```
