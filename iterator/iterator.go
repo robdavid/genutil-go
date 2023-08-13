@@ -8,6 +8,7 @@ import (
 	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/option"
+	"golang.org/x/exp/constraints"
 )
 
 // The largest slice capacity we are prepared to allocate to collect
@@ -294,14 +295,12 @@ func Of[T any](elements ...T) Iterator[T] {
 	return Slice(elements)
 }
 
-// Numeric types with ordering
-type Numeric interface {
-	uint | uint8 | uint16 | uint32 | uint64 |
-		int | int8 | int16 | int32 | int64 |
-		float32 | float64
+// Scalar numeric types with ordering
+type Ranged interface {
+	constraints.Float | constraints.Integer
 }
 
-type rangeIter[T Numeric] struct {
+type rangeIter[T Ranged] struct {
 	index, to, by, value T
 }
 
@@ -340,7 +339,7 @@ func (ri *rangeIter[T]) Size() IteratorSize {
 
 // Range creates an iterator that ranges from `from` to
 // `upto` exclusive
-func Range[T Numeric](from, upto T) Iterator[T] {
+func Range[T Ranged](from, upto T) Iterator[T] {
 	return &rangeIter[T]{from, upto, 1, 0}
 }
 
@@ -348,7 +347,7 @@ func Range[T Numeric](from, upto T) Iterator[T] {
 // `upto` exclusive, incrementing by `by` each step.
 // This can be negative (and `upto` should be less than `from`),
 // but it cannot be zero.
-func RangeBy[T Numeric](from, upto, by T) Iterator[T] {
+func RangeBy[T Ranged](from, upto, by T) Iterator[T] {
 	if by == 0 {
 		panic("Illegal range by zero")
 	}

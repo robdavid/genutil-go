@@ -288,10 +288,12 @@ output := Collect(iter) // output is equal to input
 
 #### Ranges
 
-An iterator over a range of numeric values can be build using the `Range` function.
+An iterator over a range of scalar numeric values can be built using the `Range` function.
 
 ```go
 iter := Range(1,5)
 slice := Collect(iter) // []int{1,2,3,4}
 
 ```
+
+Ranges can be built over 
