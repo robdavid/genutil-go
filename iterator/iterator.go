@@ -185,10 +185,16 @@ func MakeIterator[T any](base SizedIterator[T]) Iterator[T] {
 	return &autoChannelIterator[T]{base, nil}
 }
 
-// MakeIteratorFromSimple creates a generic iterator from a sized iterator. Provides an implementation
-// of a source of elements over a channel.
+// MakeIteratorFromSimple creates a generic iterator from a sized iterator, providing an implementation
+// of a source of elements over a channel. The size of the iterator will be unknown.
 func MakeIteratorFromSimple[T any](base SimpleIterator[T]) Iterator[T] {
 	return MakeIterator(MakeSizedIterator(base))
+}
+
+// MakeIteratorOfSizeFromSimple creates a generic iterator from a sized iterator, providing an implementation
+// of a source of elements over a channel. The size of the iterator will be the size provided.
+func MakeIteratorOfSizeFromSimple[T any](base SimpleIterator[T], size IteratorSize) Iterator[T] {
+	return MakeIterator(MakeIteratorOfSize(base, size))
 }
 
 func (ei *autoChannelIterator[T]) Chan() <-chan T {
@@ -346,13 +352,32 @@ func Range[T Ranged](from, upto T) Iterator[T] {
 // RangeBy creates an iterator that ranges from `from` up to
 // `upto` exclusive, incrementing by `by` each step.
 // This can be negative (and `upto` should be less than `from`),
-// but it cannot be zero.
+// but it cannot be zero unless from == upto, in which case
+// an empty iterator is returned.
 func RangeBy[T Ranged](from, upto, by T) Iterator[T] {
 	if by == 0 {
+		if from == upto {
+			return Empty[T]()
+		}
 		panic("Illegal range by zero")
 	}
 	return &rangeIter[T]{from, upto, by, 0}
 }
+
+type emptyIter[T any] struct{}
+
+func (emptyIter[T]) Next() bool         { return false }
+func (emptyIter[T]) Value() T           { var zero T; return zero }
+func (emptyIter[T]) Size() IteratorSize { return SizeKnown{0} }
+func (emptyIter[T]) Abort()             {}
+func (emptyIter[T]) Chan() <-chan T {
+	c := make(chan T)
+	close(c)
+	return c
+}
+
+// Empty creates an iterator that returns no items.
+func Empty[T any]() Iterator[T] { return emptyIter[T]{} }
 
 // Map applies function `mapping` of type `func(T) U` to each value, producing
 // a new iterator over `U`.

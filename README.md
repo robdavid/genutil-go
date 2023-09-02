@@ -22,6 +22,7 @@ The library falls into a number of categories, subdivided into separate packages
   - [Constructing iterators](#constructing-iterators)
     - [Slices](#slices)
     - [Ranges](#ranges)
+  - [Simple Iterator](#simple-iterator)
 
 ## Tuple
 
@@ -263,7 +264,7 @@ The `Abort` method can be used to stop the iterator; once called the `Next` meth
 
 ### Constructing iterators
 
-Aside from just implementing the `Iterator` interface, there are a number of way available for constructing iterators.
+Aside from just implementing the `Iterator` interface, there are a number of ways available for constructing iterators.
 
 #### Slices
 
@@ -271,7 +272,7 @@ An iterator over a slice of values is easily created with the `Slice` function.
 
 ```go
 input := []int{1, 2, 3, 4}
-iter := Slice(input)
+iter := iterator.Slice(input)
 for iter.Next() {
   fmt.Sprintf("%d ",iter.Value()) // 1 2 3 4
 }
@@ -281,9 +282,8 @@ An iterator can also be collected into a slice with `Collect`
 
 ```go
 input := []int{1, 2, 3, 4}
-iter := Slice(input)
-output := Collect(iter) // output is equal to input
-
+iter := iterator.Slice(input)
+output := iterator.Collect(iter) // output is equal to input
 ```
 
 #### Ranges
@@ -291,9 +291,96 @@ output := Collect(iter) // output is equal to input
 An iterator over a range of scalar numeric values can be built using the `Range` function.
 
 ```go
-iter := Range(1,5)
-slice := Collect(iter) // []int{1,2,3,4}
-
+iter := iterator.Range(1,5)
+slice := iterator.Collect(iter) // []int{1,2,3,4}
 ```
 
-Ranges can be built over 
+Ranges can be built over any scalar numeric type, including float
+
+```go
+iter := iterator.Range(0.0, 5.0)
+slice := iterator.Collect(iter) // []float64{0.0, 1.0, 2.0, 3.0, 4.0}
+```
+
+The `RangeBy` method creates a range with a specific increment.
+
+```go
+iter := iterator.RangeBy(0.0, 2.0, 0.5)
+slice := iterator.Collect(iter) // []float64{0.0, 0.5, 1.0, 1.5, 2.0 }
+```
+
+The increment may be negative, in which case the `from` value must be less 
+than the `upto` value.
+
+```go
+iter := iterator.RangeBy(5.0, 0.0, -0.5)
+slice := iterator.Collect(iter) // []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5}
+```
+
+### Simple Iterator
+
+An iterator can be built via a simplified SimpleIterator interface.
+
+```go
+type SimpleIterator[T any] interface {
+  // Next sets the iterator's current value to be the first, and subsequent, iterator elements.
+  // False is returned only when there are no more elements (the current value remains unchanged)
+  Next() bool
+  // Value gets the current iterator value.
+  Value() T
+  // Abort stops the iterator; subsequent calls to Next() will return false.
+  Abort()
+}
+```
+
+Instances implementing this interface can be transformed to a full `Iterator[T]` via one of the utility methods.
+
+To make an `Iterator[T]` of indeterminate size, use
+
+```go
+func MakeIteratorFromSimple[T any](base SimpleIterator[T]) Iterator[T]
+```
+
+or to make one with a given size use
+
+```go
+func MakeIteratorOfSizeFromSimple[T any](base SimpleIterator[T], size IteratorSize) Iterator[T]
+```
+
+The following example illustrates how an Iterator over a slice can be created by implementing only
+the SimpleIterator interface. 
+
+```go
+
+// iterSlice is a SimpleIterator over a slice; it implements Next, Value and Abort methods
+type iterSlice[T any] struct {
+  slice []T
+  index int
+}
+
+// Advance to first/next element
+func (is *iterSlice[T]) Next() bool {
+  is.index++
+  return is.index < len(is.slice)
+}
+
+// Return current element
+func (is *iterSlice[T]) Value() T {
+  return is.slice[is.index]
+}
+
+// Move index after last element; ensures next Next() call returns false
+func (is *iterSlice[T]) Abort() {
+  is.index = len(is.slice)
+}
+
+// newIterSlice creates an Iterator over a slice
+func newIterSlice[T any](slice []T) Iterator[T] {
+  // First, create the SimpleIterator over the slice.
+  // Index starts at -1 because Next() is called for the first element.
+  simpleIter := &iterSlice[T]{slice, -1}
+  // Then create an Iterator from the SimpleIterator, with known size (the slice's length)
+  return iterator.MakeIteratorOfSizeFromSimple[T](simpleIter, iterator.NewSize(len(slice)))
+}
+```
+
