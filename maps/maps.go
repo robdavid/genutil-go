@@ -10,9 +10,19 @@ import (
 	"github.com/robdavid/genutil-go/tuple"
 )
 
+// ErrPathConflict is an error constant that indicates that a nested map key path is being
+// treated as both a value and a map.
 var ErrPathConflict = errors.New("conflict between object and non-object types")
+
+// ErrKeyError is an error constant that indicates that a key was not found.
 var ErrKeyError = errors.New("key not found in map")
 
+// PathConflict is an error type that indicates that a nested map key path is being
+// treated as both a value and a map. It wraps ErrPathConflict and so
+//
+//	errors.Is(NewPathConflict(path), maps.ErrPathConflict)
+//
+// will return true.
 type PathConflict[K comparable] []K
 
 func (pc PathConflict[K]) Error() string {
@@ -27,6 +37,12 @@ func NewPathConflict[K comparable](path []K) PathConflict[K] {
 	return PathConflict[K](path)
 }
 
+// PathNotFound is an error type that indicates that a nested map does not
+// contain the key path specified. It wraps ErrKeyError and so
+//
+//	errors.Is(NewPathNotFound(path), maps.ErrKeyError)
+//
+// will return true.
 type PathNotFound[K comparable] []K
 
 func (pnf PathNotFound[K]) Error() string {
@@ -41,10 +57,22 @@ func NewPathNotFound[K comparable](path []K) PathNotFound[K] {
 	return PathNotFound[K](path)
 }
 
+// PutPath puts a value in a (possibly) nested map of maps. It mutates a map
+// instance that maps from any comparable key to any value. The type of thew value
+// can therefore encompass other map types. The path argument is a list of keys,
+// each one representing a key at consecutive levels in the map. Intermediate maps
+// are created as necessary. It is an error to attempt to replace an existing map
+// with another value, or to replace an existing non-map value with a map.
+//
+//		m := make(map[string]any)
+//		PutPath([]string{"a", "b"}, 123, m)
+//		// m contains map[string]any{ "a": map[string]any{"b": 123} }
+//	    err := PutPath([]string{"a"}, 456, m) // err != nil
 func PutPath[K comparable, T any](path []K, value T, top map[K]T) error {
 	m := top
 	for i, s := range path {
 		if i == len(path)-1 {
+			// Reached final item in path
 			if n, ok := m[s]; ok {
 				if _, ok := any(n).(map[K]T); ok {
 					return NewPathConflict(path)
@@ -66,6 +94,37 @@ func PutPath[K comparable, T any](path []K, value T, top map[K]T) error {
 		}
 	}
 	return nil
+}
+
+func DeletePath[K comparable, T any](path []K, top map[K]T) (result T, ok bool, err error) {
+	m := top
+	result = any(top).(T)
+	parents := make([]map[K]T, 0, len(path))
+	parents = append(parents, top)
+	for i, s := range path {
+		if i == len(path)-1 {
+			if result, ok = m[s]; ok {
+				delete(m, s)
+				for j := len(parents) - 1; j > 0; j-- {
+					if len(parents[j]) == 0 {
+						delete(parents[j-1], path[j-1])
+					}
+				}
+			}
+			break
+		} else {
+			var v T
+			if v, ok = m[s]; ok {
+				if m, ok = any(v).(map[K]T); ok {
+					parents = append(parents, m)
+				}
+			}
+			if !ok {
+				break
+			}
+		}
+	}
+	return
 }
 
 func GetPath[K comparable, T any](path []K, top map[K]T) (result T, err error) {

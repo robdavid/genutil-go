@@ -8,7 +8,7 @@
 
 A library of utility functions made possible by Go generics, providing features missing from the standard libraries. This library is still in its early stages, and breaking changes are still possible. Additional functionality is likely to be added.
 
-See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/errors/handler) for more details.
+See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go) for more details.
 
 The library falls into a number of categories, subdivided into separate packages.
 
@@ -23,6 +23,7 @@ The library falls into a number of categories, subdivided into separate packages
     - [Slices](#slices)
     - [Ranges](#ranges)
   - [Simple Iterator](#simple-iterator)
+- [Maps](#maps)
 
 ## Tuple
 
@@ -302,15 +303,14 @@ iter := iterator.Range(0.0, 5.0)
 slice := iterator.Collect(iter) // []float64{0.0, 1.0, 2.0, 3.0, 4.0}
 ```
 
-The `RangeBy` method creates a range with a specific increment.
+The `RangeBy` method creates a range with a given increment.
 
 ```go
 iter := iterator.RangeBy(0.0, 2.0, 0.5)
 slice := iterator.Collect(iter) // []float64{0.0, 0.5, 1.0, 1.5, 2.0 }
 ```
 
-The increment may be negative, in which case the `from` value must be less 
-than the `upto` value.
+The increment may be negative, in which case the `from` value must be less than the `upto` value.
 
 ```go
 iter := iterator.RangeBy(5.0, 0.0, -0.5)
@@ -384,3 +384,6 @@ func newIterSlice[T any](slice []T) Iterator[T] {
 }
 ```
 
+## Maps
+
+The `maps` package contains a number of utility functions that work over maps, including getting a slice of the Keys or Values of a map
