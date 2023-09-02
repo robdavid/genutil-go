@@ -3,6 +3,7 @@
 package test
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -51,7 +52,7 @@ func Result[T any](value T, err error) *TestableResult[T] {
 	return &TestableResult[T]{result.From(value, err)}
 }
 
-// Checks if a given error value is nil. If not, report the
+// Check checks if a given error value is nil. If not, report the
 // error and fail the test.
 func Check(t TestReporting, err error) {
 	t.Helper()
@@ -61,7 +62,7 @@ func Check(t TestReporting, err error) {
 	}
 }
 
-// Either return the value of a TestableResult, or if
+// Must either returns the value of a TestableResult, or if
 // an error has occurred, report it and fail the test.
 func (r *TestableResult[T]) Must(t TestReporting) T {
 	t.Helper()
@@ -71,7 +72,7 @@ func (r *TestableResult[T]) Must(t TestReporting) T {
 	return r.Get()
 }
 
-// Expects an error; marks the test as failed if the result is not an error
+// Fails expects an error; it marks the test as failed if the result is not an error
 func (r *TestableResult[T]) Fails(t TestReporting) *TestableResult[T] {
 	t.Helper()
 	if !r.IsError() {
@@ -80,13 +81,13 @@ func (r *TestableResult[T]) Fails(t TestReporting) *TestableResult[T] {
 	return r
 }
 
-// Expects a specific error; marks the test as failed if the result is not the error
-// provided in expected.
+// FailsWith expects a specific error; it marks the test as failed if the result is
+// not, or does not wrap, the expected error.
 func (r *TestableResult[T]) FailsWith(t TestReporting, expected error) *TestableResult[T] {
 	t.Helper()
 	if !r.IsError() {
 		t.Error(fmt.Errorf("an error was expected, but did not occur"))
-	} else if expected != r.GetErr() {
+	} else if !errors.Is(r.GetErr(), expected) {
 		t.Error(fmt.Errorf("expected error '%s', but got '%s'", expected, r.GetErr()))
 	}
 	return r
