@@ -20,12 +20,46 @@ func TestCollectInto(t *testing.T) {
 }
 
 func TestFloatingRange(t *testing.T) {
+	iter := Range(0.0, 5.0)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 5, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	expected := []float64{0.0, 1.0, 2.0, 3.0, 4.0}
+	assert.Equal(t, expected, output)
+}
+
+func TestFloatingRangeBy(t *testing.T) {
 	iter := RangeBy(0.0, 5.0, 0.5)
 	assert.True(t, IsSizeKnown(iter.Size()))
 	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
 	output := Collect(iter)
 	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}
 	assert.Equal(t, expected, output)
+}
+
+func TestFloatingRangeDesc(t *testing.T) {
+	iter := RangeBy(5.0, 0.0, -0.5)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5}
+	assert.Equal(t, expected, output)
+}
+
+func TestInvalidRange(t *testing.T) {
+	iter := RangeBy(5.0, 0.0, 0.5)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 0, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	assert.Empty(t, output)
+}
+
+func TestZeroRange(t *testing.T) {
+	iter := RangeBy(1, 1, 0)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 0, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	assert.Empty(t, output)
 }
 
 func TestSliceIter(t *testing.T) {
@@ -236,6 +270,65 @@ func BenchmarkGenerateFibChan2(b *testing.B) {
 			iter.Abort()
 		}
 	}
+}
+
+type SimpleFib [2]int
+
+func NewSimpleFib() SimpleIterator[int] {
+	return &SimpleFib{0, 1}
+}
+
+func (sf *SimpleFib) Value() int {
+	return sf[0]
+}
+
+func (sf *SimpleFib) Next() bool {
+	if sf[1] == 0 {
+		return false
+	} else {
+		*sf = SimpleFib{sf[1], sf[0] + sf[1]}
+		return true
+	}
+}
+
+func (sf *SimpleFib) Abort() {
+	sf[1] = 0
+}
+
+func NewFib() Iterator[int] {
+	return MakeIteratorFromSimple[int](NewSimpleFib())
+}
+
+func TestSimpleFib(t *testing.T) {
+	fib := NewFib()
+	seq := Collect(Take(10, fib))
+	expected := []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	assert.Equal(t, expected, seq)
+}
+
+type iterSlice[T any] struct {
+	slice []T
+	index int
+}
+
+func (is *iterSlice[T]) Next() bool {
+	is.index++
+	return is.index < len(is.slice)
+}
+
+func (is *iterSlice[T]) Value() T {
+	return is.slice[is.index]
+}
+
+func (is *iterSlice[T]) Abort() {
+	is.index = len(is.slice)
+}
+
+func TestMakeSizedIterator(t *testing.T) {
+	slice := []string{"red", "orange", "hello"}
+	simpleIter := &iterSlice[string]{slice, -1}
+	actual := Collect(MakeIteratorOfSizeFromSimple[string](simpleIter, NewSize(len(slice))))
+	assert.Equal(t, slice, actual)
 }
 
 func TestGeneratorChan(t *testing.T) {
