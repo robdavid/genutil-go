@@ -386,4 +386,4 @@ func newIterSlice[T any](slice []T) Iterator[T] {
 
 ## Maps
 
-The `maps` package contains a number of utility functions that work over maps, including getting a slice of the Keys or Values of a map
+The `maps` package contains a number of utility functions that work over maps, including getting a slice of the Keys or Values of a map.
