@@ -15,7 +15,7 @@ import (
 
 func TestInsertPathOne(t *testing.T) {
 	m := make(map[string]any)
-	test.Check(t, PutPath([]string{"a", "b"}, 123, m))
+	test.Check(t, PutPath(m, []string{"a", "b"}, 123))
 	assert.Equal(t, map[string]any{
 		"a": map[string]any{"b": 123},
 	}, m)
@@ -24,8 +24,8 @@ func TestInsertPathOne(t *testing.T) {
 
 func TestInsertPathTwo(t *testing.T) {
 	m := make(map[string]any)
-	test.Check(t, PutPath([]string{"a", "b"}, 123, m))
-	test.Check(t, PutPath([]string{"a", "c"}, 456, m))
+	test.Check(t, PutPath(m, []string{"a", "b"}, 123))
+	test.Check(t, PutPath(m, []string{"a", "c"}, 456))
 	assert.Equal(t, map[string]any{
 		"a": map[string]any{"b": 123, "c": 456},
 	}, m)
@@ -34,7 +34,7 @@ func TestInsertPathTwo(t *testing.T) {
 func TestInsertPathFourDeep(t *testing.T) {
 	m := make(map[string]any)
 	path := []string{"a", "b", "c", "d"}
-	test.Check(t, PutPath(path, 123, m))
+	test.Check(t, PutPath(m, path, 123))
 	assert.Equal(t, map[string]any{
 		"a": map[string]any{
 			"b": map[string]any{
@@ -52,16 +52,77 @@ func TestInsertPathFourDeep(t *testing.T) {
 
 func TestInsertPathConflictLeaf(t *testing.T) {
 	m := make(map[string]any)
-	test.Check(t, PutPath([]string{"a", "b", "c", "d"}, 123, m))
-	err := PutPath([]string{"a", "b", "c"}, 456, m)
+	test.Check(t, PutPath(m, []string{"a", "b", "c", "d"}, 123))
+	err := PutPath(m, []string{"a", "b", "c"}, 456)
 	assert.EqualError(t, err, "conflict between object and non-object types at key path [a b c]")
 }
 
 func TestInsertPathConflictInterior(t *testing.T) {
 	m := make(map[string]any)
-	test.Check(t, PutPath([]string{"a", "b", "c"}, 123, m))
-	err := PutPath([]string{"a", "b", "c", "d"}, 456, m)
+	test.Check(t, PutPath(m, []string{"a", "b", "c"}, 123))
+	err := PutPath(m, []string{"a", "b", "c", "d"}, 456)
 	assert.EqualError(t, err, "conflict between object and non-object types at key path [a b c]")
+}
+
+func TestDeleteTop(t *testing.T) {
+	m := make(map[string]any)
+	test.Check(t, PutPath(m, []string{"a"}, 123))
+	value, ok := test.Result2(DeletePath(m, []string{"a"})).Must2(t)
+	assert.True(t, ok)
+	assert.Equal(t, 123, value)
+	assert.True(t, len(m) == 0)
+}
+
+func TestDeleteDepth2(t *testing.T) {
+	m := make(map[string]any)
+	test.Check(t, PutPath(m, []string{"a", "b"}, 123))
+	value, ok := test.Result2(DeletePath(m, []string{"a", "b"})).Must2(t)
+	assert.True(t, ok)
+	assert.Equal(t, 123, value)
+	assert.True(t, len(m) == 0)
+}
+
+func TestDeleteDepth3(t *testing.T) {
+	m := make(map[string]any)
+	test.Check(t, PutPath(m, []string{"a", "b", "c"}, 123))
+	value, ok := test.Result2(DeletePath(m, []string{"a", "b", "c"})).Must2(t)
+	assert.True(t, ok)
+	assert.Equal(t, 123, value)
+	assert.True(t, len(m) == 0)
+}
+
+func TestDeleteEmptySubtree(t *testing.T) {
+	m := make(map[string]any)
+	test.Check(t, PutPath(m, []string{"a", "b", "x"}, 123))
+	test.Check(t, PutPath(m, []string{"y"}, 456))
+	value, ok := test.Result2(DeletePath(m, []string{"a", "b", "x"})).Must2(t)
+	assert.True(t, ok)
+	assert.Equal(t, 123, value)
+	expected := map[string]any{"y": 456}
+	assert.Equal(t, expected, m)
+}
+
+func TestDeleteLeaf(t *testing.T) {
+	m := make(map[string]any)
+	test.Check(t, PutPath(m, []string{"a", "b", "x"}, 123))
+	test.Check(t, PutPath(m, []string{"a", "b", "y"}, 456))
+	value, ok := test.Result2(DeletePath(m, []string{"a", "b", "x"})).Must2(t)
+	assert.True(t, ok)
+	assert.Equal(t, 123, value)
+	expected := map[string]any{"a": map[string]any{"b": map[string]any{"y": 456}}}
+	assert.Equal(t, expected, m)
+}
+
+func TestDeleteSubtree(t *testing.T) {
+	m := make(map[string]any)
+	test.Check(t, PutPath(m, []string{"a", "b", "x"}, 123))
+	test.Check(t, PutPath(m, []string{"a", "b", "y"}, 456))
+	test.Check(t, PutPath(m, []string{"a", "z"}, 789))
+	value, ok := test.Result2(DeletePath(m, []string{"a", "b"})).Must2(t)
+	assert.True(t, ok)
+	assert.Equal(t, map[string]any{"x": 123, "y": 456}, value)
+	expected := map[string]any{"a": map[string]any{"z": 789}}
+	assert.Equal(t, expected, m)
 }
 
 func TestKeys(t *testing.T) {

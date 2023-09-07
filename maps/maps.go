@@ -58,48 +58,63 @@ func NewPathNotFound[K comparable](path []K) PathNotFound[K] {
 }
 
 // PutPath puts a value in a (possibly) nested map of maps. It mutates a map
-// instance that maps from any comparable key to any value. The type of thew value
-// can therefore encompass other map types. The path argument is a list of keys,
-// each one representing a key at consecutive levels in the map. Intermediate maps
-// are created as necessary. It is an error to attempt to replace an existing map
-// with another value, or to replace an existing non-map value with a map.
+// whose type signature maps from a comparable key to a value, where that value
+// can include a nested map with the same type signature. The path argument is
+// a list of keys,  each one representing a key at consecutive levels in the map.
+// Intermediate maps are created as necessary. It is an error to attempt to replace
+// an existing map with another value, or to replace an existing non-map value with a map.
 //
 //		m := make(map[string]any)
-//		PutPath([]string{"a", "b"}, 123, m)
+//		PutPath(m, []string{"a", "b"}, 123)
 //		// m contains map[string]any{ "a": map[string]any{"b": 123} }
-//	    err := PutPath([]string{"a"}, 456, m) // err != nil
-func PutPath[K comparable, T any](path []K, value T, top map[K]T) error {
+//	  err := PutPath([]string{"a"}, 456, m) // err != nil
+func PutPath[K comparable](top map[K]any, path []K, value any) error {
 	m := top
 	for i, s := range path {
 		if i == len(path)-1 {
 			// Reached final item in path
 			if n, ok := m[s]; ok {
-				if _, ok := any(n).(map[K]T); ok {
+				if _, ok := n.(map[K]any); ok {
 					return NewPathConflict(path)
 				}
 			}
 			m[s] = value
 		} else {
 			if n, ok := m[s]; ok {
-				if nm, okm := any(n).(map[K]T); okm {
+				if nm, okm := n.(map[K]any); okm {
 					m = nm
 				} else {
 					return NewPathConflict(path[:i+1])
 				}
 			} else {
-				n := any(make(map[K]T))
-				m[s] = n.(T)
-				m = n.(map[K]T)
+				n := make(map[K]any)
+				m[s] = n
+				m = n
 			}
 		}
 	}
 	return nil
 }
 
-func DeletePath[K comparable, T any](path []K, top map[K]T) (result T, ok bool, err error) {
+// DeletePath removes a value from a (possibly) nested map of maps. It mutates a map
+// whose type signature maps from a comparable key to a value, where that value
+// can include a nested map with the same type signature. The path argument is
+// a list of keys,  each one representing a key at consecutive levels in the map.
+// If, as a result of removing an item from a map, the map becomes empty, the map
+// itself is removed from the parent map (if any). Interior maps, as well as leaf
+// values can be removed, causing an entire subtree to be removed. The function
+// returns the previous value (if any) plus a flag indicating if a previous value
+// was present.
+//
+//	m := map[string]any{ "a": map[string]any{"b": 123 } }
+//	prev,ok,err := DeletePath(m, []string{"a", "b"})
+//	// prev == 123
+//	// ok == true
+//	// m is empty
+func DeletePath[K comparable](top map[K]any, path []K) (result any, ok bool, err error) {
 	m := top
-	result = any(top).(T)
-	parents := make([]map[K]T, 0, len(path))
+	result = any(top)
+	parents := make([]map[K]any, 0, len(path))
 	parents = append(parents, top)
 	for i, s := range path {
 		if i == len(path)-1 {
@@ -113,9 +128,9 @@ func DeletePath[K comparable, T any](path []K, top map[K]T) (result T, ok bool, 
 			}
 			break
 		} else {
-			var v T
+			var v any
 			if v, ok = m[s]; ok {
-				if m, ok = any(v).(map[K]T); ok {
+				if m, ok = any(v).(map[K]any); ok {
 					parents = append(parents, m)
 				}
 			}
@@ -127,15 +142,15 @@ func DeletePath[K comparable, T any](path []K, top map[K]T) (result T, ok bool, 
 	return
 }
 
-func GetPath[K comparable, T any](path []K, top map[K]T) (result T, err error) {
+func GetPath[K comparable](path []K, top map[K]any) (result any, err error) {
 	m := top
-	result = any(top).(T)
+	result = any(top)
 	for i, s := range path {
 		var ok bool
 		if i == len(path)-1 {
 			result, ok = m[s]
 		} else {
-			m, ok = any(m[s]).(map[K]T)
+			m, ok = m[s].(map[K]any)
 		}
 		if !ok {
 			err = NewPathNotFound(path[:i])
