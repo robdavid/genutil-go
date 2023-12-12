@@ -59,15 +59,16 @@ func NewPathNotFound[K comparable](path []K) PathNotFound[K] {
 
 // PutPath puts a value in a (possibly) nested map of maps. It mutates a map
 // whose type signature maps from a comparable key to a value, where that value
-// can include a nested map with the same type signature. The path argument is
-// a list of keys,  each one representing a key at consecutive levels in the map.
+// can include a nested map with the same type signature. The map can be empty, but
+// it cannot be nil. The path argument is
+// a list of keys, each one representing a key at consecutive levels in the map.
 // Intermediate maps are created as necessary. It is an error to attempt to replace
 // an existing map with another value, or to replace an existing non-map value with a map.
 //
-//		m := make(map[string]any)
-//		PutPath(m, []string{"a", "b"}, 123)
-//		// m contains map[string]any{ "a": map[string]any{"b": 123} }
-//	  err := PutPath([]string{"a"}, 456, m) // err != nil
+//	m := make(map[string]any)
+//	PutPath(m, []string{"a", "b"}, 123)
+//	// m contains map[string]any{ "a": map[string]any{"b": 123} }
+//	err := PutPath([]string{"a"}, 456, m) // err != nil
 func PutPath[K comparable](top map[K]any, path []K, value any) error {
 	m := top
 	for i, s := range path {
@@ -142,7 +143,18 @@ func DeletePath[K comparable](top map[K]any, path []K) (result any, ok bool, err
 	return
 }
 
-func GetPath[K comparable](path []K, top map[K]any) (result any, err error) {
+// GetPath fetches a value from a (possibly) nested map of maps. It traverses a map
+// whose type signature maps from a comparable key to a value, where that value
+// can include a nested map with the same type signature. The path argument is
+// a list of keys, each one representing a key at consecutive levels in the map.
+// This function looks up each key in turn at consecutive levels of the nested maps
+// and returns the value found after the last key lookup. This may be a leaf value or
+// an interior map node. If any of the key lookups fail, a PathNotFound error is
+// returned indicating which key lookup failed.
+//
+//	m := map[string]any{ "a": map[string]any{"b": 123 } }
+//	GetPath(m,[]string{"a","b"}) // 123
+func GetPath[K comparable](top map[K]any, path []K) (result any, err error) {
 	m := top
 	result = any(top)
 	for i, s := range path {

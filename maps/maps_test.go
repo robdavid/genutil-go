@@ -13,13 +13,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestFetchPathNil(t *testing.T) {
+	var m map[string]any = nil
+	_, e := GetPath(m, []string{"a", "b", "c", "e"})
+	assert.ErrorIs(t, e, ErrKeyError)
+}
+
+func TestFetchPath(t *testing.T) {
+	m := map[string]any{
+		"a": map[string]any{
+			"b": map[string]any{
+				"c": map[string]any{
+					"d": 123,
+				},
+			},
+		},
+	}
+	v, e := GetPath(m, []string{"a", "b", "c", "d"})
+	assert.NoError(t, e)
+	assert.Equal(t, 123, v)
+	_, e = GetPath(m, []string{"a", "b", "c", "e"})
+	assert.ErrorIs(t, e, ErrKeyError)
+	_, e = GetPath(m, []string{"a", "b", "c", "d", "e"})
+	assert.ErrorIs(t, e, ErrKeyError)
+}
+
 func TestInsertPathOne(t *testing.T) {
 	m := make(map[string]any)
 	test.Check(t, PutPath(m, []string{"a", "b"}, 123))
 	assert.Equal(t, map[string]any{
 		"a": map[string]any{"b": 123},
 	}, m)
-	assert.Equal(t, 123, test.Result(GetPath([]string{"a", "b"}, m)).Must(t))
+	assert.Equal(t, 123, test.Result(GetPath(m, []string{"a", "b"})).Must(t))
 }
 
 func TestInsertPathTwo(t *testing.T) {
@@ -44,8 +69,8 @@ func TestInsertPathFourDeep(t *testing.T) {
 			},
 		},
 	}, m)
-	assert.Equal(t, 123, test.Result(GetPath(path, m)).Must(t))
-	res := test.Result(GetPath(slices.Concat(path, []string{"e"}), m))
+	assert.Equal(t, 123, test.Result(GetPath(m, path)).Must(t))
+	res := test.Result(GetPath(m, slices.Concat(path, []string{"e"})))
 	assert.True(t, res.IsError())
 	assert.True(t, errors.Is(res.GetErr(), ErrKeyError))
 }
@@ -123,6 +148,17 @@ func TestDeleteSubtree(t *testing.T) {
 	assert.Equal(t, map[string]any{"x": 123, "y": 456}, value)
 	expected := map[string]any{"a": map[string]any{"z": 789}}
 	assert.Equal(t, expected, m)
+}
+
+func TestDeleteExample(t *testing.T) {
+	m := map[string]any{
+		"one": 1,
+		"two": map[string]any{
+			"three": 23,
+		},
+	}
+	DeletePath(m, []string{"two", "three"})
+	assert.Equal(t, map[string]any{"one": 1}, m)
 }
 
 func TestKeys(t *testing.T) {
