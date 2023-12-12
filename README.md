@@ -24,6 +24,7 @@ The library falls into a number of categories, subdivided into separate packages
     - [Ranges](#ranges)
   - [Simple Iterator](#simple-iterator)
 - [Maps](#maps)
+  - [Keys, Values and Items](#keys-values-and-items)
 
 ## Tuple
 
@@ -387,3 +388,25 @@ func newIterSlice[T any](slice []T) Iterator[T] {
 ## Maps
 
 The `maps` package contains a number of utility functions that work over maps, including getting a slice of the Keys or Values of a map.
+
+### Keys, Values and Items
+The `Keys` function can be used to collect the keys of a map into a slice, e.g:
+
+```go
+m := map[string]int{"one": 1, "two": 2}
+k := maps.Keys(m) // []string{"one","two"}
+```
+
+Similarly, the `Values` function will collect the values:
+
+```go
+v := maps.Values(m) // []int{1,2}
+```
+
+If you need both keys and values, the `Items` function will return a slice of `tuple.Tuple2` values with each tuple holding a key/value pair, e.g:
+```go
+i := maps.Items(m) // []tuple.Tuple2[string,int] { {"one",1}, {"two",2} }
+```
+
+Note that in all three cases, the ordering of the slice returned is undefined.
+
