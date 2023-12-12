@@ -410,3 +410,9 @@ i := maps.Items(m) // []tuple.Tuple2[string,int] { {"one",1}, {"two",2} }
 
 Note that in all three cases, the ordering of the slice returned is undefined.
 
+#### Iterators
+For each of the these three functions, there exists three variants,  `IterKeys`, `IterValues` and `IterItems`, which return iterators rather than slices. The ordering for these iterators is also undefined.
+
+#### Sorted slices
+The slice returning functions also have ordred alternatives, `SortedKeys`, `SortedValuesByKey` and `SortedItems`, which return keys, values and items sorted in key order.
+

@@ -64,10 +64,10 @@ func NewPathNotFound[K comparable](path []K) PathNotFound[K] {
 // Intermediate maps are created as necessary. It is an error to attempt to replace
 // an existing map with another value, or to replace an existing non-map value with a map.
 //
-//		m := make(map[string]any)
-//		PutPath(m, []string{"a", "b"}, 123)
-//		// m contains map[string]any{ "a": map[string]any{"b": 123} }
-//	  err := PutPath([]string{"a"}, 456, m) // err != nil
+//	m := make(map[string]any)
+//	PutPath(m, []string{"a", "b"}, 123)
+//	// m contains map[string]any{ "a": map[string]any{"b": 123} }
+//	err := PutPath([]string{"a"}, 456, m) // err != nil
 func PutPath[K comparable](top map[K]any, path []K, value any) error {
 	m := top
 	for i, s := range path {
