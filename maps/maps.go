@@ -142,7 +142,18 @@ func DeletePath[K comparable](top map[K]any, path []K) (result any, ok bool, err
 	return
 }
 
-func GetPath[K comparable](path []K, top map[K]any) (result any, err error) {
+// GetPath fetches a value from a (possibly) nested map of maps. It traverses a map
+// whose type signature maps from a comparable key to a value, where that value
+// can include a nested map with the same type signature. The path argument is
+// a list of keys, each one representing a key at consecutive levels in the map.
+// This function looks up each key in turn at consecutive levels of the nested maps
+// and returns the value found after the last key lookup. This may be a leaf value or
+// an interior map node. If any of the key lookups fail, a PathNotFound error is
+// returned indicating which key lookup failed.
+//
+//	m := map[string]any{ "a": map[string]any{"b": 123 } }
+//	GetPath(m,[]string{"a","b"}) // 123
+func GetPath[K comparable](top map[K]any, path []K) (result any, err error) {
 	m := top
 	result = any(top)
 	for i, s := range path {

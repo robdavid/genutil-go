@@ -19,7 +19,7 @@ func TestInsertPathOne(t *testing.T) {
 	assert.Equal(t, map[string]any{
 		"a": map[string]any{"b": 123},
 	}, m)
-	assert.Equal(t, 123, test.Result(GetPath([]string{"a", "b"}, m)).Must(t))
+	assert.Equal(t, 123, test.Result(GetPath(m, []string{"a", "b"})).Must(t))
 }
 
 func TestInsertPathTwo(t *testing.T) {
@@ -44,8 +44,8 @@ func TestInsertPathFourDeep(t *testing.T) {
 			},
 		},
 	}, m)
-	assert.Equal(t, 123, test.Result(GetPath(path, m)).Must(t))
-	res := test.Result(GetPath(slices.Concat(path, []string{"e"}), m))
+	assert.Equal(t, 123, test.Result(GetPath(m, path)).Must(t))
+	res := test.Result(GetPath(m, slices.Concat(path, []string{"e"})))
 	assert.True(t, res.IsError())
 	assert.True(t, errors.Is(res.GetErr(), ErrKeyError))
 }
