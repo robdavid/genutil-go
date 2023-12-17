@@ -13,6 +13,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestFetchPathNil(t *testing.T) {
+	var m map[string]any = nil
+	_, e := GetPath(m, []string{"a", "b", "c", "e"})
+	assert.ErrorIs(t, e, ErrKeyError)
+}
+
+func TestFetchPath(t *testing.T) {
+	m := map[string]any{
+		"a": map[string]any{
+			"b": map[string]any{
+				"c": map[string]any{
+					"d": 123,
+				},
+			},
+		},
+	}
+	v, e := GetPath(m, []string{"a", "b", "c", "d"})
+	assert.NoError(t, e)
+	assert.Equal(t, 123, v)
+	_, e = GetPath(m, []string{"a", "b", "c", "e"})
+	assert.ErrorIs(t, e, ErrKeyError)
+	_, e = GetPath(m, []string{"a", "b", "c", "d", "e"})
+	assert.ErrorIs(t, e, ErrKeyError)
+}
+
 func TestInsertPathOne(t *testing.T) {
 	m := make(map[string]any)
 	test.Check(t, PutPath(m, []string{"a", "b"}, 123))

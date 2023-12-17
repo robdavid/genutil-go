@@ -25,6 +25,12 @@ The library falls into a number of categories, subdivided into separate packages
   - [Simple Iterator](#simple-iterator)
 - [Maps](#maps)
   - [Keys, Values and Items](#keys-values-and-items)
+    - [Iterators](#iterators)
+    - [Sorted slices](#sorted-slices)
+  - [Nested maps](#nested-maps)
+    - [Inserting values](#inserting-values)
+    - [Fetching values](#fetching-values)
+    - [Deleting values](#deleting-values)
 
 ## Tuple
 
@@ -417,5 +423,40 @@ For each of the these three functions, there exists three variants,  `IterKeys`,
 The slice returning functions also have ordered alternatives, `SortedKeys`, `SortedValuesByKey` and `SortedItems`, which return keys, values and items sorted in key order.
 
 ### Nested maps
-A set of functions are available for managing nested maps, that is maps whose values may also be maps, and which have the signature `map[K comparable]any`. A common concrete example is `map[string]any`, which is useful for un-marshaling arbitrary YAML or JSON documents. All the functions take a map 
+A group of functions are available for managing nested maps, that is maps whose values may also be maps, and which have the signature `map[K comparable]any`. A common concrete example is `map[string]any`, which is useful for un-marshaling arbitrary YAML or JSON documents.
 
+All the functions take a map with the generic signature above, and a list of elements of type K which represent a path into the map. For example a list consisting of `[]string{"a","b","c"}` describes the value found by first looking up "a" in a map with `string` keys, expecting to find another map value of the same type, then looking up "b" in that map, again expecting a map result, and then finally looking up "c" in that final map.
+
+#### Inserting values
+The `PutPath` function will insert or mutate a key in the map. Any missing intermediate levels of map will be created as necessary, except the top level; the map provided cannot be nil. For example:
+
+```go
+m := make(map[string]any)
+maps.PutPath(m, []string{"a", "b"}, 123)
+// m is map[string]any{	"a": map[string]any{"b": 123}}
+```
+
+Once an item has been established as either a map or non-map value, it cannot be replaced by a value of the opposite kind, for example:
+
+```go
+err := maps.PutPath(m, []string{"a"}, 456)
+errors.Is(err,maps.ErrPathConflict) // true
+```
+
+#### Fetching values
+The `GetPath` function will fetch a value at a location in the nested map, defined by a slice of keys. It returns the value found and an error.
+
+```go
+m := map[string]any {"a": map[string]any { "b": 123 }}
+v, _ := maps.GetPath(m, []string{"a","b"}) // v == 123
+```
+
+If the specified path does not exist, then a `maps.ErrKeyError` error will be returned.
+
+```go
+_, err := maps.GetPath(m, []string{"a","c"})     // errors.Is(err,maps.ErrKeyError)
+_, err := maps.GetPath(m, []string{"a","b","c"}) // errors.Is(err,maps.ErrKeyError)
+```
+
+#### Deleting values
+The `DeletePath` function will delete an item from a nested map, located by a path consisting of a slice of keys. It can delete a leaf value or an interior map, thereby removing a subtree. If a map becomes empty as a result of deleting a key from it, it itself is deleted from the parent map. This process recurses towards the root of the tree as many times as necessary.
