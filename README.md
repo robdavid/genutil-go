@@ -460,3 +460,8 @@ _, err := maps.GetPath(m, []string{"a","b","c"}) // errors.Is(err,maps.ErrKeyErr
 
 #### Deleting values
 The `DeletePath` function will delete an item from a nested map, located by a path consisting of a slice of keys. It can delete a leaf value or an interior map, thereby removing a subtree. If a map becomes empty as a result of deleting a key from it, it itself is deleted from the parent map. This process recurses towards the root of the tree as many times as necessary.
+
+```go
+m := map[string]any { "one": 1, "two": map[string]any { "three": 23 }}
+maps.DeletePath(m,[]string{"two","three"}) // m == map[string]any{"one": 1 }
+```

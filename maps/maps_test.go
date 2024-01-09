@@ -150,6 +150,12 @@ func TestDeleteSubtree(t *testing.T) {
 	assert.Equal(t, expected, m)
 }
 
+func TestDeleteExample(t *testing.T) {
+	m := map[string]any{"one": 1, "two": map[string]any{"three": 23}}
+	DeletePath(m, []string{"two", "three"})
+	assert.Equal(t, map[string]any{"one": 1}, m)
+}
+
 func TestKeys(t *testing.T) {
 	mymap := map[string]int{
 		"one":   1,
