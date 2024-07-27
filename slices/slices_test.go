@@ -159,6 +159,29 @@ func TestConcat(t *testing.T) {
 	assert.Equal(t, []int{1, 2, 3, 4, 5, 6, 7, 8, 9}, sliceOut)
 }
 
+func TestReverse(t *testing.T) {
+	sliceIn := []int{1, 2, 3, 4, 5, 6}
+	assert.Equal(t, []int{6, 5, 4, 3, 2, 1}, Reverse(sliceIn))
+	sliceIn = append(sliceIn, 7)
+	assert.Equal(t, []int{7, 6, 5, 4, 3, 2, 1}, Reverse(sliceIn))
+}
+
+func TestReverseINil(t *testing.T) {
+	var sliceIn []int = nil
+	ReverseI(sliceIn)
+	assert.Nil(t, sliceIn)
+}
+
+func TestReverseI(t *testing.T) {
+	sliceIn := []int{1, 2, 3, 4, 5, 6}
+	ReverseI(sliceIn)
+	assert.Equal(t, []int{6, 5, 4, 3, 2, 1}, sliceIn)
+	ReverseI(sliceIn)
+	sliceIn = append(sliceIn, 7)
+	ReverseI(sliceIn)
+	assert.Equal(t, []int{7, 6, 5, 4, 3, 2, 1}, sliceIn)
+}
+
 func TestFilterRef(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	sliceOut := FilterRef(sliceIn, func(i *int) bool { return (*i)&1 == 0 })
@@ -166,7 +189,7 @@ func TestFilterRef(t *testing.T) {
 }
 func TestFilter(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	sliceOut := Filter(sliceIn, func(i int) bool { return i&1 == 0 })
+	sliceOut := Filter(sliceIn, func(i int) bool { return i%2 == 0 })
 	assert.Equal(t, []int{2, 4, 6, 8}, sliceOut)
 }
 
@@ -268,4 +291,41 @@ func TestCompare(t *testing.T) {
 	assert.Equal(t, -1, Compare([]int{1, 2}, []int{1, 3}))
 	assert.Equal(t, 0, Compare([]int{1, 2}, []int{1, 2}))
 	assert.Equal(t, 1, Compare([]int{1, 2, 4}, []int{1, 2, 3}))
+}
+
+func TestEmptyRange(t *testing.T) {
+	assert.Equal(t, []int{}, Range(0, 0))
+	assert.Equal(t, []float64{}, Range(0.0, 0.0))
+}
+
+func TestSingletonRange(t *testing.T) {
+	assert.Equal(t, []int{0}, Range(0, 1))
+	assert.Equal(t, []float64{0.0}, Range(0.0, 0.9))
+}
+
+func TestSimpleRange(t *testing.T) {
+	assert.Equal(t, []int{0, 1, 2, 3, 4}, Range(0, 5))
+	assert.Equal(t, []float64{0.0, 1.0, 2.0, 3.0, 4.0}, Range(0.0, 5.0))
+}
+
+func TestReverseRange(t *testing.T) {
+	assert.Equal(t, []int{4, 3, 2, 1, 0}, Range(5, 0))
+	assert.Equal(t, []int{4, 3, 2, 1, 0}, RangeBy(0, 5, -1))
+	assert.Equal(t, []int{4, 2, 0}, RangeBy(0, 5, -2))
+	assert.Equal(t, RangeBy(0, 5, -1), Reverse(RangeBy(0, 5, 1)))
+	assert.Equal(t, []uint{4, 3, 2, 1, 0}, Range[uint](5, 0))
+	assert.Equal(t, []float64{4.0, 3.0, 2.0, 1.0, 0.0}, Range(5.0, 0.0))
+	assert.Equal(t, []float64{1.32, 0.99, 0.66, 0.33, 0.0}, RangeBy(1.33, 0.0, 0.33))
+	assert.Equal(t, []float64{0.99, 0.66, 0.33, 0.0}, RangeBy(1.32, 0.0, -0.33))
+}
+
+func TestNonIntegerRange(t *testing.T) {
+	assert.Equal(t, []float64{0.0, 0.5, 1.0, 1.5, 2.0}, RangeBy(0.0, 2.5, 0.5))
+}
+
+func TestNonIntegerReverseRange(t *testing.T) {
+	assert.Equal(t, []float64{0.0, 0.5, 1.0, 1.5, 2.0}, RangeBy(0.0, 2.5, 0.5))
+	reversed := Reverse(RangeBy(0.0, 2.5, 0.5))
+	assert.Equal(t, reversed, RangeBy(0.0, 2.5, -0.5))
+	assert.Equal(t, reversed, RangeBy(2.5, 0.0, 0.5))
 }
