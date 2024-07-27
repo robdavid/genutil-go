@@ -20,7 +20,7 @@ The library falls into a number of categories, subdivided into separate packages
   - [Test](#test)
 - [Iterator](#iterator)
   - [Constructing iterators](#constructing-iterators)
-    - [Slices](#slices)
+    - [Iterators over slices](#iterators-over-slices)
     - [Ranges](#ranges)
   - [Simple Iterator](#simple-iterator)
 - [Maps](#maps)
@@ -31,6 +31,9 @@ The library falls into a number of categories, subdivided into separate packages
     - [Inserting values](#inserting-values)
     - [Fetching values](#fetching-values)
     - [Deleting values](#deleting-values)
+- [Slices](#slices)
+  - [Predicate functions](#predicate-functions)
+  - [Functional primitives](#functional-primitives)
 
 ## Tuple
 
@@ -274,7 +277,7 @@ The `Abort` method can be used to stop the iterator; once called the `Next` meth
 
 Aside from just implementing the `Iterator` interface, there are a number of ways available for constructing iterators.
 
-#### Slices
+#### Iterators over slices
 
 An iterator over a slice of values is easily created with the `Slice` function.
 
@@ -355,7 +358,7 @@ func MakeIteratorOfSizeFromSimple[T any](base SimpleIterator[T], size IteratorSi
 ```
 
 The following example illustrates how an Iterator over a slice can be created by implementing only
-the SimpleIterator interface. 
+the SimpleIterator interface.
 
 ```go
 
@@ -396,6 +399,7 @@ func newIterSlice[T any](slice []T) Iterator[T] {
 The `maps` package contains a number of utility functions that work over maps, including getting a slice of the Keys or Values of a map.
 
 ### Keys, Values and Items
+
 The `Keys` function can be used to collect the keys of a map into a slice, e.g:
 
 ```go
@@ -410,6 +414,7 @@ v := maps.Values(m) // []int{1,2}
 ```
 
 If you need both keys and values, the `Items` function will return a slice of `tuple.Tuple2` values with each tuple holding a key/value pair, e.g:
+
 ```go
 i := maps.Items(m) // []tuple.Tuple2[string,int] { {"one",1}, {"two",2} }
 ```
@@ -417,23 +422,27 @@ i := maps.Items(m) // []tuple.Tuple2[string,int] { {"one",1}, {"two",2} }
 Note that in all three cases, the ordering of the slice returned is undefined.
 
 #### Iterators
+
 For each of the these three functions, there exists three variants,  `IterKeys`, `IterValues` and `IterItems`, which return iterators rather than slices. The ordering for these iterators is also undefined.
 
 #### Sorted slices
+
 The slice returning functions also have ordered alternatives, `SortedKeys`, `SortedValuesByKey` and `SortedItems`, which return keys, values and items sorted in key order.
 
 ### Nested maps
+
 A group of functions are available for managing nested maps, that is maps whose values may also be maps, and which have the signature `map[K comparable]any`. A common concrete example is `map[string]any`, which is useful for un-marshaling arbitrary YAML or JSON documents.
 
 All the functions take a map with the generic signature above, and a list of elements of type K which represent a path into the map. For example a list consisting of `[]string{"a","b","c"}` describes the value found by first looking up "a" in a map with `string` keys, expecting to find another map value of the same type, then looking up "b" in that map, again expecting a map result, and then finally looking up "c" in that final map.
 
 #### Inserting values
+
 The `PutPath` function will insert or mutate a key in the map. Any missing intermediate levels of map will be created as necessary, except the top level; the map provided cannot be nil. For example:
 
 ```go
 m := make(map[string]any)
 maps.PutPath(m, []string{"a", "b"}, 123)
-// m is map[string]any{	"a": map[string]any{"b": 123}}
+// m is map[string]any{"a": map[string]any{"b": 123}}
 ```
 
 Once an item has been established as either a map or non-map value, it cannot be replaced by a value of the opposite kind, for example:
@@ -444,6 +453,7 @@ errors.Is(err,maps.ErrPathConflict) // true
 ```
 
 #### Fetching values
+
 The `GetPath` function will fetch a value at a location in the nested map, defined by a slice of keys. It returns the value found and an error.
 
 ```go
@@ -459,6 +469,7 @@ _, err := maps.GetPath(m, []string{"a","b","c"}) // errors.Is(err,maps.ErrKeyErr
 ```
 
 #### Deleting values
+
 The `DeletePath` function will delete an item from a nested map, located by a path consisting of a slice of keys. It can delete a leaf value or an interior map, thereby removing a subtree. If a map becomes empty as a result of deleting a key from it, it itself is deleted from the parent map. This process recurses towards the root of the tree as many times as necessary.
 
 ```go
@@ -470,3 +481,50 @@ m := map[string]any{
 }
 maps.DeletePath(m,[]string{"two","three"}) // m == map[string]any{"one": 1 }
 ```
+
+## Slices
+
+
+A variety of functions that work over slices are included in the `slices` package. Some examples are covered here. See the [documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/slices) for full
+details.
+
+### Functional primitives
+
+Some "functional style" operations on slices are available.
+
+#### Predicate functions
+
+Elements in a slice can be tested with predicate functions. The `All` and `Any` functions test the elements in a slice with a given predicate function and determine if all the elements or at least one of them are true under the predicate respectively.
+
+```go
+input1 := []rune("---------")
+All(input1, func(r rune) bool { return r == '-'}) // true
+Any(input1, func(r rune) bool { return r == '!'}) // false
+
+input2 := []rune("-----!----") 
+All(input2, func(r rune) bool { return r == '-'}) // false
+Any(input2, func(r rune) bool { return r == '!'}) // true
+
+```
+
+#### Transformations
+
+The functional programming primitives of `Map`, `Filter` and `Fold` are available.
+
+The `Map` function creates a new slice by transforming all the elements of an existing slice by applying a function to each element.
+
+```go
+input := []int{1, 2, 3, 4}
+actual := slices.Map(input, func(x int) int { return x * 2 }) // []int{2, 4, 6, 8}
+```
+
+The `Filter` function creates a new slice by selecting element to retain from an existing slice based on a predicate function.
+
+```go
+input := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+slices.Filter(input, func(i int) bool { return i%2 == 0 }) // []int{2, 4, 6, 8}
+```
+
+The `Fold` function reduces all the elements of a slice down to a single value, using a function to combine elements.
+
+

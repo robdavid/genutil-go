@@ -202,8 +202,8 @@ func (o *Option[T]) SafeSet(v T) {
 func (o *Option[T]) SetRef(v *T) {
 	if v == nil {
 		o.nonEmpty = false
-		var value T
-		o.value = value
+		var zero T
+		o.value = zero
 	} else {
 		o.value = *v
 		o.nonEmpty = true
@@ -212,8 +212,8 @@ func (o *Option[T]) SetRef(v *T) {
 
 // Sets the option empty
 func (o *Option[T]) Clear() {
-	var v T
-	o.value = v
+	var zero T
+	o.value = zero
 	o.nonEmpty = false
 }
 
