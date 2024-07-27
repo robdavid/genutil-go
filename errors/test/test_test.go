@@ -3,6 +3,8 @@ package test
 import (
 	"errors"
 	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/handler"
@@ -11,6 +13,7 @@ import (
 )
 
 var errTestErr = errors.New("this is my test error")
+var errTestBottom = errors.New("hit the bottom")
 
 func dummySuccessFunction() (string, error) {
 	return "success", nil
@@ -38,11 +41,18 @@ func dummyErrFunction() error {
 
 type mockTesting struct {
 	lastError []any
+	errOutput []string
 	fatal     bool
 }
 
 func (mt *mockTesting) Error(args ...any) {
 	mt.lastError = args
+}
+
+func (mt *mockTesting) Errorf(format string, args ...any) {
+	message := fmt.Sprintf(format, args...)
+	fmt.Println(message)
+	mt.errOutput = append(mt.errOutput, message)
 }
 
 func (mt *mockTesting) FailNow() {
@@ -130,4 +140,53 @@ func TestErrorReporting(t *testing.T) {
 	}()
 	defer ReportErr(&mt)
 	Status(dummyErrFunction()).Try()
+}
+
+var dummyErrorRaiseLine int
+var dummyErrorRaiseFile string
+
+func dummyErrorRecurse(level int, catch bool) (err error) {
+	if catch {
+		defer handler.Catch(&err)
+	}
+	if level > 0 {
+		dummyErrorRecurse(level-1, false)
+	} else {
+
+		_, dummyErrorRaiseFile, dummyErrorRaiseLine, _ = runtime.Caller(0)
+		dummyErrorRaiseLine += 2
+		handler.Check(errTestBottom)
+	}
+	return
+}
+
+func TestErrorTrace(t *testing.T) {
+	var mt mockTesting
+	var line int
+	var file string
+	defer func() {
+		assert.Equal(t, "hit the bottom", mt.message())
+		errLines := strings.Split(mt.errOutput[0], "\n")
+		assert.Equal(t, "stack trace", errLines[0])
+		parts := strings.Split(errLines[1], " ")
+		assert.Equal(t, fmt.Sprintf("%s:%d", file, line+1), parts[0])
+	}()
+	defer ReportErr(&mt)
+	_, file, line, _ = runtime.Caller(0)
+	Status(dummyErrorRecurse(0, true)).Try()
+}
+
+func TestHandlerTryTrace(t *testing.T) {
+	var mt mockTesting
+	const depth = 10
+	defer func() {
+		assert.Equal(t, "hit the bottom", mt.message())
+		errLines := strings.Split(mt.errOutput[0], "\n")
+		assert.Greater(t, len(errLines), depth)
+		assert.Equal(t, "stack trace", errLines[0])
+		parts := strings.Split(errLines[1], " ")
+		assert.Equal(t, fmt.Sprintf("%s:%d", dummyErrorRaiseFile, dummyErrorRaiseLine), parts[0])
+	}()
+	defer ReportErr(&mt)
+	handler.Check(dummyErrorRecurse(depth, false))
 }

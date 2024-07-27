@@ -27,9 +27,22 @@
 // can recovered via the Catch() or Handle() functions.
 package handler
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
-// Removes the error value from a return value.
+var packageName string
+
+// PackageName returns the pull path of this package
+func PackageName() string {
+	if packageName == "" {
+		packageName = reflect.TypeOf(TryError{}).PkgPath()
+	}
+	return packageName
+}
+
+// Must removes the error value from a return value.
 // Panics if err is non-nil, otherwise returns the value
 // e.g.
 //
@@ -116,13 +129,13 @@ func Catch(retErr *error) {
 // such as wrapping the error in another error type.
 // e.g.
 //
-//    func readFileWrapErr(fname string) (content []byte, err error) {
-//      defer Handle(func(e error) {
-//        err = fmt.Errorf("Error reading %s: %w", fname, e)
-//      })
-//      content = Try(os.ReadFile(fname))
-//      return
-//    }
+//	func readFileWrapErr(fname string) (content []byte, err error) {
+//	  defer Handle(func(e error) {
+//	    err = fmt.Errorf("Error reading %s: %w", fname, e)
+//	  })
+//	  content = Try(os.ReadFile(fname))
+//	  return
+//	}
 func Handle(handler func(err error)) {
 	if err := recover(); err != nil {
 		if tryErr, ok := err.(TryError); ok {

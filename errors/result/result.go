@@ -7,11 +7,20 @@ package result
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/robdavid/genutil-go/errors/handler"
 )
 
-//import "github.com"
+var packageName string
+
+// PackageName returns the pull path of this package
+func PackageName() string {
+	if packageName == "" {
+		packageName = reflect.TypeOf(Result[bool]{}).PkgPath()
+	}
+	return packageName
+}
 
 // Contains a value of type T, and/or an error
 type Result[T any] struct {
