@@ -190,3 +190,7 @@ func TestHandlerTryTrace(t *testing.T) {
 	defer ReportErr(&mt)
 	handler.Check(dummyErrorRecurse(depth, false))
 }
+
+func TestNoError(t *testing.T) {
+	defer ReportErr(t)
+}

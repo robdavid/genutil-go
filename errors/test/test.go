@@ -190,9 +190,9 @@ func logStack(t TestReporting) {
 //	f := Try(os.Open(myfile))
 func ReportErr(t TestReporting) {
 	t.Helper()
-	logStack(t)
 	if err := recover(); err != nil {
 		if tryErr, ok := err.(handler.TryError); ok {
+			logStack(t)
 			t.Error(tryErr.Error)
 		} else {
 			panic(err)
