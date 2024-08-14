@@ -2,9 +2,11 @@ package slices
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
+	"github.com/robdavid/genutil-go/iterator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -294,8 +296,25 @@ func TestCompare(t *testing.T) {
 }
 
 func TestEmptyRange(t *testing.T) {
-	assert.Equal(t, []int{}, Range(0, 0))
-	assert.Equal(t, []float64{}, Range(0.0, 0.0))
+	for i := -9; i < 10; i++ {
+		assert.Equal(t, []int{}, Range(i, i))
+		assert.Equal(t, []int{}, RangeBy(i, i, -1))
+		assert.Equal(t, []float64{}, Range(float64(i), float64(i)))
+		assert.Equal(t, []int{}, ParRange(i, i))
+		assert.Equal(t, []int{}, ParRangeBy(i, i, 0))
+		assert.Equal(t, []int{}, ParRange(i, i, ParThreshold(0)))
+	}
+}
+
+func TestSingletonIncRange(t *testing.T) {
+	for i := -9; i < 10; i++ {
+		assert.Equal(t, []int{i}, IncRange(i, i))
+		assert.Equal(t, []int{i}, IncRangeBy(i, i, -1))
+		assert.Equal(t, []float64{float64(i)}, IncRange(float64(i), float64(i)))
+		assert.Equal(t, []int{i}, ParIncRange(i, i))
+		assert.Equal(t, []int{i}, ParIncRangeBy(i, i, 0))
+		assert.Equal(t, []int{i}, ParIncRange(i, i, ParThreshold(0)))
+	}
 }
 
 func TestSingletonRange(t *testing.T) {
@@ -305,18 +324,215 @@ func TestSingletonRange(t *testing.T) {
 
 func TestSimpleRange(t *testing.T) {
 	assert.Equal(t, []int{0, 1, 2, 3, 4}, Range(0, 5))
+	assert.Equal(t, []int{-2, -1}, Range(-2, 0))
+	assert.Equal(t, []int{-2, -1, 0, 1}, Range(-2, 2))
 	assert.Equal(t, []float64{0.0, 1.0, 2.0, 3.0, 4.0}, Range(0.0, 5.0))
+	assert.Equal(t, []float64{-2.0, -1.5, -1.0, -0.5}, RangeBy(-2.0, 0.0, 0.5))
+	assert.Equal(t, []float64{-1.0, -0.5, 0.0, 0.5}, RangeBy(-1.0, 1.0, 0.5))
+}
+
+func TestSimpleInclusiveRange(t *testing.T) {
+	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, IncRange(0, 5))
+	assert.Equal(t, []int{-2, -1, 0}, IncRange(-2, 0))
+	assert.Equal(t, []int{-2, -1, 0, 1, 2}, IncRange(-2, 2))
+	assert.Equal(t, []float64{0.0, 1.0, 2.0, 3.0, 4.0, 5.0}, IncRange(0.0, 5.0))
+	assert.Equal(t, []float64{-2.0, -1.5, -1.0, -0.5, 0.0}, IncRangeBy(-2.0, 0.0, 0.5))
+	assert.Equal(t, []float64{-1.0, -0.5, 0.0, 0.5, 1.0}, IncRangeBy(-1.0, 1.0, 0.5))
+}
+
+func rangeBench(parallel bool, scale int, minPar int, numCpu int) {
+	var size = minPar * numCpu
+	slice := make([]int, size)
+	if parallel {
+		for iter := 0; iter < scale; iter++ {
+			chunks := parChunks(slice, minPar, numCpu)
+			parSliceFill(0, 1, false, chunks)
+		}
+	} else {
+		for iter := 0; iter < scale; iter++ {
+			sliceFill(0, 1, false, slice)
+		}
+	}
+}
+
+func BenchmarkParChunk(b *testing.B) {
+	const parMin = 100000
+	const numCpu = 4
+	rangeBench(true, b.N, parMin, numCpu)
+}
+
+func BenchmarkOneChunk(b *testing.B) {
+	const parMin = 100000
+	const numCpu = 4
+	rangeBench(false, b.N, parMin, numCpu)
+}
+
+func BenchmarkParSmallChunk(b *testing.B) {
+	const parMin = 10000
+	const numCpu = 4
+	rangeBench(true, b.N, parMin, numCpu)
+}
+
+func BenchmarkOneSmallChunk(b *testing.B) {
+	const parMin = 10000
+	const numCpu = 4
+	rangeBench(false, b.N, parMin, numCpu)
+}
+
+func TestLargeFloatRange(t *testing.T) {
+	r := RangeBy(0.0, 1000000.0, 0.25)
+	assert.Equal(t, 4000000, len(r))
+	v := 0.0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v += 0.25
+	}
+}
+
+func TestLargeIntRange(t *testing.T) {
+	r := Range(0, 4000000)
+	assert.Equal(t, 4000000, len(r))
+	v := 0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v++
+	}
+}
+
+func TestLargeInclusiveFloatRange(t *testing.T) {
+	r := IncRangeBy(0.0, 1000000.0, 0.25)
+	assert.Equal(t, 4000001, len(r))
+	v := 0.0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v += 0.25
+	}
+	assert.Equal(t, iterator.Collect(iterator.IncRangeBy(0.0, 1000000, 0.25)), r)
+}
+
+func TestLargeInclusiveIntRange(t *testing.T) {
+	r := IncRange(0, 4000000)
+	assert.Equal(t, 4000001, len(r))
+	v := 0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v++
+	}
+}
+
+func TestInclusiveFullRange(t *testing.T) {
+	full := IncRange(0, ^byte(0))
+	assert.Equal(t, 256, len(full))
+	for i := range full {
+		assert.Equal(t, i, int(full[i]))
+	}
+}
+
+func TestInclusiveSignedFullRange(t *testing.T) {
+	full := IncRange(int8(-128), int8(127))
+	assert.Equal(t, 256, len(full))
+	for i := range full {
+		assert.Equal(t, i-128, int(full[i]))
+	}
+}
+
+func TestIntRangeConsistency(t *testing.T) {
+	for size := 0; size < 10000; size += 10 {
+		for by := 1; by < 10; by++ {
+			irange := iterator.Collect(iterator.RangeBy(0, size, by))
+			srange := RangeBy(0, size, by)
+			prange := ParRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.RangeBy(size, 0, -by))
+			srange = RangeBy(size, 0, -by)
+			prange = ParRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(0, size, by))
+			srange = IncRangeBy(0, size, by)
+			prange = ParIncRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(size, 0, -by))
+			srange = IncRangeBy(size, 0, -by)
+			prange = ParIncRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+		}
+	}
+}
+
+func TestFloatRangeConsistency(t *testing.T) {
+	for size := 0.0; size < 1000.0; size += 1.0 {
+		for by := 1; by < 10; by++ {
+			irange := iterator.Collect(iterator.RangeBy(0, size, by))
+			srange := RangeBy(0, size, by)
+			prange := ParRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.RangeBy(size, 0, -by))
+			srange = RangeBy(size, 0, -by)
+			prange = ParRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(0, size, by))
+			srange = IncRangeBy(0, size, by)
+			prange = ParIncRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(size, 0, -by))
+			srange = IncRangeBy(size, 0, -by)
+			prange = ParIncRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+		}
+	}
+}
+
+func TestParRangeExample(t *testing.T) {
+	actual := ParRangeBy[uint](400000, 0, -2)
+	assert.Equal(t, 200000, len(actual))
+	var last uint
+	for i, v := range actual {
+		assert.Equal(t, 400000-i*2, int(v))
+		last = v
+	}
+	assert.Equal(t, uint(2), last)
+}
+
+func TestParIncRangeExample(t *testing.T) {
+	actual := ParIncRangeBy[uint](400000, 0, -2)
+	assert.Equal(t, 200001, len(actual))
+	var last uint
+	for i, v := range actual {
+		assert.Equal(t, 400000-i*2, int(v))
+		last = v
+	}
+	assert.Equal(t, uint(0), last)
+}
+
+func TestInvalidRange(t *testing.T) {
+	assert.PanicsWithError(t, "invalid range: negative step or inverse range (but not both)",
+		func() { RangeBy(0, 5, -1) },
+	)
+	assert.PanicsWithError(t, "invalid range: step is zero",
+		func() { RangeBy(0.0, 0.5, 0.0) },
+	)
 }
 
 func TestReverseRange(t *testing.T) {
-	assert.Equal(t, []int{4, 3, 2, 1, 0}, Range(5, 0))
-	assert.Equal(t, []int{4, 3, 2, 1, 0}, RangeBy(0, 5, -1))
-	assert.Equal(t, []int{4, 2, 0}, RangeBy(0, 5, -2))
-	assert.Equal(t, RangeBy(0, 5, -1), Reverse(RangeBy(0, 5, 1)))
-	assert.Equal(t, []uint{4, 3, 2, 1, 0}, Range[uint](5, 0))
-	assert.Equal(t, []float64{4.0, 3.0, 2.0, 1.0, 0.0}, Range(5.0, 0.0))
-	assert.Equal(t, []float64{1.32, 0.99, 0.66, 0.33, 0.0}, RangeBy(1.33, 0.0, 0.33))
-	assert.Equal(t, []float64{0.99, 0.66, 0.33, 0.0}, RangeBy(1.32, 0.0, -0.33))
+	assert.Equal(t, []int{5, 4, 3, 2, 1}, Range(5, 0))
+	assert.Equal(t, []int{0, 1, 2, 3, 4}, Range(0, 5))
+	assert.Equal(t, []int{5, 3, 1}, RangeBy(5, 0, -2))
+	assert.Equal(t, []int{5, 3, 1}, IncRangeBy(5, 0, -2))
+	assert.Equal(t, []int{4, 2, 0}, IncRangeBy(4, 0, -2))
+	assert.Equal(t, IncRange(5, 0), Reverse(IncRange(0, 5)))
+	assert.Equal(t, []uint{5, 4, 3, 2, 1}, Range[uint](5, 0))
+	assert.Equal(t, []uint{5, 4, 3, 2, 1, 0}, IncRange[uint](5, 0))
+	assert.Equal(t, []float64{5.0, 4.0, 3.0, 2.0, 1.0}, Range(5.0, 0.0))
+	assert.Equal(t, []float64{132, 99, 66, 33}, Map(RangeBy(1.32, 0.0, -0.33), func(x float64) float64 { return math.Round(x * 100) }))
+	assert.Equal(t, []float64{0.0, 0.33, 0.66, 0.99}, RangeBy(0.0, 1.32, 0.33))
 }
 
 func TestNonIntegerRange(t *testing.T) {
@@ -326,6 +542,6 @@ func TestNonIntegerRange(t *testing.T) {
 func TestNonIntegerReverseRange(t *testing.T) {
 	assert.Equal(t, []float64{0.0, 0.5, 1.0, 1.5, 2.0}, RangeBy(0.0, 2.5, 0.5))
 	reversed := Reverse(RangeBy(0.0, 2.5, 0.5))
-	assert.Equal(t, reversed, RangeBy(0.0, 2.5, -0.5))
-	assert.Equal(t, reversed, RangeBy(2.5, 0.0, 0.5))
+	assert.Equal(t, reversed, RangeBy(2.0, -0.5, -0.5))
+	//assert.Equal(t, reversed, RangeBy(2.5, 0.0, 0.5))
 }

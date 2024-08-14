@@ -1,7 +1,5 @@
 package functions
 
-import "golang.org/x/exp/constraints"
-
 // Identity function - returns the value passed.
 func Id[T any](v T) T {
 	return v
@@ -33,22 +31,4 @@ func IfElseF[T any](cond bool, f func() T, alt func() T) T {
 	} else {
 		return alt()
 	}
-}
-
-// Max returns the largest of two ordered values. Note the values can be strings as well
-// as numeric types.
-func Max[T constraints.Ordered](x, y T) T {
-	if y > x {
-		return y
-	}
-	return x
-}
-
-// Min returns the smallest of two ordered values. Note the values can be strings as well
-// as numeric types.
-func Min[T constraints.Ordered](x, y T) T {
-	if y < x {
-		return y
-	}
-	return x
 }

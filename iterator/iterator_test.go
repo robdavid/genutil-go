@@ -19,6 +19,16 @@ func TestCollectInto(t *testing.T) {
 	assert.Equal(t, expected, output)
 }
 
+func TestInclusiveCollectInto(t *testing.T) {
+	iter := IncRange(0, 5)
+	var output []int = nil
+	CollectInto(iter, &output)
+	iter2 := IncRange(10, 15)
+	CollectInto(iter2, &output)
+	expected := []int{0, 1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15}
+	assert.Equal(t, expected, output)
+}
+
 func TestFloatingRange(t *testing.T) {
 	iter := Range(0.0, 5.0)
 	assert.True(t, IsSizeKnown(iter.Size()))
@@ -37,12 +47,30 @@ func TestFloatingRangeBy(t *testing.T) {
 	assert.Equal(t, expected, output)
 }
 
+func TestInclusiveFloatingRangeBy(t *testing.T) {
+	iter := IncRangeBy(0.0, 5.0, 0.5)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 11, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0}
+	assert.Equal(t, expected, output)
+}
+
 func TestFloatingRangeDesc(t *testing.T) {
 	iter := RangeBy(5.0, 0.0, -0.5)
 	assert.True(t, IsSizeKnown(iter.Size()))
 	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
 	output := Collect(iter)
 	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5}
+	assert.Equal(t, expected, output)
+}
+
+func TestInclusiveFloatingRangeDesc(t *testing.T) {
+	iter := IncRangeBy(5.0, 0.0, -0.5)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 11, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.0}
 	assert.Equal(t, expected, output)
 }
 
@@ -60,6 +88,14 @@ func TestZeroRange(t *testing.T) {
 	assert.Equal(t, 0, iter.Size().(SizeKnown).Size)
 	output := Collect(iter)
 	assert.Empty(t, output)
+}
+
+func TestInclusiveZeroRange(t *testing.T) {
+	iter := IncRangeBy(1, 1, 0)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 1, iter.Size().(SizeKnown).Size)
+	output := Collect(iter)
+	assert.Equal(t, []int{1}, output)
 }
 
 func TestSliceIter(t *testing.T) {
@@ -98,6 +134,16 @@ func TestSliceIterChan(t *testing.T) {
 func TestRange(t *testing.T) {
 	r := Range(0, 10)
 	seq := Collect(r)
+	assert.Equal(t, 10, len(seq))
+	for i, v := range seq {
+		assert.Equal(t, i, v)
+	}
+}
+
+func TestInclusiveRange(t *testing.T) {
+	r := IncRange(0, 10)
+	seq := Collect(r)
+	assert.Equal(t, 11, len(seq))
 	for i, v := range seq {
 		assert.Equal(t, i, v)
 	}
@@ -110,6 +156,17 @@ func TestRangeChan(t *testing.T) {
 		assert.Equal(t, i, v)
 		i += 1
 	}
+	assert.Equal(t, 10, i)
+}
+
+func TestInclusiveRangeChan(t *testing.T) {
+	r := IncRange(0, 10)
+	i := 0
+	for v := range r.Chan() {
+		assert.Equal(t, i, v)
+		i += 1
+	}
+	assert.Equal(t, 11, i)
 }
 
 func TestRangeFor(t *testing.T) {
@@ -145,6 +202,16 @@ func TestEmptyNegativeRange(t *testing.T) {
 func TestRangeBy(t *testing.T) {
 	r := RangeBy(0, 9, 3)
 	seq := Collect(r)
+	assert.Equal(t, 3, len(seq))
+	for i, v := range seq {
+		assert.Equal(t, i*3, v)
+	}
+}
+
+func TestInclusiveRangeBy(t *testing.T) {
+	r := IncRangeBy(0, 9, 3)
+	seq := Collect(r)
+	assert.Equal(t, 4, len(seq))
 	for i, v := range seq {
 		assert.Equal(t, i*3, v)
 	}
