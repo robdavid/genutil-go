@@ -309,7 +309,7 @@ func TestSimpleRange(t *testing.T) {
 }
 
 func TestReverseRange(t *testing.T) {
-	assert.Equal(t, []int{4, 3, 2, 1, 0}, Range(5, 0))
+	assert.Equal(t, []int{4, 3, 2, 1, 0}, RangeBy(5, 0, -1))
 	assert.Equal(t, []int{4, 3, 2, 1, 0}, RangeBy(0, 5, -1))
 	assert.Equal(t, []int{4, 2, 0}, RangeBy(0, 5, -2))
 	assert.Equal(t, RangeBy(0, 5, -1), Reverse(RangeBy(0, 5, 1)))

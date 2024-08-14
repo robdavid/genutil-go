@@ -79,50 +79,29 @@ func Reverse[T any](f []T) (t []T) {
 //	slices.RangeBy(0, 5, -1) // []int{4, 3, 2, 1, 0}
 //	slices.Equal(slices.RangeBy(0, 5, -1), slices.RangeBy(5, 0, 1)) // true
 //	slices.Equal(slices.RangeBy(0, 5, -1), slices.Reverse(slices.RangeBy(0, 5, 1)) // true
-func RangeBy[T types.Ranged](start, end, step T) (result []T) {
+func RangeBy[T types.Ranged, S types.Ranged](start, end T, step S) (result []T) {
 	if step == 0 {
 		panic(fmt.Errorf("%w: step is zero", ErrInvalidRange))
 	}
-	capacity := int((end - start) / step)
+	capacity := int((end - start) / T(step))
 	if capacity < 0 {
-		capacity = -capacity
+		panic(fmt.Errorf("%w: negative step or inverse range (but not both)", ErrInvalidRange))
 	}
-	if step < 0 {
-		step = -step
-		if end > start {
-			start, end = end, start
-		}
-	}
-	if end < start {
-		var size int = 0
-		var anyStep any = step
-		if T(capacity)*step < start-end {
-			capacity++
-		}
-		switch anyStep.(type) {
-		case float32, float64:
-			for n := end; n < start; n += step {
-				size++
-			}
-		default:
-			size = capacity
-		}
-		result = make([]T, size)
-		i := size - 1
-		for n := end; n < start; n += step {
-			result[i] = n
-			i--
-		}
-	} else {
-		if T(capacity)*step < end-start {
-			capacity++
-		}
-		result = make([]T, 0, capacity)
-		for n := start; n < end; n += step {
-			result = append(result, n)
+	result = make([]T, 0, capacity)
+	for v := start; v != end; v = T(S(v) + step) {
+		result = append(result, v)
+		if S(abs(end-v)) <= abs(step) {
+			break
 		}
 	}
 	return
+}
+
+func abs[T types.Ranged](n T) T {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
 
 func Range[T types.Ranged](start, end T) []T {
