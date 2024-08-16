@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/types"
 )
 
@@ -80,18 +81,24 @@ func Reverse[T any](f []T) (t []T) {
 //	slices.Equal(slices.RangeBy(0, 5, -1), slices.RangeBy(5, 0, 1)) // true
 //	slices.Equal(slices.RangeBy(0, 5, -1), slices.Reverse(slices.RangeBy(0, 5, 1)) // true
 func RangeBy[T types.Ranged, S types.Ranged](start, end T, step S) (result []T) {
-	if step == 0 {
+	if T(step) == 0 {
 		panic(fmt.Errorf("%w: step is zero", ErrInvalidRange))
 	}
-	capacity := int((end - start) / T(step))
-	if capacity < 0 {
+	if (step > 0 && end < start) || (step < 0 && end > start) {
 		panic(fmt.Errorf("%w: negative step or inverse range (but not both)", ErrInvalidRange))
 	}
-	result = make([]T, 0, capacity)
-	for v := start; v != end; v = T(S(v) + step) {
-		result = append(result, v)
-		if S(abs(end-v)) <= abs(step) {
-			break
+	aRange := absDiff(start, end)
+	aStep := T(abs(step))
+	intervals := int(aRange / aStep)
+	size := intervals + functions.IfElse(aStep*T(intervals) < aRange, 1, 0)
+	result = make([]T, size)
+	v := start
+	for i := range result {
+		result[i] = v
+		if step < 0 {
+			v -= aStep
+		} else {
+			v += aStep
 		}
 	}
 	return
@@ -102,6 +109,14 @@ func abs[T types.Ranged](n T) T {
 		return -n
 	}
 	return n
+}
+
+func absDiff[T types.Ranged](x, y T) T {
+	if x > y {
+		return x - y
+	} else {
+		return y - x
+	}
 }
 
 func Range[T types.Ranged](start, end T) []T {
