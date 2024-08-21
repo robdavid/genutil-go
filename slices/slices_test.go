@@ -296,6 +296,7 @@ func TestCompare(t *testing.T) {
 
 func TestEmptyRange(t *testing.T) {
 	assert.Equal(t, []int{}, Range(0, 0))
+	assert.Equal(t, []int{}, RangeBy(0, 0, -1))
 	assert.Equal(t, []float64{}, Range(0.0, 0.0))
 }
 
@@ -307,6 +308,23 @@ func TestSingletonRange(t *testing.T) {
 func TestSimpleRange(t *testing.T) {
 	assert.Equal(t, []int{0, 1, 2, 3, 4}, Range(0, 5))
 	assert.Equal(t, []float64{0.0, 1.0, 2.0, 3.0, 4.0}, Range(0.0, 5.0))
+}
+
+func TestSimpleInclusiveRange(t *testing.T) {
+	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, IncRange(0, 5))
+	assert.Equal(t, []float64{0.0, 1.0, 2.0, 3.0, 4.0, 5.0}, IncRange(0.0, 5.0))
+}
+
+func TestInvalidRange(t *testing.T) {
+	assert.PanicsWithError(t, "invalid range: negative step or inverse range (but not both)",
+		func() { Range(5, 0) },
+	)
+	assert.PanicsWithError(t, "invalid range: negative step or inverse range (but not both)",
+		func() { RangeBy(0, 5, -1) },
+	)
+	assert.PanicsWithError(t, "invalid range: step is zero",
+		func() { RangeBy(0.0, 0.5, 0.0) },
+	)
 }
 
 func TestReverseRange(t *testing.T) {

@@ -1,6 +1,9 @@
 package functions
 
-import "golang.org/x/exp/constraints"
+import (
+	"github.com/robdavid/genutil-go/types"
+	"golang.org/x/exp/constraints"
+)
 
 // Identity function - returns the value passed.
 func Id[T any](v T) T {
@@ -51,4 +54,21 @@ func Min[T constraints.Ordered](x, y T) T {
 		return y
 	}
 	return x
+}
+
+// Abs returns the absolute value of a non-complex numeric type
+func Abs[T types.Real](n T) T {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+// AbsDiff returns the absolute (non-negative) difference between two real types.
+func AbsDiff[T types.Real](x, y T) T {
+	if x > y {
+		return x - y
+	} else {
+		return y - x
+	}
 }

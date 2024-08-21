@@ -301,7 +301,7 @@ func Of[T any](elements ...T) Iterator[T] {
 	return Slice(elements)
 }
 
-type rangeIter[T types.Ranged] struct {
+type rangeIter[T types.Real] struct {
 	index, to, by, value T
 }
 
@@ -340,7 +340,7 @@ func (ri *rangeIter[T]) Size() IteratorSize {
 
 // Range creates an iterator that ranges from `from` to
 // `upto` exclusive
-func Range[T types.Ranged](from, upto T) Iterator[T] {
+func Range[T types.Real](from, upto T) Iterator[T] {
 	return &rangeIter[T]{from, upto, 1, 0}
 }
 
@@ -349,7 +349,7 @@ func Range[T types.Ranged](from, upto T) Iterator[T] {
 // This can be negative (and `upto` should be less than `from`),
 // but it cannot be zero unless from == upto, in which case
 // an empty iterator is returned.
-func RangeBy[T types.Ranged](from, upto, by T) Iterator[T] {
+func RangeBy[T types.Real](from, upto, by T) Iterator[T] {
 	if by == 0 {
 		if from == upto {
 			return Empty[T]()
