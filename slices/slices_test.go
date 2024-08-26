@@ -415,6 +415,7 @@ func TestReverseRange(t *testing.T) {
 	assert.Equal(t, []int{0, 1, 2, 3, 4}, Range(0, 5))
 	assert.Equal(t, []int{5, 3, 1}, RangeBy(5, 0, -2))
 	assert.Equal(t, []int{5, 3, 1}, IncRangeBy(5, 0, -2))
+	assert.Equal(t, []int{4, 2, 0}, IncRangeBy(4, 0, -2))
 	assert.Equal(t, IncRange(5, 0), Reverse(IncRange(0, 5)))
 	assert.Equal(t, []uint{5, 4, 3, 2, 1}, Range[uint](5, 0))
 	assert.Equal(t, []uint{5, 4, 3, 2, 1, 0}, IncRange[uint](5, 0))

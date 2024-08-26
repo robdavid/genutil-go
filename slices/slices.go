@@ -60,7 +60,7 @@ func Reverse[T any](f []T) (t []T) {
 	return
 }
 
-// RangeBy generates a slice consisting of a range of numbers. The
+// RangeBy generates a slice consisting of a range of a sequence of numbers. The
 // range starts at start and extends up to, but does not include, end.
 // The difference between each number will be determined by step.
 //
@@ -71,7 +71,7 @@ func Reverse[T any](f []T) (t []T) {
 // If the range is to be in descending order, the step should be negative
 // and start should be larger than end.
 //
-//	slices.RangeBy[uint](5, 0, -1) // []uint{5, 4, 3, 2, 1 }
+//	slices.RangeBy[uint](5, 0, -2) // []uint{5, 3, 2}
 //
 // If start is larger than end whilst step is positive, or if end is larger
 // than start whilst step is negative, the function panics.
@@ -79,6 +79,21 @@ func RangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) 
 	return rangeBy[T, S](start, end, step, false)
 }
 
+// IncRangeBy generates a slice consisting of a sequence of numbers. The
+// range starts at start and extends up to, and including, end.
+// The difference between each number will be determined by step.
+//
+// e.g.
+//
+//	slices.IncRangeBy(0, 5, 1) // []int{0, 1, 2, 3, 4, 5}
+//
+// If the range is to be in descending order, the step should be negative
+// and start should be larger than end.
+//
+//	slices.RangeBy[uint](4, 0, -2) // []uint{4, 2, 0}
+//
+// If start is larger than end whilst step is positive, or if end is larger
+// than start whilst step is negative, the function panics.
 func IncRangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) {
 	return rangeBy[T, S](start, end, step, true)
 }
@@ -183,10 +198,28 @@ func rangeBy[T realnum.Real, S realnum.Real](start, end T, step S, inclusive boo
 	return
 }
 
+// Range generates a slice consisting of a sequence of real numbers. The
+// sequence begins at start and extends up to, but does not include, end.
+// Consecutive numbers in the sequence differ by 1 if end is greater than start,
+// and by -1 otherwise.
+//
+// e.g.
+//
+//	slices.Range(0, 5)         // []int{0, 1, 2, 3, 4}
+//	slices.RangeBy[uint](5, 0) // []uint{5, 4, 3, 2, 1}
 func Range[T realnum.Real](start, end T) []T {
 	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false)
 }
 
+// Range generates a slice consisting of a sequence of real numbers. The
+// sequence begins at start and extends up to, and including, end.
+// Consecutive numbers in the sequence differ by 1 if end is greater than start,
+// and by -1 otherwise.
+//
+// e.g.
+//
+//	slices.IncRange(0, 5)       // []int{0, 1, 2, 3, 4, 5}
+//	slices.IncRange[uint](5, 0) // []uint{5, 4, 3, 2, 1, 0}
 func IncRange[T realnum.Real](start, end T) []T {
 	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true)
 }
