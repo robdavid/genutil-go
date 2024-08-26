@@ -324,25 +324,43 @@ func TestSimpleInclusiveRange(t *testing.T) {
 	assert.Equal(t, []float64{-1.0, -0.5, 0.0, 0.5, 1.0}, IncRangeBy(-1.0, 1.0, 0.5))
 }
 
-func BenchmarkParChunk(b *testing.B) {
-	const parMin = 10000
-	const numCpu = 8
-	const size = parMin * numCpu
+func rangeBench(parallel bool, scale int, minPar int, numCpu int) {
+	var size = minPar * numCpu
 	slice := make([]int, size)
-	for iter := 0; iter < b.N; iter++ {
-		chunks := parChunks(slice, parMin, option.Value(numCpu))
-		parSliceFill(0, 1, false, chunks)
+	if parallel {
+		for iter := 0; iter < scale; iter++ {
+			chunks := parChunks(slice, minPar, option.Value(numCpu))
+			parSliceFill(0, 1, false, chunks)
+		}
+	} else {
+		for iter := 0; iter < scale; iter++ {
+			sliceFill(0, 1, false, slice)
+		}
 	}
 }
 
+func BenchmarkParChunk(b *testing.B) {
+	const parMin = 100000
+	const numCpu = 4
+	rangeBench(true, b.N, parMin, numCpu)
+}
+
 func BenchmarkOneChunk(b *testing.B) {
+	const parMin = 100000
+	const numCpu = 4
+	rangeBench(false, b.N, parMin, numCpu)
+}
+
+func BenchmarkParSmallChunk(b *testing.B) {
 	const parMin = 10000
-	const numCpu = 8
-	const size = parMin * numCpu
-	slice := make([]int, size)
-	for iter := 0; iter < b.N; iter++ {
-		sliceFill(0, 1, false, slice)
-	}
+	const numCpu = 4
+	rangeBench(true, b.N, parMin, numCpu)
+}
+
+func BenchmarkOneSmallChunk(b *testing.B) {
+	const parMin = 10000
+	const numCpu = 4
+	rangeBench(false, b.N, parMin, numCpu)
 }
 
 func TestLargeFloatRange(t *testing.T) {
