@@ -3,10 +3,13 @@ package slices
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sort"
+	"sync"
 
 	"github.com/robdavid/genutil-go/functions"
-	"github.com/robdavid/genutil-go/types"
+	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/realnum"
 )
 
 var ErrInvalidRange = errors.New("invalid range")
@@ -72,47 +75,120 @@ func Reverse[T any](f []T) (t []T) {
 //
 // If start is larger than end whilst step is positive, or if end is larger
 // than start whilst step is negative, the function panics.
-func RangeBy[T types.Real, S types.Real](start, end T, step S) (result []T) {
+func RangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) {
 	return rangeBy[T, S](start, end, step, false)
 }
 
-func IncRangeBy[T types.Real, S types.Real](start, end T, step S) (result []T) {
+func IncRangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) {
 	return rangeBy[T, S](start, end, step, true)
 }
 
-func rangeBy[T types.Real, S types.Real](start, end T, step S, inclusive bool) (result []T) {
+func rangeSize[T realnum.Real, S realnum.Real](start, end T, step S, inclusive bool) (int, T) {
+	if realnum.IsInteger(start) {
+		iRange := realnum.Abs(realnum.Sub[int64](end, start))
+		iStep := int64(realnum.Abs(step))
+		intervals := int(iRange / iStep)
+		return intervals + functions.IfElse(iStep*int64(intervals) < iRange || inclusive, 1, 0), T(iStep)
+	} else {
+		fRange := realnum.Abs(realnum.Sub[float64](end, start))
+		fStep := float64(realnum.Abs(step))
+		intervals := int(fRange / fStep)
+		return intervals + functions.IfElse(fStep*float64(intervals) < fRange || inclusive, 1, 0), T(fStep)
+	}
+}
+
+func parChunks[T any](slice []T, minPar int, maxCpu option.Option[int]) (slices [][]T) {
+	if l := len(slice); l <= minPar {
+		return [][]T{slice}
+	} else {
+		var chunkSize int
+		ncpu := functions.IfElseF(maxCpu.HasValue(),
+			func() int { return maxCpu.Get() }, func() int { return runtime.NumCPU() })
+		idealCpu := l / minPar
+		if idealCpu <= ncpu {
+			chunkSize = l / idealCpu
+		} else {
+			chunkSize = l / ncpu
+		}
+		if l%chunkSize != 0 {
+			chunkSize++
+		}
+		slices = make([][]T, 0, l/chunkSize)
+		for pos := 0; pos < l; {
+			npos := pos + chunkSize
+			chunk := functions.IfElseF(npos < l,
+				func() []T { return slice[pos:npos] },
+				func() []T { return slice[pos:] })
+			slices = append(slices, chunk)
+			pos = npos
+		}
+		return
+	}
+}
+
+func sliceFill[T realnum.Real](start, aStep T, desc bool, slice []T) {
+	v := start
+	if desc {
+		for i := range slice {
+			slice[i] = v
+			v -= aStep
+		}
+	} else {
+		for i := range slice {
+			slice[i] = v
+			v += aStep
+		}
+	}
+}
+
+func parSliceFill[T realnum.Real](start, aStep T, desc bool, chunks [][]T) {
+	cstart := start
+	var wg sync.WaitGroup
+	for i := range chunks {
+		wg.Add(1)
+		n := i
+		cs := cstart
+		go func() {
+			defer wg.Done()
+			//fmt.Printf("Started chunk %d\n", n)
+			sliceFill(cs, aStep, desc, chunks[n])
+			//fmt.Printf("Finished chunk %d\n", n)
+		}()
+		chunkStep := aStep * T(len(chunks[i]))
+		if desc {
+			cstart -= chunkStep
+		} else {
+			cstart += chunkStep
+		}
+	}
+	wg.Wait()
+}
+
+func rangeBy[T realnum.Real, S realnum.Real](start, end T, step S, inclusive bool) (result []T) {
+	const parThreshold = 100000
 	if T(step) == 0 {
 		panic(fmt.Errorf("%w: step is zero", ErrInvalidRange))
 	}
 	if (step > 0 && end < start) || (step < 0 && end > start) {
 		panic(fmt.Errorf("%w: negative step or inverse range (but not both)", ErrInvalidRange))
 	}
-	aRange := functions.AbsDiff(start, end)
-	aStep := T(functions.Abs(step))
-	intervals := int(aRange / aStep)
-	size := intervals + functions.IfElse(aStep*T(intervals) < aRange || inclusive, 1, 0)
+	size, aStep := rangeSize(start, end, step, inclusive)
 	result = make([]T, size)
-	v := start
-	if step < 0 {
-		for i := range result {
-			result[i] = v
-			v -= aStep
-		}
+	chunks := parChunks(result, parThreshold, option.Empty[int]())
+	if len(chunks) == 1 {
+		sliceFill(start, aStep, step < 0, result)
 	} else {
-		for i := range result {
-			result[i] = v
-			v += aStep
-		}
+		parSliceFill(start, aStep, step < 0, chunks)
 	}
 	return
 }
 
-func Range[T types.Real](start, end T) []T {
-	return rangeBy(start, end, 1, false)
+func Range[T realnum.Real](start, end T) []T {
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false)
 }
 
-func IncRange[T types.Real](start, end T) []T {
-	return rangeBy(start, end, 1, true)
+func IncRange[T realnum.Real](start, end T) []T {
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true)
 }
 
 // Returns true if predicate returns true for all elements in

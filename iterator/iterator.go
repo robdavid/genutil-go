@@ -6,9 +6,8 @@ import (
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
-	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/option"
-	"github.com/robdavid/genutil-go/types"
+	"github.com/robdavid/genutil-go/realnum"
 )
 
 // The largest slice capacity we are prepared to allocate to collect
@@ -301,7 +300,7 @@ func Of[T any](elements ...T) Iterator[T] {
 	return Slice(elements)
 }
 
-type rangeIter[T types.Real] struct {
+type rangeIter[T realnum.Real] struct {
 	index, to, by, value T
 }
 
@@ -340,7 +339,7 @@ func (ri *rangeIter[T]) Size() IteratorSize {
 
 // Range creates an iterator that ranges from `from` to
 // `upto` exclusive
-func Range[T types.Real](from, upto T) Iterator[T] {
+func Range[T realnum.Real](from, upto T) Iterator[T] {
 	return &rangeIter[T]{from, upto, 1, 0}
 }
 
@@ -349,7 +348,7 @@ func Range[T types.Real](from, upto T) Iterator[T] {
 // This can be negative (and `upto` should be less than `from`),
 // but it cannot be zero unless from == upto, in which case
 // an empty iterator is returned.
-func RangeBy[T types.Real](from, upto, by T) Iterator[T] {
+func RangeBy[T realnum.Real](from, upto, by T) Iterator[T] {
 	if by == 0 {
 		if from == upto {
 			return Empty[T]()
@@ -684,9 +683,9 @@ func (ti *takeIterator[T]) Next() bool {
 func (ti *takeIterator[T]) Size() IteratorSize {
 	switch s := ti.iterator.Size().(type) {
 	case SizeKnown:
-		return NewSize(functions.Min(s.Size, ti.max))
+		return NewSize(realnum.Min(s.Size, ti.max))
 	case SizeAtMost:
-		return NewSizeAtMost(functions.Min(s.Size, ti.max))
+		return NewSizeAtMost(realnum.Min(s.Size, ti.max))
 	default:
 		return NewSizeAtMost(ti.max)
 	}

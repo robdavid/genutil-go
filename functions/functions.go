@@ -1,10 +1,5 @@
 package functions
 
-import (
-	"github.com/robdavid/genutil-go/types"
-	"golang.org/x/exp/constraints"
-)
-
 // Identity function - returns the value passed.
 func Id[T any](v T) T {
 	return v
@@ -35,40 +30,5 @@ func IfElseF[T any](cond bool, f func() T, alt func() T) T {
 		return f()
 	} else {
 		return alt()
-	}
-}
-
-// Max returns the largest of two ordered values. Note the values can be strings as well
-// as numeric types.
-func Max[T constraints.Ordered](x, y T) T {
-	if y > x {
-		return y
-	}
-	return x
-}
-
-// Min returns the smallest of two ordered values. Note the values can be strings as well
-// as numeric types.
-func Min[T constraints.Ordered](x, y T) T {
-	if y < x {
-		return y
-	}
-	return x
-}
-
-// Abs returns the absolute value of a non-complex numeric type
-func Abs[T types.Real](n T) T {
-	if n < 0 {
-		return -n
-	}
-	return n
-}
-
-// AbsDiff returns the absolute (non-negative) difference between two real types.
-func AbsDiff[T types.Real](x, y T) T {
-	if x > y {
-		return x - y
-	} else {
-		return y - x
 	}
 }

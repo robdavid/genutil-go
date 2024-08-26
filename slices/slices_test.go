@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robdavid/genutil-go/option"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -307,18 +308,100 @@ func TestSingletonRange(t *testing.T) {
 
 func TestSimpleRange(t *testing.T) {
 	assert.Equal(t, []int{0, 1, 2, 3, 4}, Range(0, 5))
+	assert.Equal(t, []int{-2, -1}, Range(-2, 0))
+	assert.Equal(t, []int{-2, -1, 0, 1}, Range(-2, 2))
 	assert.Equal(t, []float64{0.0, 1.0, 2.0, 3.0, 4.0}, Range(0.0, 5.0))
+	assert.Equal(t, []float64{-2.0, -1.5, -1.0, -0.5}, RangeBy(-2.0, 0.0, 0.5))
+	assert.Equal(t, []float64{-1.0, -0.5, 0.0, 0.5}, RangeBy(-1.0, 1.0, 0.5))
 }
 
 func TestSimpleInclusiveRange(t *testing.T) {
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5}, IncRange(0, 5))
+	assert.Equal(t, []int{-2, -1, 0}, IncRange(-2, 0))
+	assert.Equal(t, []int{-2, -1, 0, 1, 2}, IncRange(-2, 2))
 	assert.Equal(t, []float64{0.0, 1.0, 2.0, 3.0, 4.0, 5.0}, IncRange(0.0, 5.0))
+	assert.Equal(t, []float64{-2.0, -1.5, -1.0, -0.5, 0.0}, IncRangeBy(-2.0, 0.0, 0.5))
+	assert.Equal(t, []float64{-1.0, -0.5, 0.0, 0.5, 1.0}, IncRangeBy(-1.0, 1.0, 0.5))
+}
+
+func BenchmarkParChunk(b *testing.B) {
+	const parMin = 10000
+	const numCpu = 8
+	const size = parMin * numCpu
+	slice := make([]int, size)
+	for iter := 0; iter < b.N; iter++ {
+		chunks := parChunks(slice, parMin, option.Value(numCpu))
+		parSliceFill(0, 1, false, chunks)
+	}
+}
+
+func BenchmarkOneChunk(b *testing.B) {
+	const parMin = 10000
+	const numCpu = 8
+	const size = parMin * numCpu
+	slice := make([]int, size)
+	for iter := 0; iter < b.N; iter++ {
+		sliceFill(0, 1, false, slice)
+	}
+}
+
+func TestLargeFloatRange(t *testing.T) {
+	r := RangeBy(0.0, 1000000.0, 0.25)
+	assert.Equal(t, 4000000, len(r))
+	v := 0.0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v += 0.25
+	}
+}
+
+func TestLargeIntRange(t *testing.T) {
+	r := Range(0, 4000000)
+	assert.Equal(t, 4000000, len(r))
+	v := 0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v++
+	}
+}
+
+func TestLargeInclusiveFloatRange(t *testing.T) {
+	r := IncRangeBy(0.0, 1000000.0, 0.25)
+	assert.Equal(t, 4000001, len(r))
+	v := 0.0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v += 0.25
+	}
+}
+
+func TestLargeInclusiveIntRange(t *testing.T) {
+	r := IncRange(0, 4000000)
+	assert.Equal(t, 4000001, len(r))
+	v := 0
+	for _, e := range r {
+		assert.Equal(t, v, e)
+		v++
+	}
+}
+
+func TestInclusiveFullRange(t *testing.T) {
+	full := IncRange(0, ^byte(0))
+	assert.Equal(t, 256, len(full))
+	for i := range full {
+		assert.Equal(t, i, int(full[i]))
+	}
+}
+
+func TestInclusiveSignedFullRange(t *testing.T) {
+	full := IncRange(int8(-128), int8(127))
+	assert.Equal(t, 256, len(full))
+	for i := range full {
+		assert.Equal(t, i-128, int(full[i]))
+	}
 }
 
 func TestInvalidRange(t *testing.T) {
-	assert.PanicsWithError(t, "invalid range: negative step or inverse range (but not both)",
-		func() { Range(5, 0) },
-	)
 	assert.PanicsWithError(t, "invalid range: negative step or inverse range (but not both)",
 		func() { RangeBy(0, 5, -1) },
 	)
@@ -328,12 +411,14 @@ func TestInvalidRange(t *testing.T) {
 }
 
 func TestReverseRange(t *testing.T) {
-	assert.Equal(t, []int{5, 4, 3, 2, 1}, RangeBy(5, 0, -1))
-	assert.Equal(t, []int{0, 1, 2, 3, 4}, RangeBy(0, 5, 1))
+	assert.Equal(t, []int{5, 4, 3, 2, 1}, Range(5, 0))
+	assert.Equal(t, []int{0, 1, 2, 3, 4}, Range(0, 5))
 	assert.Equal(t, []int{5, 3, 1}, RangeBy(5, 0, -2))
-	assert.Equal(t, RangeBy(5, 0, -1), Reverse(RangeBy(1, 6, 1)))
-	// assert.Equal(t, []uint{4, 3, 2, 1, 0}, Range[uint](5, 0))
-	// assert.Equal(t, []float64{4.0, 3.0, 2.0, 1.0, 0.0}, Range(5.0, 0.0))
+	assert.Equal(t, []int{5, 3, 1}, IncRangeBy(5, 0, -2))
+	assert.Equal(t, IncRange(5, 0), Reverse(IncRange(0, 5)))
+	assert.Equal(t, []uint{5, 4, 3, 2, 1}, Range[uint](5, 0))
+	assert.Equal(t, []uint{5, 4, 3, 2, 1, 0}, IncRange[uint](5, 0))
+	assert.Equal(t, []float64{5.0, 4.0, 3.0, 2.0, 1.0}, Range(5.0, 0.0))
 	assert.Equal(t, []float64{132, 99, 66, 33}, Map(RangeBy(1.32, 0.0, -0.33), func(x float64) float64 { return math.Round(x * 100) }))
 	assert.Equal(t, []float64{0.0, 0.33, 0.66, 0.99}, RangeBy(0.0, 1.32, 0.33))
 }
