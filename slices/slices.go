@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/robdavid/genutil-go/functions"
-	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/internal/rangehelper"
 	"github.com/robdavid/genutil-go/realnum"
 )
 
@@ -76,7 +76,7 @@ func Reverse[T any](f []T) (t []T) {
 // If start is larger than end whilst step is positive, or if end is larger
 // than start whilst step is negative, the function panics.
 func RangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) {
-	return rangeBy[T, S](start, end, step, false)
+	return rangeBy[T, S](start, end, step, false, 0, 0)
 }
 
 // IncRangeBy generates a slice consisting of a sequence of numbers. The
@@ -95,30 +95,16 @@ func RangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) 
 // If start is larger than end whilst step is positive, or if end is larger
 // than start whilst step is negative, the function panics.
 func IncRangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) {
-	return rangeBy[T, S](start, end, step, true)
+	return rangeBy[T, S](start, end, step, true, 0, 0)
 }
 
-func rangeSize[T realnum.Real, S realnum.Real](start, end T, step S, inclusive bool) (int, T) {
-	if realnum.IsInteger(start) {
-		iRange := realnum.Abs(realnum.Sub[int64](end, start))
-		iStep := int64(realnum.Abs(step))
-		intervals := int(iRange / iStep)
-		return intervals + functions.IfElse(iStep*int64(intervals) < iRange || inclusive, 1, 0), T(iStep)
-	} else {
-		fRange := realnum.Abs(realnum.Sub[float64](end, start))
-		fStep := float64(realnum.Abs(step))
-		intervals := int(fRange / fStep)
-		return intervals + functions.IfElse(fStep*float64(intervals) < fRange || inclusive, 1, 0), T(fStep)
-	}
-}
-
-func parChunks[T any](slice []T, minPar int, maxCpu option.Option[int]) (slices [][]T) {
+func parChunks[T any](slice []T, minPar int, maxCpu int) (slices [][]T) {
 	if l := len(slice); l <= minPar {
 		return [][]T{slice}
 	} else {
 		var chunkSize int
-		ncpu := functions.IfElseF(maxCpu.HasValue(),
-			func() int { return maxCpu.Get() }, func() int { return runtime.NumCPU() })
+		ncpu := functions.IfElseF(maxCpu > 0,
+			func() int { return maxCpu }, func() int { return runtime.NumCPU() })
 		idealCpu := l / minPar
 		if idealCpu <= ncpu {
 			chunkSize = l / idealCpu
@@ -165,9 +151,7 @@ func parSliceFill[T realnum.Real](start, aStep T, desc bool, chunks [][]T) {
 		cs := cstart
 		go func() {
 			defer wg.Done()
-			//fmt.Printf("Started chunk %d\n", n)
 			sliceFill(cs, aStep, desc, chunks[n])
-			//fmt.Printf("Finished chunk %d\n", n)
 		}()
 		chunkStep := aStep * T(len(chunks[i]))
 		if desc {
@@ -179,21 +163,27 @@ func parSliceFill[T realnum.Real](start, aStep T, desc bool, chunks [][]T) {
 	wg.Wait()
 }
 
-func rangeBy[T realnum.Real, S realnum.Real](start, end T, step S, inclusive bool) (result []T) {
-	const parThreshold = 100000
+func rangeBy[T realnum.Real, S realnum.Real](start, end T, step S, inclusive bool, parThreshold int, maxCpu int) (result []T) {
+	if start == end && !inclusive {
+		return []T{}
+	}
 	if T(step) == 0 {
 		panic(fmt.Errorf("%w: step is zero", ErrInvalidRange))
 	}
 	if (step > 0 && end < start) || (step < 0 && end > start) {
 		panic(fmt.Errorf("%w: negative step or inverse range (but not both)", ErrInvalidRange))
 	}
-	size, aStep := rangeSize(start, end, step, inclusive)
+	size, aStep := rangehelper.RangeSize(start, end, step, inclusive)
 	result = make([]T, size)
-	chunks := parChunks(result, parThreshold, option.Empty[int]())
-	if len(chunks) == 1 {
+	if parThreshold < 1 {
 		sliceFill(start, aStep, step < 0, result)
 	} else {
-		parSliceFill(start, aStep, step < 0, chunks)
+		chunks := parChunks(result, parThreshold, maxCpu)
+		if len(chunks) == 1 {
+			sliceFill(start, aStep, step < 0, result)
+		} else {
+			parSliceFill(start, aStep, step < 0, chunks)
+		}
 	}
 	return
 }
@@ -208,7 +198,7 @@ func rangeBy[T realnum.Real, S realnum.Real](start, end T, step S, inclusive boo
 //	slices.Range(0, 5)         // []int{0, 1, 2, 3, 4}
 //	slices.RangeBy[uint](5, 0) // []uint{5, 4, 3, 2, 1}
 func Range[T realnum.Real](start, end T) []T {
-	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false)
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false, 0, 0)
 }
 
 // Range generates a slice consisting of a sequence of real numbers. The
@@ -221,7 +211,45 @@ func Range[T realnum.Real](start, end T) []T {
 //	slices.IncRange(0, 5)       // []int{0, 1, 2, 3, 4, 5}
 //	slices.IncRange[uint](5, 0) // []uint{5, 4, 3, 2, 1, 0}
 func IncRange[T realnum.Real](start, end T) []T {
-	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true)
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true, 0, 0)
+}
+
+type parOptions struct {
+	threshold int
+	maxCpu    int
+}
+
+type ParOption func(*parOptions)
+
+func combineParOptions(opts []ParOption) parOptions {
+	result := parOptions{100000, 0}
+	for _, opt := range opts {
+		opt(&result)
+	}
+	return result
+}
+
+func ParThreshold(threshold int) ParOption { return func(o *parOptions) { o.threshold = threshold } }
+func ParMaxCpu(maxCpu int) ParOption       { return func(o *parOptions) { o.maxCpu = maxCpu } }
+
+func ParRange[T realnum.Real](start, end T, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false, opts.threshold, opts.maxCpu)
+}
+
+func ParIncRange[T realnum.Real](start, end T, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true, opts.threshold, opts.maxCpu)
+}
+
+func ParRangeBy[T realnum.Real, S realnum.Real](start, end T, step S, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, step, false, opts.threshold, opts.maxCpu)
+}
+
+func ParIncRangeBy[T realnum.Real, S realnum.Real](start, end T, step S, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, step, true, opts.threshold, opts.maxCpu)
 }
 
 // Returns true if predicate returns true for all elements in

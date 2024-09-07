@@ -6,6 +6,7 @@ import (
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
+	"github.com/robdavid/genutil-go/internal/rangehelper"
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/realnum"
 )
@@ -300,39 +301,50 @@ func Of[T any](elements ...T) Iterator[T] {
 	return Slice(elements)
 }
 
-type rangeIter[T realnum.Real] struct {
-	index, to, by, value T
+type rangeIter[T realnum.Real, S realnum.Real] struct {
+	index, to T
+	by        S
+	value     T
+	inclusive bool
 }
 
-func (ri *rangeIter[T]) Next() bool {
-	if ri.by < 0 {
-		if ri.index <= ri.to {
+func (ri *rangeIter[T, S]) Next() bool {
+	if !ri.inclusive && ri.index == ri.to {
+		return false
+	} else if ri.by < 0 {
+		if ri.index < ri.to {
 			return false
 		}
-	} else if ri.index >= ri.to {
+	} else if ri.index > ri.to {
 		return false
 	}
 	ri.value = ri.index
-	ri.index += ri.by
+	ri.index += T(ri.by)
 	return true
 }
 
-func (ri *rangeIter[T]) Value() T {
+func (ri *rangeIter[T, S]) Value() T {
 	return ri.value
 }
 
-func (ri *rangeIter[T]) Abort() {
-	ri.index = ri.to
+func (ri *rangeIter[T, S]) Abort() {
+	if ri.inclusive {
+		ri.index = ri.to + T(ri.by)
+	} else {
+		ri.index = ri.to
+	}
 }
 
-func (ri *rangeIter[T]) Chan() <-chan T {
+func (ri *rangeIter[T, S]) Chan() <-chan T {
 	return iterChan[T](ri)
 }
 
-func (ri *rangeIter[T]) Size() IteratorSize {
-	size := int((ri.to - ri.index) / ri.by)
-	if size < 0 {
+func (ri *rangeIter[T, S]) Size() IteratorSize {
+	var size int
+	if (ri.index > ri.to && ri.by > 0) || (ri.index < ri.to && ri.by < 0) {
 		size = 0
+	} else {
+		size, _ = rangehelper.RangeSize[T, S](ri.index, ri.to, ri.by, ri.inclusive)
 	}
 	return SizeKnown{size}
 }
@@ -340,7 +352,13 @@ func (ri *rangeIter[T]) Size() IteratorSize {
 // Range creates an iterator that ranges from `from` to
 // `upto` exclusive
 func Range[T realnum.Real](from, upto T) Iterator[T] {
-	return &rangeIter[T]{from, upto, 1, 0}
+	return &rangeIter[T, int]{from, upto, 1, 0, false}
+}
+
+// Range creates an iterator that ranges from `from` to
+// `upto` inclusive
+func IncRange[T realnum.Real](from, upto T) Iterator[T] {
+	return &rangeIter[T, int]{from, upto, 1, 0, true}
 }
 
 // RangeBy creates an iterator that ranges from `from` up to
@@ -348,14 +366,29 @@ func Range[T realnum.Real](from, upto T) Iterator[T] {
 // This can be negative (and `upto` should be less than `from`),
 // but it cannot be zero unless from == upto, in which case
 // an empty iterator is returned.
-func RangeBy[T realnum.Real](from, upto, by T) Iterator[T] {
+func RangeBy[T realnum.Real, S realnum.Real](from, upto T, by S) Iterator[T] {
 	if by == 0 {
 		if from == upto {
 			return Empty[T]()
 		}
 		panic("Illegal range by zero")
 	}
-	return &rangeIter[T]{from, upto, by, 0}
+	return &rangeIter[T, S]{from, upto, by, 0, false}
+}
+
+// RangeBy creates an iterator that ranges from `from` up to
+// `upto` inclusive, incrementing by `by` each step.
+// This can be negative (and `upto` should be less than `from`),
+// but it cannot be zero unless from == upto, in which case
+// an empty iterator is returned.
+func IncRangeBy[T realnum.Real, S realnum.Real](from, upto T, by S) Iterator[T] {
+	if by == 0 {
+		if from != upto {
+			panic("Illegal range by zero")
+		}
+		return &rangeIter[T, S]{from, upto, 1, 0, true}
+	}
+	return &rangeIter[T, S]{from, upto, by, 0, true}
 }
 
 type emptyIter[T any] struct{}

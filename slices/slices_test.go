@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/iterator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -329,7 +329,7 @@ func rangeBench(parallel bool, scale int, minPar int, numCpu int) {
 	slice := make([]int, size)
 	if parallel {
 		for iter := 0; iter < scale; iter++ {
-			chunks := parChunks(slice, minPar, option.Value(numCpu))
+			chunks := parChunks(slice, minPar, numCpu)
 			parSliceFill(0, 1, false, chunks)
 		}
 	} else {
@@ -391,6 +391,7 @@ func TestLargeInclusiveFloatRange(t *testing.T) {
 		assert.Equal(t, v, e)
 		v += 0.25
 	}
+	assert.Equal(t, iterator.Collect(iterator.IncRangeBy(0.0, 1000000, 0.25)), r)
 }
 
 func TestLargeInclusiveIntRange(t *testing.T) {
@@ -416,6 +417,60 @@ func TestInclusiveSignedFullRange(t *testing.T) {
 	assert.Equal(t, 256, len(full))
 	for i := range full {
 		assert.Equal(t, i-128, int(full[i]))
+	}
+}
+
+func TestIntRangeConsistency(t *testing.T) {
+	for size := 0; size < 10000; size += 10 {
+		for by := 1; by < 10; by++ {
+			irange := iterator.Collect(iterator.RangeBy(0, size, by))
+			srange := RangeBy(0, size, by)
+			prange := ParRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.RangeBy(size, 0, -by))
+			srange = RangeBy(size, 0, -by)
+			prange = ParRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(0, size, by))
+			srange = IncRangeBy(0, size, by)
+			prange = ParIncRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(size, 0, -by))
+			srange = IncRangeBy(size, 0, -by)
+			prange = ParIncRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+		}
+	}
+}
+
+func TestFloatRangeConsistency(t *testing.T) {
+	for size := 0.0; size < 1000.0; size += 1.0 {
+		for by := 1; by < 10; by++ {
+			irange := iterator.Collect(iterator.RangeBy(0, size, by))
+			srange := RangeBy(0, size, by)
+			prange := ParRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.RangeBy(size, 0, -by))
+			srange = RangeBy(size, 0, -by)
+			prange = ParRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(0, size, by))
+			srange = IncRangeBy(0, size, by)
+			prange = ParIncRangeBy(0, size, by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+			irange = iterator.Collect(iterator.IncRangeBy(size, 0, -by))
+			srange = IncRangeBy(size, 0, -by)
+			prange = ParIncRangeBy(size, 0, -by, ParThreshold(1000), ParMaxCpu(4))
+			assert.Equal(t, irange, srange)
+			assert.Equal(t, irange, prange)
+		}
 	}
 }
 
