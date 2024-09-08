@@ -1,4 +1,6 @@
-// Package realnum contains generic utility functions for real numbers.
+// Package realnum contains generic utility functions for real numbers, where real numbers
+// are any non-complex primitive numeric types spanning signed and unsigned integers and
+// floats of all sizes.
 package realnum
 
 import (

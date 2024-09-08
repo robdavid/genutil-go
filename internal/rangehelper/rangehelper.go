@@ -5,6 +5,8 @@ import (
 	"github.com/robdavid/genutil-go/realnum"
 )
 
+// RangeSize calculates the number of elements expected in a given range. Signs of step and the
+// difference between start and end are ignored. Will panic (divide zero) if step is zero.
 func RangeSize[T realnum.Real, S realnum.Real](start, end T, step S, inclusive bool) (int, T) {
 	if realnum.IsInteger(start) {
 		iRange := realnum.Abs(realnum.Sub[int64](end, start))
