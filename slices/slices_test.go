@@ -474,6 +474,28 @@ func TestFloatRangeConsistency(t *testing.T) {
 	}
 }
 
+func TestParRangeExample(t *testing.T) {
+	actual := ParRangeBy[uint](400000, 0, -2)
+	assert.Equal(t, 200000, len(actual))
+	var last uint
+	for i, v := range actual {
+		assert.Equal(t, 400000-i*2, int(v))
+		last = v
+	}
+	assert.Equal(t, uint(2), last)
+}
+
+func TestParIncRangeExample(t *testing.T) {
+	actual := ParIncRangeBy[uint](400000, 0, -2)
+	assert.Equal(t, 200001, len(actual))
+	var last uint
+	for i, v := range actual {
+		assert.Equal(t, 400000-i*2, int(v))
+		last = v
+	}
+	assert.Equal(t, uint(0), last)
+}
+
 func TestInvalidRange(t *testing.T) {
 	assert.PanicsWithError(t, "invalid range: negative step or inverse range (but not both)",
 		func() { RangeBy(0, 5, -1) },
