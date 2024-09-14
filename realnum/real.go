@@ -12,7 +12,7 @@ import (
 
 var ErrUnknownType = errors.New("uknown type")
 
-// Scalar numeric type constraint.
+// Scalar numeric type constraint. Includes all floating and integer types.
 type Real interface {
 	constraints.Float | constraints.Integer
 }
