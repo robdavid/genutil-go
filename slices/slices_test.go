@@ -296,9 +296,25 @@ func TestCompare(t *testing.T) {
 }
 
 func TestEmptyRange(t *testing.T) {
-	assert.Equal(t, []int{}, Range(0, 0))
-	assert.Equal(t, []int{}, RangeBy(0, 0, -1))
-	assert.Equal(t, []float64{}, Range(0.0, 0.0))
+	for i := -9; i < 10; i++ {
+		assert.Equal(t, []int{}, Range(i, i))
+		assert.Equal(t, []int{}, RangeBy(i, i, -1))
+		assert.Equal(t, []float64{}, Range(float64(i), float64(i)))
+		assert.Equal(t, []int{}, ParRange(i, i))
+		assert.Equal(t, []int{}, ParRangeBy(i, i, 0))
+		assert.Equal(t, []int{}, ParRange(i, i, ParThreshold(0)))
+	}
+}
+
+func TestSingletonIncRange(t *testing.T) {
+	for i := -9; i < 10; i++ {
+		assert.Equal(t, []int{i}, IncRange(i, i))
+		assert.Equal(t, []int{i}, IncRangeBy(i, i, -1))
+		assert.Equal(t, []float64{float64(i)}, IncRange(float64(i), float64(i)))
+		assert.Equal(t, []int{i}, ParIncRange(i, i))
+		assert.Equal(t, []int{i}, ParIncRangeBy(i, i, 0))
+		assert.Equal(t, []int{i}, ParIncRange(i, i, ParThreshold(0)))
+	}
 }
 
 func TestSingletonRange(t *testing.T) {
