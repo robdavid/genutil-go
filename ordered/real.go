@@ -1,7 +1,6 @@
-// Package realnum contains generic utility functions for real numbers, where real numbers
-// are any non-complex primitive numeric types spanning signed and unsigned integers and
-// floats of all sizes.
-package realnum
+// Package ordered contains generic utility functions over ordered types, i.e. types
+// that support the operators <, >, == etc.
+package ordered
 
 import (
 	"errors"
@@ -11,19 +10,26 @@ import (
 )
 
 var ErrUnknownType = errors.New("uknown type")
+var ErrEmptySlice = errors.New("no elements in slice")
 
 // Scalar numeric type constraint. Includes all floating and integer types.
 type Real interface {
 	constraints.Float | constraints.Integer
 }
 
-// Max returns the largest of two ordered values. Note the values can be strings as well
+// Max returns the largest of one or more ordered values. Note the values can be strings as well
 // as numeric types.
-func Max[T constraints.Ordered](x, y T) T {
-	if y > x {
-		return y
+func Max[T constraints.Ordered](xs ...T) T {
+	if len(xs) == 0 {
+		panic(ErrEmptySlice)
 	}
-	return x
+	max := xs[0]
+	for _, n := range xs[1:] {
+		if n > max {
+			n = max
+		}
+	}
+	return max
 }
 
 // Min returns the smallest of two ordered values. Note the values can be strings as well
@@ -66,14 +72,14 @@ func Add[R Real, T Real](x, y T) R {
 // integers, this is simply the bit size of the integer
 // (including the sign bit if present). For floating
 func Precision[T Real](v T) int {
-	bits := unsafe.Sizeof(v)
+	bytes := unsafe.Sizeof(v)
 	if IsInteger(v) {
-		return int(bits)
+		return int(bytes * 8)
 	} else {
-		switch bits {
-		case 32:
+		switch bytes {
+		case 4:
 			return 25 // float32, including implicit leading bit and sign bit.
-		case 64:
+		case 8:
 			return 54 // float64, including implicit leading bit sign bit.
 		default:
 			panic(ErrUnknownType)

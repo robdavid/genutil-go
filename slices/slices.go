@@ -9,7 +9,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/internal/rangehelper"
-	"github.com/robdavid/genutil-go/realnum"
+	"github.com/robdavid/genutil-go/ordered"
 )
 
 var ErrInvalidRange = errors.New("invalid range")
@@ -91,7 +91,7 @@ func parChunks[T any](slice []T, minPar int, maxCpu int) (slices [][]T) {
 	}
 }
 
-func sliceFill[T realnum.Real](start, aStep T, desc bool, slice []T) {
+func sliceFill[T ordered.Real](start, aStep T, desc bool, slice []T) {
 	v := start
 	if desc {
 		for i := range slice {
@@ -106,7 +106,7 @@ func sliceFill[T realnum.Real](start, aStep T, desc bool, slice []T) {
 	}
 }
 
-func parSliceFill[T realnum.Real](start, aStep T, desc bool, chunks [][]T) {
+func parSliceFill[T ordered.Real](start, aStep T, desc bool, chunks [][]T) {
 	cstart := start
 	var wg sync.WaitGroup
 	for i := range chunks {
@@ -127,7 +127,7 @@ func parSliceFill[T realnum.Real](start, aStep T, desc bool, chunks [][]T) {
 	wg.Wait()
 }
 
-func rangeBy[T realnum.Real, S realnum.Real](start, end T, step S, inclusive bool, parThreshold int, maxCpu int) (result []T) {
+func rangeBy[T ordered.Real, S ordered.Real](start, end T, step S, inclusive bool, parThreshold int, maxCpu int) (result []T) {
 	if start == end {
 		if inclusive {
 			return []T{start}
@@ -172,7 +172,7 @@ func rangeBy[T realnum.Real, S realnum.Real](start, end T, step S, inclusive boo
 // If start is larger than end whilst step is positive, or if end is larger
 // than start whilst step is negative, the function panics. If start is equal to
 // end then an empty slice is returned.
-func RangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) {
+func RangeBy[T ordered.Real, S ordered.Real](start, end T, step S) (result []T) {
 	return rangeBy[T, S](start, end, step, false, 0, 0)
 }
 
@@ -192,7 +192,7 @@ func RangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) 
 // If start is larger than end whilst step is positive, or if end is larger
 // than start whilst step is negative, the function panics. If start is equal to
 // end then a slice containing that value as its only element is returned.
-func IncRangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []T) {
+func IncRangeBy[T ordered.Real, S ordered.Real](start, end T, step S) (result []T) {
 	return rangeBy[T, S](start, end, step, true, 0, 0)
 }
 
@@ -206,7 +206,7 @@ func IncRangeBy[T realnum.Real, S realnum.Real](start, end T, step S) (result []
 //
 //	slices.Range(0, 5)         // []int{0, 1, 2, 3, 4}
 //	slices.RangeBy[uint](5, 0) // []uint{5, 4, 3, 2, 1}
-func Range[T realnum.Real](start, end T) []T {
+func Range[T ordered.Real](start, end T) []T {
 	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false, 0, 0)
 }
 
@@ -220,7 +220,7 @@ func Range[T realnum.Real](start, end T) []T {
 //
 //	slices.IncRange(0, 5)       // []int{0, 1, 2, 3, 4, 5}
 //	slices.IncRange[uint](5, 0) // []uint{5, 4, 3, 2, 1, 0}
-func IncRange[T realnum.Real](start, end T) []T {
+func IncRange[T ordered.Real](start, end T) []T {
 	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true, 0, 0)
 }
 
@@ -267,7 +267,7 @@ func ParMaxCpu(maxCpu int) ParOption { return func(o *parOptions) { o.maxCpu = m
 // e.g.
 //
 //	slices.ParRange(0, 400000, ParThreshold(100000), ParMaxCpu(4))
-func ParRange[T realnum.Real](start, end T, parOpts ...ParOption) []T {
+func ParRange[T ordered.Real](start, end T, parOpts ...ParOption) []T {
 	opts := combineParOptions(parOpts)
 	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false, opts.threshold, opts.maxCpu)
 }
@@ -292,7 +292,7 @@ func ParRange[T realnum.Real](start, end T, parOpts ...ParOption) []T {
 // e.g.
 //
 //	slices.ParIncRange(0, 400000, ParThreshold(100000), ParMaxCpu(4))
-func ParIncRange[T realnum.Real](start, end T, parOpts ...ParOption) []T {
+func ParIncRange[T ordered.Real](start, end T, parOpts ...ParOption) []T {
 	opts := combineParOptions(parOpts)
 	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true, opts.threshold, opts.maxCpu)
 }
@@ -324,7 +324,7 @@ func ParIncRange[T realnum.Real](start, end T, parOpts ...ParOption) []T {
 // e.g.
 //
 //	slices.ParRangeBy(0, 400000, 1, ParThreshold(100000), ParMaxCpu(4))
-func ParRangeBy[T realnum.Real, S realnum.Real](start, end T, step S, parOpts ...ParOption) []T {
+func ParRangeBy[T ordered.Real, S ordered.Real](start, end T, step S, parOpts ...ParOption) []T {
 	opts := combineParOptions(parOpts)
 	return rangeBy(start, end, step, false, opts.threshold, opts.maxCpu)
 }
@@ -356,7 +356,7 @@ func ParRangeBy[T realnum.Real, S realnum.Real](start, end T, step S, parOpts ..
 // e.g.
 //
 //	slices.ParIncRangeBy(0, 400000, 1, ParThreshold(100000), ParMaxCpu(4))
-func ParIncRangeBy[T realnum.Real, S realnum.Real](start, end T, step S, parOpts ...ParOption) []T {
+func ParIncRangeBy[T ordered.Real, S ordered.Real](start, end T, step S, parOpts ...ParOption) []T {
 	opts := combineParOptions(parOpts)
 	return rangeBy(start, end, step, true, opts.threshold, opts.maxCpu)
 }
