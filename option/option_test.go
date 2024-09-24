@@ -2,9 +2,11 @@ package option
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/robdavid/genutil-go/errors/handler"
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
@@ -26,13 +28,13 @@ func TestValue(t *testing.T) {
 
 func TestRef(t *testing.T) {
 	five := 5
-	var v Option[int] = Ref(&five)
+	var v *Option[int] = Ref(&five)
 	assert.False(t, v.IsEmpty())
 	assert.True(t, v.HasValue())
 	assert.Equal(t, 5, v.Get())
 	assert.Equal(t, &five, v.Ref())
-	assert.Equal(t, 7, MapRef(&v, func(x *int) *int { var y = *x + 2; return &y }).Get())
-	assert.Equal(t, Value(8), Map(v, func(x int) int { return x + 3 }))
+	assert.Equal(t, 7, MapRef(v, func(x *int) *int { var y = *x + 2; return &y }).Get())
+	assert.Equal(t, Value(8), Map(*v, func(x int) int { return x + 3 }))
 	v.Set(6)
 	assert.Equal(t, 6, v.Get())
 	assert.Equal(t, 6, *v.Ref())
@@ -40,17 +42,24 @@ func TestRef(t *testing.T) {
 	assert.True(t, v.IsEmpty())
 }
 
+func TestToRefExample(t *testing.T) {
+	var slice []int = []int{6, 7}
+	append42 := func(s *[]int) { *s = append(*s, 42) }
+	opt := Value(slice).ToRef().Mutate(append42).Get() // []int{6, 7, 42}
+	assert.Equal(t, []int{6, 7, 42}, opt)
+}
+
 func TestEquality(t *testing.T) {
 	six := 6
 	val := Value(six)
 	ref := Ref(&six)
-	assert.True(t, val == ref)
+	assert.True(t, val == *ref)
 	val.Set(7)
-	assert.False(t, val == ref)
+	assert.False(t, val == *ref)
 	val.Set(6)
-	assert.True(t, val == ref)
+	assert.True(t, val == *ref)
 	val.Clear()
-	assert.False(t, val == ref)
+	assert.False(t, val == *ref)
 }
 
 func TestEmpty(t *testing.T) {
@@ -62,13 +71,24 @@ func TestEmpty(t *testing.T) {
 	assert.True(t, vm.IsEmpty())
 }
 
+func TestNewStruct(t *testing.T) {
+	opt := New[struct {
+		num  int
+		text string
+	}]()
+	opt.Ref().num = 123
+	opt.Ref().text = "one two three"
+	assert.Equal(t, 123, opt.Get().num)
+	assert.Equal(t, "one two three", opt.Get().text)
+}
+
 func TestSafe(t *testing.T) {
 	var myInt int = 32
 	v := Safe[*int](nil)
 	assert.True(t, v.IsEmpty())
 	v = Safe(&myInt)
 	assert.False(t, v.IsEmpty())
-	vList := Safe[[]int](nil)
+	vList := From[[]int](nil)
 	assert.True(t, vList.IsEmpty())
 	vList = Safe([]int{1, 2, 3})
 	assert.False(t, vList.IsEmpty())
@@ -105,6 +125,30 @@ func TestSafe(t *testing.T) {
 	chin = ch
 	v7.SafeSet(chin)
 	assert.False(t, v7.IsEmpty())
+}
+
+func BenchmarkSafeInit(b *testing.B) {
+	var ptr []int
+	for i := 0; i < b.N; i++ {
+		v := Safe(ptr)
+		assert.False(b, v.IsEmpty())
+	}
+}
+
+func BenchmarkFromInit(b *testing.B) {
+	var ptr *int
+	for i := 0; i < b.N; i++ {
+		v := From(ptr)
+		assert.True(b, v.IsEmpty())
+	}
+}
+
+func BenchmarkValueInit(b *testing.B) {
+	var ptr *int
+	for i := 0; i < b.N; i++ {
+		v := Value(ptr)
+		assert.False(b, v.IsEmpty())
+	}
 }
 
 type TestS1 struct {
@@ -147,14 +191,55 @@ func TestOptionList(t *testing.T) {
 	assert.Equal(t, []int{1}, opt.Get())
 }
 
+func tryOption(o Option[int], errE error, errF func() error) (result int, err error) {
+	defer handler.Catch(&err) // err set to ErrOptionIsEmpty
+	if errF != nil {
+		result = o.TryErrF(errF)
+	} else if errE != nil {
+		result = o.TryErr(errE)
+	} else {
+		result = o.Try()
+	}
+	return
+}
+
 func TestOptionTry(t *testing.T) {
+	assert := assert.New(t)
+	var actual int
 	var err error
-	defer func() {
-		assert.ErrorIs(t, err, ErrOptionIsEmpty)
-	}()
-	defer eh.Catch(&err)
-	eo := Empty[int]()
-	assert.Equal(t, 0, eo.Try())
+	actual, err = tryOption(Value(123), nil, nil)
+	assert.Equal(123, actual)
+	assert.NoError(err)
+	_, err = tryOption(Empty[int](), nil, nil)
+	assert.ErrorIs(err, ErrOptionIsEmpty)
+}
+
+func TestOptionTryErr(t *testing.T) {
+	assert := assert.New(t)
+	var actual int
+	var err error
+	errTest := errors.New("test error")
+	actual, err = tryOption(Value(123), errTest, nil)
+	assert.Equal(123, actual)
+	assert.NoError(err)
+	_, err = tryOption(Empty[int](), errTest, nil)
+	assert.ErrorIs(err, errTest)
+}
+
+func TestOptionTryErrF(t *testing.T) {
+	assert := assert.New(t)
+	var actual int
+	var err error
+	errTest := errors.New("test error")
+	invoked := false
+	fnErr := func() error { invoked = true; return errTest }
+	actual, err = tryOption(Value(123), nil, fnErr)
+	assert.Equal(123, actual)
+	assert.NoError(err)
+	assert.False(invoked)
+	_, err = tryOption(Empty[int](), nil, fnErr)
+	assert.ErrorIs(err, errTest)
+	assert.True(invoked)
 }
 
 func TestOptionPointerTry(t *testing.T) {
@@ -165,6 +250,51 @@ func TestOptionPointerTry(t *testing.T) {
 	defer eh.Catch(&err)
 	eo := Safe[*int](nil)
 	assert.Equal(t, 0, eo.Try())
+}
+
+func TestMapAndMorph(t *testing.T) {
+	assert := assert.New(t)
+	opt := Value(123)
+	nopt := Empty[int]()
+	fdouble := func(n int) float64 { return 2.0 * float64(n) }
+	idouble := func(n int) int { return 2 * n }
+	assert.Equal(float64(246), Map(opt, fdouble).Get())
+	assert.Equal(Value(246), opt.Morph(idouble))
+	assert.Equal(float64(0), Map(nopt, fdouble).GetOrZero())
+	assert.Equal(0, nopt.Morph(idouble).GetOr(0))
+}
+
+func TestMutate(t *testing.T) {
+	assert := assert.New(t)
+	opt := Value(123)
+	nopt := Empty[int]()
+	o2 := opt.Mutate(func(n *int) { *n *= 2 })
+	assert.Equal(246, opt.Get())
+	assert.Equal(&opt, o2)
+	nopt.Mutate(func(n *int) { *n *= 2 })
+	assert.Equal(0, nopt.GetOrZero())
+}
+
+func TestThenElse(t *testing.T) {
+	const (
+		none int = iota
+		less
+		more
+	)
+	condition := func(opt Option[int]) (result int) {
+		opt.Then(func(n int) {
+			if n < 100 {
+				result = less
+			} else {
+				result = more
+			}
+		}).Else(func() { result = none })
+		return
+	}
+	assert := assert.New(t)
+	assert.Equal(none, condition(Empty[int]()))
+	assert.Equal(less, condition(Value(50)))
+	assert.Equal(more, condition(Value(150)))
 }
 
 type testMarshall struct {

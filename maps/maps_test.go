@@ -13,6 +13,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetAs(t *testing.T) {
+	m := map[string]any{
+		"one":   1,
+		"two":   2,
+		"hello": "world",
+	}
+	assert := assert.New(t)
+	assert.Equal(1, GetAs[int](m, "one").GetOr(-1))
+	assert.Equal(2, GetAs[int](m, "two").GetOr(-1))
+	assert.Equal(-1, GetAs[int](m, "three").GetOr(-1))
+	assert.Equal("nope", GetAs[string](m, "two").GetOr("nope"))
+	assert.Equal("world", GetAs[string](m, "hello").GetOr("nope"))
+}
+
 func TestFetchPathNil(t *testing.T) {
 	var m map[string]any = nil
 	_, e := GetPath(m, []string{"a", "b", "c", "e"})
