@@ -26,13 +26,13 @@ func TestValue(t *testing.T) {
 
 func TestRef(t *testing.T) {
 	five := 5
-	var v Option[int] = Ref(&five)
+	var v *Option[int] = Ref(&five)
 	assert.False(t, v.IsEmpty())
 	assert.True(t, v.HasValue())
 	assert.Equal(t, 5, v.Get())
 	assert.Equal(t, &five, v.Ref())
-	assert.Equal(t, 7, MapRef(&v, func(x *int) *int { var y = *x + 2; return &y }).Get())
-	assert.Equal(t, Value(8), Map(v, func(x int) int { return x + 3 }))
+	assert.Equal(t, 7, MapRef(v, func(x *int) *int { var y = *x + 2; return &y }).Get())
+	assert.Equal(t, Value(8), Map(*v, func(x int) int { return x + 3 }))
 	v.Set(6)
 	assert.Equal(t, 6, v.Get())
 	assert.Equal(t, 6, *v.Ref())
@@ -40,17 +40,41 @@ func TestRef(t *testing.T) {
 	assert.True(t, v.IsEmpty())
 }
 
+func TestAs(t *testing.T) {
+	var v any = 123
+	opt := As[int](v).Get()
+	assert.Equal(t, 123, opt)
+	assert.Equal(t, []any(nil), As[[]any](v).GetOr(nil))
+}
+
+func TestAsRef(t *testing.T) {
+	var n = 123
+	var v any = &n
+	var i *int = nil
+	opt := AsRef[int](&n).Get()
+	assert.Equal(t, 123, opt)
+	assert.True(t, AsRef[int](i).IsEmpty())
+	i = AsRef[int](v).GetRef()
+	assert.Equal(t, 123, AsRef[int](i).Get())
+}
+
+func TestToRefExample(t *testing.T) {
+	var slice any = []int{1, 2, 3}
+	opt := As[[]int](slice).ToRef().GetRef()
+	assert.Equal(t, []int{1, 2, 3}, *opt)
+}
+
 func TestEquality(t *testing.T) {
 	six := 6
 	val := Value(six)
 	ref := Ref(&six)
-	assert.True(t, val == ref)
+	assert.True(t, val == *ref)
 	val.Set(7)
-	assert.False(t, val == ref)
+	assert.False(t, val == *ref)
 	val.Set(6)
-	assert.True(t, val == ref)
+	assert.True(t, val == *ref)
 	val.Clear()
-	assert.False(t, val == ref)
+	assert.False(t, val == *ref)
 }
 
 func TestEmpty(t *testing.T) {
@@ -165,6 +189,51 @@ func TestOptionPointerTry(t *testing.T) {
 	defer eh.Catch(&err)
 	eo := Safe[*int](nil)
 	assert.Equal(t, 0, eo.Try())
+}
+
+func TestMapAndMorph(t *testing.T) {
+	assert := assert.New(t)
+	opt := Value(123)
+	nopt := Empty[int]()
+	fdouble := func(n int) float64 { return 2.0 * float64(n) }
+	idouble := func(n int) int { return 2 * n }
+	assert.Equal(float64(246), Map(opt, fdouble).Get())
+	assert.Equal(Value(246), opt.Morph(idouble))
+	assert.Equal(float64(0), Map(nopt, fdouble).GetOrZero())
+	assert.Equal(0, nopt.Morph(idouble).GetOr(0))
+}
+
+func TestMutate(t *testing.T) {
+	assert := assert.New(t)
+	opt := Value(123)
+	nopt := Empty[int]()
+	o2 := opt.Mutate(func(n *int) { *n *= 2 })
+	assert.Equal(246, opt.Get())
+	assert.Equal(&opt, o2)
+	nopt.Mutate(func(n *int) { *n *= 2 })
+	assert.Equal(0, nopt.GetOrZero())
+}
+
+func TestThenElse(t *testing.T) {
+	const (
+		none int = iota
+		less
+		more
+	)
+	condition := func(opt Option[int]) (result int) {
+		opt.Then(func(n int) {
+			if n < 100 {
+				result = less
+			} else {
+				result = more
+			}
+		}).Else(func() { result = none })
+		return
+	}
+	assert := assert.New(t)
+	assert.Equal(none, condition(Empty[int]()))
+	assert.Equal(less, condition(Value(50)))
+	assert.Equal(more, condition(Value(150)))
 }
 
 type testMarshall struct {
