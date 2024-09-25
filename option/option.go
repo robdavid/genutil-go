@@ -47,9 +47,15 @@ func Empty[T any]() Option[T] {
 	return Option[T]{}
 }
 
-// Create a reference to an empty option
+// EmptyRef creates a reference to an empty option.
 func EmptyRef[T any]() *Option[T] {
 	return &Option[T]{}
+}
+
+// New creates a reference to a new zero value Option
+func New[T any]() *Option[T] {
+	var zero T
+	return &Option[T]{zero, true}
 }
 
 // Attempts a type assertion of a to type T. If

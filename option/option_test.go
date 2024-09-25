@@ -86,6 +86,17 @@ func TestEmpty(t *testing.T) {
 	assert.True(t, vm.IsEmpty())
 }
 
+func TestNewStruct(t *testing.T) {
+	opt := New[struct {
+		num  int
+		text string
+	}]()
+	opt.Ref().num = 123
+	opt.Ref().text = "one two three"
+	assert.Equal(t, 123, opt.Get().num)
+	assert.Equal(t, "one two three", opt.Get().text)
+}
+
 func TestSafe(t *testing.T) {
 	var myInt int = 32
 	v := Safe[*int](nil)
