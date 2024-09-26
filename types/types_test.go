@@ -7,10 +7,13 @@ import (
 )
 
 func TestAs(t *testing.T) {
-	var v  = 123
-	opt := As[int](v).Get()
+	var n = 123
+	var v any = &n
+	opt := As[int](n).Get()
 	assert.Equal(t, 123, opt)
-	assert.Equal(t, []any(nil), As[[]any](v).GetOr(nil))
+	assert.Equal(t, []any(nil), As[[]any](n).GetOr(nil))
+	opt2 := As[*int](v).Get()
+	assert.Equal(t, 123, *opt2)
 }
 
 func TestAsRef(t *testing.T) {

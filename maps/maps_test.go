@@ -22,6 +22,7 @@ func TestGetAs(t *testing.T) {
 	assert := assert.New(t)
 	assert.Equal(1, GetAs[int](m, "one").GetOr(-1))
 	assert.Equal(2, GetAs[int](m, "two").GetOr(-1))
+	assert.Equal(-1, GetAs[int](m, "three").GetOr(-1))
 	assert.Equal("nope", GetAs[string](m, "two").GetOr("nope"))
 	assert.Equal("world", GetAs[string](m, "hello").GetOr("nope"))
 }
