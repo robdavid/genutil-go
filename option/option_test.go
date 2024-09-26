@@ -2,9 +2,11 @@ package option
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/robdavid/genutil-go/errors/handler"
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
@@ -40,28 +42,11 @@ func TestRef(t *testing.T) {
 	assert.True(t, v.IsEmpty())
 }
 
-func TestAs(t *testing.T) {
-	var v any = 123
-	opt := As[int](v).Get()
-	assert.Equal(t, 123, opt)
-	assert.Equal(t, []any(nil), As[[]any](v).GetOr(nil))
-}
-
-func TestAsRef(t *testing.T) {
-	var n = 123
-	var v any = &n
-	var i *int = nil
-	opt := AsRef[int](&n).Get()
-	assert.Equal(t, 123, opt)
-	assert.True(t, AsRef[int](i).IsEmpty())
-	i = AsRef[int](v).GetRef()
-	assert.Equal(t, 123, AsRef[int](i).Get())
-}
-
 func TestToRefExample(t *testing.T) {
-	var slice any = []int{1, 2, 3}
-	opt := As[[]int](slice).ToRef().GetRef()
-	assert.Equal(t, []int{1, 2, 3}, *opt)
+	var slice []int = []int{6, 7}
+	append42 := func(s *[]int) { *s = append(*s, 42) }
+	opt := Value(slice).ToRef().Mutate(append42).Get() // []int{6, 7, 42}
+	assert.Equal(t, []int{6, 7, 42}, opt)
 }
 
 func TestEquality(t *testing.T) {
@@ -182,14 +167,55 @@ func TestOptionList(t *testing.T) {
 	assert.Equal(t, []int{1}, opt.Get())
 }
 
+func tryOption(o Option[int], errE error, errF func() error) (result int, err error) {
+	defer handler.Catch(&err) // err set to ErrOptionIsEmpty
+	if errF != nil {
+		result = o.TryErrF(errF)
+	} else if errE != nil {
+		result = o.TryErr(errE)
+	} else {
+		result = o.Try()
+	}
+	return
+}
+
 func TestOptionTry(t *testing.T) {
+	assert := assert.New(t)
+	var actual int
 	var err error
-	defer func() {
-		assert.ErrorIs(t, err, ErrOptionIsEmpty)
-	}()
-	defer eh.Catch(&err)
-	eo := Empty[int]()
-	assert.Equal(t, 0, eo.Try())
+	actual, err = tryOption(Value(123), nil, nil)
+	assert.Equal(123, actual)
+	assert.NoError(err)
+	_, err = tryOption(Empty[int](), nil, nil)
+	assert.ErrorIs(err, ErrOptionIsEmpty)
+}
+
+func TestOptionTryErr(t *testing.T) {
+	assert := assert.New(t)
+	var actual int
+	var err error
+	errTest := errors.New("test error")
+	actual, err = tryOption(Value(123), errTest, nil)
+	assert.Equal(123, actual)
+	assert.NoError(err)
+	_, err = tryOption(Empty[int](), errTest, nil)
+	assert.ErrorIs(err, errTest)
+}
+
+func TestOptionTryErrF(t *testing.T) {
+	assert := assert.New(t)
+	var actual int
+	var err error
+	errTest := errors.New("test error")
+	invoked := false
+	fnErr := func() error { invoked = true; return errTest }
+	actual, err = tryOption(Value(123), nil, fnErr)
+	assert.Equal(123, actual)
+	assert.NoError(err)
+	assert.False(invoked)
+	_, err = tryOption(Empty[int](), nil, fnErr)
+	assert.ErrorIs(err, errTest)
+	assert.True(invoked)
 }
 
 func TestOptionPointerTry(t *testing.T) {

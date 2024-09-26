@@ -23,7 +23,7 @@ func Value[T any](v T) Option[T] {
 }
 
 // From creates an option from a nilable value,
-// which will be empty of the value is nil.
+// which will be empty if the value is nil.
 func From[T any](v T) Option[T] {
 	return Option[T]{v, !isNil(v)}
 }
@@ -56,26 +56,6 @@ func EmptyRef[T any]() *Option[T] {
 func New[T any]() *Option[T] {
 	var zero T
 	return &Option[T]{zero, true}
-}
-
-// Attempts a type assertion of a to type T. If
-// successful, an option of value T is returned.
-// Otherwise, an empty option is returned.
-func As[T any](a any) Option[T] {
-	v, ok := a.(T)
-	if ok {
-		return Value(v)
-	} else {
-		return Empty[T]()
-	}
-}
-
-// Attempts a type assertion of a to type T. If
-// successful, and a is non-nil, an option of value T is returned.
-// Otherwise, an empty option is returned.
-func AsRef[T any](a any) *Option[T] {
-	v, _ := a.(*T)
-	return Ref(v)
 }
 
 // Returns true if the option is empty and has no value
@@ -181,18 +161,56 @@ func (o *Option[T]) RefOK() (*T, bool) {
 	}
 }
 
-// Get the options' value. If the option is empty, this call will panic
-// with a try value that can be caught with Catch or Handle in
+// Try returns the option's non-empty value. If the option is empty,
+// this call will panic with a try value that can be caught with Catch or Handle in
 // errors/handler package.
 // e.g.
 //
-//	var err error
-//	defer handler.Catch(&err)
-//	ov := Empty[int]()
-//	v := ov.Try()
+//	 func tryOption() (err error) {
+//		  defer handler.Catch(&err) // err set to ErrOptionIsEmpty
+//		  ov := Empty[int]()
+//		  v := ov.Try()
+//	 }
 func (o Option[T]) Try() T {
+	return o.TryErr(ErrOptionIsEmpty)
+}
+
+// TryErr returns the option's non-empty value. If the option is empty,
+// this call will panic with a try value, wapping the error supplied in err. This panic
+// can be caught with Catch or Handle. If err is nil, there will be no panic and a 
+// zero value will be returned.
+// e.g.
+//
+//	func tryOption() (err error) {
+//	  myerr := errors.New("test error")
+//	  defer handler.Catch(&err) // err set to myerr
+//	  ov := Empty[int]() 
+//	  v := ov.TryErr(myerr)
+//	}
+func (o Option[T]) TryErr(err error) T {
 	if o.IsEmpty() {
-		eh.Check(ErrOptionIsEmpty)
+		eh.Check(err)
+	}
+	return o.value
+}
+
+// TryErrF returns the option's non-empty value. If the option is empty,
+// the user supplied error function will be invoked and TryErrF will panic with 
+// a try value wrapping this error. This panic can be caught with Catch or Handle in
+// errors/handler package. If the user supplied error function returns a nil,
+// there will be no panic and TryErrF will return a zero value.
+// e.g.
+//
+//	func tryOption() (err error) {
+//	  myerr := errors.New("test error")
+//    fnErr := func() error { return myerr }
+//	  defer handler.Catch(&err) // err set to myerr
+//	  ov := Empty[int]() 
+//	  v := ov.TryErrF(fnErr)
+//	}
+func (o Option[T]) TryErrF(err func() error) T {
+	if o.IsEmpty() {
+		eh.Check(err())
 	}
 	return o.value
 }
@@ -210,8 +228,9 @@ func (o *Option[T]) TryRef() *T {
 // Convert an option to a pointer to an option. Sometimes useful for fluent
 // method chaining. E.g
 //
-//	var slice any = []int{6, 9}
-//	option.As[[]int](slice).ToRef().Mutate(func(s *[]int) { *s = append(*s, 42) }).Get() // []int{6, 9, 42}
+//	var slice []int = []int{6, 7}
+//	append42 := func(s *[]int) { *s = append(*s, 42) }
+//	option.Value(slice).ToRef().Mutate(append42).Get() // []int{6, 7, 42}
 func (o Option[T]) ToRef() *Option[T] {
 	return &o
 }
@@ -226,14 +245,14 @@ func (o Option[T]) String() string {
 	}
 }
 
-// Returns a pointer to the value in the option. If the value is empty,
+// RefOrNil returns a pointer to the value in the option. If the value is empty,
 // nil will be returned.
 func (o *Option[T]) RefOrNil() *T {
 	return o.RefOr(nil)
 }
 
-// Returns a pointer to the value in the option. If the value is empty,
-// a default pointer will be returned.The primary use case is to allow
+// RefOr returns a pointer to the value in the option. If the value is empty,
+// the default pointer will be returned. The primary use case is to allow
 // mutation of the value held in the option.
 func (o *Option[T]) RefOr(def *T) *T {
 	if o.IsEmpty() {
@@ -243,21 +262,21 @@ func (o *Option[T]) RefOr(def *T) *T {
 	}
 }
 
-// Sets the value in the option to a new value. The option will then be
+// Set sets the value in the option to a new value. The option will then be
 // non-empty.
 func (o *Option[T]) Set(v T) {
 	o.value = v
 	o.nonEmpty = true
 }
 
-// Sets the value in the option to a new value. If the value of v is nil,
+// SafeSet sets the value in the option to a new value. If the value of v is nil,
 // the option will be empty. Otherwise it will be non-empty.
 func (o *Option[T]) SafeSet(v T) {
 	o.value = v
 	o.nonEmpty = !isNil(o.value)
 }
 
-// Sets the value in the option to the value pointed to by the parameter.
+// SetRef sets the value in the option to the value pointed to by the parameter.
 // If this is nil, the option will be set empty. Otherwise it will be
 // non-empty and contain the referenced value.
 func (o *Option[T]) SetRef(v *T) {
@@ -271,17 +290,17 @@ func (o *Option[T]) SetRef(v *T) {
 	}
 }
 
-// Sets the option empty
+// Clear sets the option empty
 func (o *Option[T]) Clear() {
 	var zero T
 	o.value = zero
 	o.nonEmpty = false
 }
 
-// If the option is non-empty, apply the supplied function
-// to it's value, and return an option containing the
-// resulting value. Otherwise, return an empty option of the
-// same type.
+// Map applies a function to the non-empty value of an Option.
+// If the option is non-empty, the function is applied
+// to it's value, and the result wrapped in an Option
+// and returned. Otherwise, an empty option is returned.
 func Map[T, U any](o Option[T], f func(T) U) Option[U] {
 	if val, ok := o.GetOK(); !ok {
 		return Empty[U]()
@@ -290,7 +309,20 @@ func Map[T, U any](o Option[T], f func(T) U) Option[U] {
 	}
 }
 
-// A variation on Map() in which the mapping function takes and
+// FlatMap applies a function returning a new option to the
+// non-empty value of an Option.
+// If the option is non-empty, the function is applied
+// to it's value, and the result is returned.
+// Otherwise, an empty option is returned.
+func FlatMap[T, U any](o Option[T], f func(T) Option[U]) Option[U] {
+	if val, ok := o.GetOK(); !ok {
+		return Empty[U]()
+	} else {
+		return f(val)
+	}
+}
+
+// MapRef is a variation of Map() in which the mapping function takes and
 // returns pointers to values. A pointer to the resultant
 // option type is returned.
 func MapRef[T, U any](o *Option[T], f func(*T) *U) *Option[U] {
@@ -299,6 +331,19 @@ func MapRef[T, U any](o *Option[T], f func(*T) *U) *Option[U] {
 		result = Ref[U](nil)
 	} else {
 		result = Ref(f(r))
+	}
+	return result
+}
+
+// FlatMapRef is a variation of FlatMap() in which the mapping function takes and
+// returns pointers to values. A pointer to the resultant
+// option type is returned.
+func FlatMapRef[T, U any](o *Option[T], f func(*T) *Option[U]) *Option[U] {
+	var result *Option[U]
+	if r := o.RefOrNil(); r == nil {
+		result = Ref[U](nil)
+	} else {
+		result = f(r)
 	}
 	return result
 }
@@ -325,6 +370,17 @@ func (o Option[T]) Morph(f func(T) T) Option[T] {
 	}
 }
 
+func (o *Option[T]) MorphRef(f func(*T) *T) *Option[T] {
+	if o.nonEmpty {
+		return Ref(f(&o.value))
+	} else {
+		return o
+	}
+}
+
+// Mutate applies an in place mutation function to an
+// option's value. It is a no-op if the option is empty.
+// A pointer to the original option is returned.
 func (o *Option[T]) Mutate(f func(*T)) *Option[T] {
 	if o.nonEmpty {
 		f(&o.value)

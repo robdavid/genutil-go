@@ -8,6 +8,7 @@ import (
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/genutil-go/tuple"
+	"github.com/robdavid/genutil-go/types"
 )
 
 // ErrPathConflict is an error constant that indicates that a nested map key path is being
@@ -141,6 +142,19 @@ func DeletePath[K comparable](top map[K]any, path []K) (result any, ok bool, err
 		}
 	}
 	return
+}
+
+func Get[K comparable, V any](m map[K]V, k K) option.Option[V] {
+	if v, ok := m[k]; ok {
+		return option.Value(v)
+	} else {
+		return option.Empty[V]()
+	}
+}
+
+func GetAs[T any, K comparable, V any](m map[K]V, k K) option.Option[T] {
+	// return option.FlatMap[V,T](Get(m,k),types.As[T])
+	return option.FlatMap(Get(m, k), func(v V) option.Option[T] { return types.As[T](v) })
 }
 
 // GetPath fetches a value from a (possibly) nested map of maps. It traverses a map
