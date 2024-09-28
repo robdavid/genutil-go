@@ -177,14 +177,14 @@ func (o Option[T]) Try() T {
 
 // TryErr returns the option's non-empty value. If the option is empty,
 // this call will panic with a try value, wapping the error supplied in err. This panic
-// can be caught with Catch or Handle. If err is nil, there will be no panic and a 
+// can be caught with Catch or Handle. If err is nil, there will be no panic and a
 // zero value will be returned.
 // e.g.
 //
 //	func tryOption() (err error) {
 //	  myerr := errors.New("test error")
 //	  defer handler.Catch(&err) // err set to myerr
-//	  ov := Empty[int]() 
+//	  ov := Empty[int]()
 //	  v := ov.TryErr(myerr)
 //	}
 func (o Option[T]) TryErr(err error) T {
@@ -195,18 +195,18 @@ func (o Option[T]) TryErr(err error) T {
 }
 
 // TryErrF returns the option's non-empty value. If the option is empty,
-// the user supplied error function will be invoked and TryErrF will panic with 
+// the user supplied error function will be invoked and TryErrF will panic with
 // a try value wrapping this error. This panic can be caught with Catch or Handle in
 // errors/handler package. If the user supplied error function returns a nil,
 // there will be no panic and TryErrF will return a zero value.
 // e.g.
 //
 //	func tryOption() (err error) {
-//	  myerr := errors.New("test error")
-//    fnErr := func() error { return myerr }
-//	  defer handler.Catch(&err) // err set to myerr
-//	  ov := Empty[int]() 
-//	  v := ov.TryErrF(fnErr)
+//	 myerr := errors.New("test error")
+//	 fnErr := func() error { return myerr }
+//	 defer handler.Catch(&err) // err set to myerr
+//	 ov := Empty[int]()
+//	 v := ov.TryErrF(fnErr)
 //	}
 func (o Option[T]) TryErrF(err func() error) T {
 	if o.IsEmpty() {
@@ -348,6 +348,10 @@ func FlatMapRef[T, U any](o *Option[T], f func(*T) *Option[U]) *Option[U] {
 	return result
 }
 
+// Then invokes the supplied function with the Option's value
+// if the Option is non-empty. Otherwise, this is a no-op. It
+//
+//	always returns the option instance it wal called with.
 func (o Option[T]) Then(f func(T)) Option[T] {
 	if o.nonEmpty {
 		f(o.value)
@@ -355,11 +359,29 @@ func (o Option[T]) Then(f func(T)) Option[T] {
 	return o
 }
 
+// Then invokes the supplied function with a pointer to the Option's value
+// if the Option is non-empty. Otherwise, this is a no-op. It always returns
+// the pointer to the Option it is called with
+func (o *Option[T]) ThenRef(f func(*T)) *Option[T] {
+	if o.nonEmpty {
+		f(&o.value)
+	}
+	return o
+}
+
+// Else invokes the provided function if the Option passed is empty.
 func (o Option[T]) Else(f func()) {
 	if !o.nonEmpty {
 		f()
 	}
+}
 
+// ElseRef invokes the provided function if the Option whose address is passed
+// is empty.
+func (o *Option[T]) ElseRef(f func()) {
+	if !o.nonEmpty {
+		f()
+	}
 }
 
 func (o Option[T]) Morph(f func(T) T) Option[T] {
