@@ -32,8 +32,10 @@ The library falls into a number of categories, subdivided into separate packages
     - [Fetching values](#fetching-values)
     - [Deleting values](#deleting-values)
 - [Slices](#slices)
-  - [Predicate functions](#predicate-functions)
   - [Functional primitives](#functional-primitives)
+    - [Predicate functions](#predicate-functions)
+    - [Transformations](#transformations)
+  - [Range functions](#range-functions)
 
 ## Tuple
 
@@ -485,8 +487,7 @@ maps.DeletePath(m,[]string{"two","three"}) // m == map[string]any{"one": 1 }
 ## Slices
 
 
-A variety of functions that work over slices are included in the `slices` package. Some examples are covered here. See the [documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/slices) for full
-details.
+A variety of functions that work over slices are included in the `slices` package. Some examples are covered here. See the [documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/slices) for full details.
 
 ### Functional primitives
 
@@ -527,4 +528,23 @@ slices.Filter(input, func(i int) bool { return i%2 == 0 }) // []int{2, 4, 6, 8}
 
 The `Fold` function reduces all the elements of a slice down to a single value, using a function to combine elements.
 
+### Range functions
+
+A number of functions are available for generating a slice consisting of a sequence of numbers of various types, including floats. For example, the following call generates a slice consisting of the numbers from 0 to 4:
+
+```go
+slices.Range(0,5) // []int{0, 1, 2, 3 ,4}
+```
+
+This is an exclusive range which goes up to, but does not include the second parameter value. To generate an inclusive range, the `IncRange` function can be used, e.g.:
+
+```go
+slices.IncRange(0,5) // []int{0, 1, 2, 3 ,4, 5}
+```
+
+The difference between each number is 1, unless the second parameter value is less than the first, in which case it is -1.
+
+```go
+slices.IncRange(5,0) // []int{5, 4, 3, 2, 1, 0}
+```
 
