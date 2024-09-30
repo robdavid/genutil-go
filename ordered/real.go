@@ -1,5 +1,3 @@
-// Package ordered contains generic utility functions over ordered types, i.e. types
-// that support the operators <, >, == etc.
 package ordered
 
 import (
@@ -15,30 +13,6 @@ var ErrEmptySlice = errors.New("no elements in slice")
 // Scalar numeric type constraint. Includes all floating and integer types.
 type Real interface {
 	constraints.Float | constraints.Integer
-}
-
-// Max returns the largest of one or more ordered values. Note the values can be strings as well
-// as numeric types.
-func Max[T constraints.Ordered](xs ...T) T {
-	if len(xs) == 0 {
-		panic(ErrEmptySlice)
-	}
-	max := xs[0]
-	for _, n := range xs[1:] {
-		if n > max {
-			n = max
-		}
-	}
-	return max
-}
-
-// Min returns the smallest of two ordered values. Note the values can be strings as well
-// as numeric types.
-func Min[T constraints.Ordered](x, y T) T {
-	if y < x {
-		return y
-	}
-	return x
 }
 
 // Abs returns the absolute value of a non-complex numeric type
