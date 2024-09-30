@@ -384,6 +384,10 @@ func (o *Option[T]) ElseRef(f func()) {
 	}
 }
 
+// Morph, inspired by the concept of [Endomorphism]: https://en.wikipedia.org/wiki/Endomorphism,
+// maps an Option value, if non-empty, to another value of the same type, wrapped in an Option.
+// Mapping to values of different types via methods is not possible due to limitations in Go
+// generics. For this use the option.Map function.
 func (o Option[T]) Morph(f func(T) T) Option[T] {
 	if o.nonEmpty {
 		return Value(f(o.value))
@@ -392,6 +396,12 @@ func (o Option[T]) Morph(f func(T) T) Option[T] {
 	}
 }
 
+// MorphRef, inspired by the concept of [Endomorphism]: https://en.wikipedia.org/wiki/Endomorphism,
+// maps a pointer to an Option value, if non-empty, to another value of the same type, wrapped in
+// in Option, returned as a pointer to the Option. The mapping function takes and returns pointers
+// to the underlying value, where present.
+// Mapping to values of different types via methods is not possible due to limitations in Go
+// generics. For this use the option.Map function.
 func (o *Option[T]) MorphRef(f func(*T) *T) *Option[T] {
 	if o.nonEmpty {
 		return Ref(f(&o.value))
