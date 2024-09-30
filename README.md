@@ -32,8 +32,10 @@ The library falls into a number of categories, subdivided into separate packages
     - [Fetching values](#fetching-values)
     - [Deleting values](#deleting-values)
 - [Slices](#slices)
-  - [Predicate functions](#predicate-functions)
   - [Functional primitives](#functional-primitives)
+    - [Predicate functions](#predicate-functions)
+    - [Transformations](#transformations)
+  - [Range functions](#range-functions)
 
 ## Tuple
 
@@ -485,8 +487,7 @@ maps.DeletePath(m,[]string{"two","three"}) // m == map[string]any{"one": 1 }
 ## Slices
 
 
-A variety of functions that work over slices are included in the `slices` package. Some examples are covered here. See the [documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/slices) for full
-details.
+A variety of functions that work over slices are included in the `slices` package. Some examples are covered here. See the [documentation](https://pkg.go.dev/github.com/robdavid/genutil-go/slices) for full details.
 
 ### Functional primitives
 
@@ -526,5 +527,65 @@ slices.Filter(input, func(i int) bool { return i%2 == 0 }) // []int{2, 4, 6, 8}
 ```
 
 The `Fold` function reduces all the elements of a slice down to a single value, using a function to combine elements.
+
+### Range functions
+
+A number of functions are available for generating a slice consisting of a sequence of numbers of various types, including floats. For example, the following call generates a slice consisting of the numbers from 0 to 4:
+
+```go
+slices.Range(0,5) // []int{0, 1, 2, 3 ,4}
+```
+
+This is an exclusive range which goes up to, but does not include the second parameter value. To generate an inclusive range, the `IncRange` function can be used, e.g.:
+
+```go
+slices.IncRange(0, 5) // []int{0, 1, 2, 3 ,4, 5}
+```
+
+The difference between each number is 1, unless the second parameter value is less than the first, in which case it is -1.
+
+```go
+slices.IncRange(5, 0) // []int{5, 4, 3, 2, 1, 0}
+```
+
+Floating point values can also be used in ranges:
+
+```go
+slices.IncRange(0.0, 5.0) // []float64{0.0, 1.0, 2.0, 3.0 ,4.0, 5.0}
+```
+
+If a non-unity difference between each slice element is required, this can be achieved with `RangeBy` or `IncRangeBy` functions.
+
+```go
+slices.RangeBy(0.0, 2.0, 0.5) // []float64{0.0, 0.5, 1.0, 1.5}
+```
+
+If the range is descending, a negative step is required, otherwise the function will panic:
+
+```go
+slices.RangeBy(2.0, 0.0, -0.5) // []float64{2.0, 1.5, 1.0, 0.5}
+
+```
+
+For very large ranges, if needed, functions are available for generating different parts of the range across multiple processor cores in parallel.  The `ParRange` function works like range, except it will try to accelerate it's execution for large ranges, across multiple cores.
+
+```go
+slices.ParRange(0, 400000) // []int{0, 1, 2, ..., 399999}
+```
+
+The function takes some optional parameters that control how the activities are parallelised. 
+
+```go
+slices.ParRange(0, 400000, ParThreshold(100000), ParMaxCpu(4))
+```
+
+The `ParThreshold` function controls the threshold beyond which the population of the slice is broken up in to parallel chunks; a range size below this value will be handled as a single chunk. The default value is 100000. The `ParMaxCpu` function controls the maximum number of parallel chunks. By default this is the number of CPU cores has; a number larger than this will typically result in lower performance.
+
+As well as `ParRange` there are parallel range functions for each of the non-parallel ones, i.e. the following functions exist:
+
+* `ParRange`
+* `ParIncRange`
+* `ParRangeBy`
+* `ParIncRangeBy`
 
 

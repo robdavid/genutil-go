@@ -436,6 +436,22 @@ func TestInclusiveSignedFullRange(t *testing.T) {
 	}
 }
 
+func TestSillyStep(t *testing.T) {
+	assert.PanicsWithError(t, "invalid range: step is zero", func() {
+		RangeBy(0, 2, 0.5)
+	})
+}
+
+func TestTruncatedStep(t *testing.T) {
+	assert.Equal(t, []int{0, 1, 2}, IncRangeBy(0, 2, 1.5))
+}
+
+func TestSillyNegativeStep(t *testing.T) {
+	assert.PanicsWithError(t, "invalid range: step is zero", func() {
+		RangeBy(0, 2, -0.5)
+	})
+}
+
 func TestIntRangeConsistency(t *testing.T) {
 	for size := 0; size < 10000; size += 10 {
 		for by := 1; by < 10; by++ {
@@ -490,6 +506,47 @@ func TestFloatRangeConsistency(t *testing.T) {
 	}
 }
 
+func TestParChunks4Core(t *testing.T) {
+	inslice := make([]int, 100)
+	chunks := parChunks(inslice, 10, 4)
+	assert.Equal(t, 4, len(chunks))
+	for _, chunk := range chunks {
+		assert.Equal(t, 25, len(chunk))
+	}
+}
+
+func TestParChunks16Core(t *testing.T) {
+	inslice := make([]int, 100)
+	chunks := parChunks(inslice, 10, 16)
+	assert.Equal(t, 10, len(chunks))
+	for _, chunk := range chunks {
+		assert.Equal(t, 10, len(chunk))
+	}
+}
+
+func TestUnequalParChunks(t *testing.T) {
+	inslice := make([]int, 100)
+	chunks := parChunks(inslice, 33, 16)
+	assert.Equal(t, 3, len(chunks))
+	assert.Equal(t, 34, len(chunks[0]))
+	assert.Equal(t, 34, len(chunks[1]))
+	assert.Equal(t, 32, len(chunks[2]))
+}
+
+func TestMultipleParChunksSize(t *testing.T) {
+	inslice := make([]int, 100)
+	for i := 1; i <= len(inslice)/2; i++ {
+		chunks := parChunks(inslice, i, len(inslice))
+		for _, chunk := range chunks {
+			ideal := len(inslice) / len(chunks)
+			diff := len(chunk) - ideal
+			assert.LessOrEqual(t, diff, ideal/2)
+		}
+		sum := Fold(0, chunks, func(n int, c []int) int { return n + len(c) })
+		assert.Equal(t, len(inslice), sum)
+	}
+}
+
 func TestParRangeExample(t *testing.T) {
 	actual := ParRangeBy[uint](400000, 0, -2)
 	assert.Equal(t, 200000, len(actual))
@@ -499,6 +556,17 @@ func TestParRangeExample(t *testing.T) {
 		last = v
 	}
 	assert.Equal(t, uint(2), last)
+}
+
+func TestParRangeExample2(t *testing.T) {
+	actual := ParRange(0, 400000)
+	assert.Equal(t, 400000, len(actual))
+	var last int
+	for i, v := range actual {
+		assert.Equal(t, i, v)
+		last = v
+	}
+	assert.Equal(t, 399999, last)
 }
 
 func TestParIncRangeExample(t *testing.T) {
