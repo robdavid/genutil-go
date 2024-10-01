@@ -88,7 +88,7 @@ func TestSafe(t *testing.T) {
 	assert.True(t, v.IsEmpty())
 	v = Safe(&myInt)
 	assert.False(t, v.IsEmpty())
-	vList := Safe[[]int](nil)
+	vList := From[[]int](nil)
 	assert.True(t, vList.IsEmpty())
 	vList = Safe([]int{1, 2, 3})
 	assert.False(t, vList.IsEmpty())
@@ -125,6 +125,30 @@ func TestSafe(t *testing.T) {
 	chin = ch
 	v7.SafeSet(chin)
 	assert.False(t, v7.IsEmpty())
+}
+
+func BenchmarkSafeInit(b *testing.B) {
+	var ptr []int
+	for i := 0; i < b.N; i++ {
+		v := Safe(ptr)
+		assert.False(b, v.IsEmpty())
+	}
+}
+
+func BenchmarkFromInit(b *testing.B) {
+	var ptr *int
+	for i := 0; i < b.N; i++ {
+		v := From(ptr)
+		assert.True(b, v.IsEmpty())
+	}
+}
+
+func BenchmarkValueInit(b *testing.B) {
+	var ptr *int
+	for i := 0; i < b.N; i++ {
+		v := Value(ptr)
+		assert.False(b, v.IsEmpty())
+	}
 }
 
 type TestS1 struct {

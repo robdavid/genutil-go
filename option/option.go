@@ -28,8 +28,11 @@ func From[T any](v T) Option[T] {
 	return Option[T]{v, !isNil(v)}
 }
 
-// Safe is an alias for From
-func Safe[T any](v T) Option[T] { return From(v) }
+// Safe is similar to From except a nil slice
+// is considered equivalent to an empty slice.
+func Safe[T any](v T) Option[T] {
+	return Option[T]{v, !isUnsafe(v)}
+}
 
 // Creates an option from a pointer to a value; a nil
 // pointer results in an empty option
@@ -76,6 +79,21 @@ func isNil[T any](value T) bool {
 	}
 	switch typ.Kind() {
 	case reflect.Pointer, reflect.Chan, reflect.Slice, reflect.Interface, reflect.Map, reflect.Func:
+		return reflect.ValueOf(value).IsNil()
+	default:
+		return false
+	}
+}
+
+// Returns true if the passed value is an "unsafe" nil; e.g. a nil slice is
+// considered safe as it is equivalent to an empty slice in terms of safe operations.
+func isUnsafe[T any](value T) bool {
+	typ := reflect.TypeOf(value)
+	if typ == nil { // Returns nil if nil interface
+		return true
+	}
+	switch typ.Kind() {
+	case reflect.Pointer, reflect.Chan, reflect.Interface, reflect.Map, reflect.Func:
 		return reflect.ValueOf(value).IsNil()
 	default:
 		return false
