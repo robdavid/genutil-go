@@ -539,12 +539,30 @@ slices.Range(0,5) // []int{0, 1, 2, 3 ,4}
 This is an exclusive range which goes up to, but does not include the second parameter value. To generate an inclusive range, the `IncRange` function can be used, e.g.:
 
 ```go
-slices.IncRange(0,5) // []int{0, 1, 2, 3 ,4, 5}
+slices.IncRange(0, 5) // []int{0, 1, 2, 3 ,4, 5}
 ```
 
 The difference between each number is 1, unless the second parameter value is less than the first, in which case it is -1.
 
 ```go
-slices.IncRange(5,0) // []int{5, 4, 3, 2, 1, 0}
+slices.IncRange(5, 0) // []int{5, 4, 3, 2, 1, 0}
 ```
 
+Floating point values can also be used in ranges:
+
+```go
+slices.IncRange(0.0, 5.0) // []float64{0.0, 1.0, 2.0, 3.0 ,4.0, 5.0}
+```
+
+If a non-unity difference between each slice element is required, this can be achieved with `RangeBy` or `IncRangeBy` functions.
+
+```go
+slices.RangeBy(0.0, 2.0, 0.5) // []float64{0.0, 0.5, 1.0, 1.5}
+```
+
+If the range is descending, a negative step is required, otherwise the function will panic:
+
+```go
+slices.RangeBy(2.0, 0.0, -0.5) // []float64{2.0, 1.5, 1.0, 0.5}
+
+```

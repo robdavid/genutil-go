@@ -436,6 +436,18 @@ func TestInclusiveSignedFullRange(t *testing.T) {
 	}
 }
 
+func TestSillyStep(t *testing.T) {
+	assert.PanicsWithError(t, "invalid range: step is zero", func() {
+		RangeBy(0, 2, 0.5)
+	})
+}
+
+func TestSillyNegativeStep(t *testing.T) {
+	assert.PanicsWithError(t, "invalid range: step is zero", func() {
+		RangeBy(0, 2, -0.5)
+	})
+}
+
 func TestIntRangeConsistency(t *testing.T) {
 	for size := 0; size < 10000; size += 10 {
 		for by := 1; by < 10; by++ {
