@@ -442,6 +442,10 @@ func TestSillyStep(t *testing.T) {
 	})
 }
 
+func TestTruncatedStep(t *testing.T) {
+	assert.Equal(t, []int{0, 1, 2}, IncRangeBy(0, 2, 1.5))
+}
+
 func TestSillyNegativeStep(t *testing.T) {
 	assert.PanicsWithError(t, "invalid range: step is zero", func() {
 		RangeBy(0, 2, -0.5)
