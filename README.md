@@ -566,3 +566,5 @@ If the range is descending, a negative step is required, otherwise the function 
 slices.RangeBy(2.0, 0.0, -0.5) // []float64{2.0, 1.5, 1.0, 0.5}
 
 ```
+
+For very large ranges, if needed, functions are available for generating different parts of the range across multiple processor cores in parallel.  The `ParRange` 
