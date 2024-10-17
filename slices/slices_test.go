@@ -506,6 +506,47 @@ func TestFloatRangeConsistency(t *testing.T) {
 	}
 }
 
+func TestParChunks4Core(t *testing.T) {
+	inslice := make([]int, 100)
+	chunks := parChunks(inslice, 10, 4)
+	assert.Equal(t, 4, len(chunks))
+	for _, chunk := range chunks {
+		assert.Equal(t, 25, len(chunk))
+	}
+}
+
+func TestParChunks16Core(t *testing.T) {
+	inslice := make([]int, 100)
+	chunks := parChunks(inslice, 10, 16)
+	assert.Equal(t, 10, len(chunks))
+	for _, chunk := range chunks {
+		assert.Equal(t, 10, len(chunk))
+	}
+}
+
+func TestUnequalParChunks(t *testing.T) {
+	inslice := make([]int, 100)
+	chunks := parChunks(inslice, 33, 16)
+	assert.Equal(t, 3, len(chunks))
+	assert.Equal(t, 34, len(chunks[0]))
+	assert.Equal(t, 34, len(chunks[1]))
+	assert.Equal(t, 32, len(chunks[2]))
+}
+
+func TestMultipleParChunksSize(t *testing.T) {
+	inslice := make([]int, 100)
+	for i := 1; i <= len(inslice)/2; i++ {
+		chunks := parChunks(inslice, i, len(inslice))
+		for _, chunk := range chunks {
+			ideal := len(inslice) / len(chunks)
+			diff := len(chunk) - ideal
+			assert.LessOrEqual(t, diff, ideal/2)
+		}
+		sum := Fold(0, chunks, func(n int, c []int) int { return n + len(c) })
+		assert.Equal(t, len(inslice), sum)
+	}
+}
+
 func TestParRangeExample(t *testing.T) {
 	actual := ParRangeBy[uint](400000, 0, -2)
 	assert.Equal(t, 200000, len(actual))
