@@ -407,7 +407,7 @@ func TestLargeInclusiveFloatRange(t *testing.T) {
 		assert.Equal(t, v, e)
 		v += 0.25
 	}
-	assert.Equal(t, iterator.Collect(iterator.IncRangeBy(0.0, 1000000, 0.25)), r)
+	assert.Equal(t, iterator.Collect(iterator.IncRangeBy(0.0, 1000000.0, 0.25)), r)
 }
 
 func TestLargeInclusiveIntRange(t *testing.T) {
