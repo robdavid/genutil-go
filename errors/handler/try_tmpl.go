@@ -63,3 +63,4 @@ func Try9[T1 any, T2 any, T3 any, T4 any, T5 any, T6 any, T7 any, T8 any, T9 any
 	}
 	return p1, p2, p3, p4, p5, p6, p7, p8, p9
 }
+

@@ -5,8 +5,9 @@ package handler
 // Variant of try with {{$params}} non-error arguments
 func Try{{$params}}[{{ mapTpl "T{{.}} any" $seq | join ", "}}]({{ mapTpl "p{{.}} T{{.}}" $seq | join ", "}}, err error) ({{ mapTpl "T{{.}}" $seq | join ", "}}) {
 	if err != nil {
-		panic(tryError{err})
+		panic(TryError{err})
 	}
 	return {{ mapTpl "p{{.}}" $seq | join ", "}}
 }
+
 {{ end }}

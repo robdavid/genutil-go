@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func readFileTest(fname string) (content []byte, err error) {
@@ -130,15 +131,58 @@ func recurseErrorCatch(depth int) (err error) {
 	return
 }
 
+func recurseNoErrorCatch(depth int) (total int, err error) {
+	defer Catch(&err)
+	if depth > 0 {
+		total = 1 + Try(recurseNoErrorCatch(depth-1))
+	}
+	return
+}
+
+func decrement(n int) (int, error) {
+	if n <= 0 {
+		return 0, fmt.Errorf("Will not decrement below zero")
+	} else {
+		return n - 1, nil
+	}
+}
+
+func loopNoErrorCatch(iterations int) (count int, err error) {
+	defer Catch(&err)
+	for iterations > 0 {
+		iterations = Try(decrement(iterations))
+		count++
+	}
+	return
+}
+
+func loopNoErrorNoCatch(iterations int) (count int, err error) {
+	for iterations > 0 {
+		iterations = Try(decrement(iterations))
+		count++
+	}
+	return
+}
+
+func loopNoError(iterations int) (count int, err error) {
+	for iterations > 0 {
+		if iterations, err = decrement(iterations); err != nil {
+			return
+		} else {
+			count++
+		}
+	}
+	return
+}
+
 func recurseErrorCatchOnce(depth int, maxDepth int) (err error) {
 	if depth == 0 {
 		defer Catch(&err)
 	}
 	if depth < maxDepth {
-		err = recurseErrorCatchOnce(depth+1, maxDepth)
+		recurseErrorCatchOnce(depth+1, maxDepth)
 	} else {
-		err = fmt.Errorf("Hit bottom")
-		Check(err)
+		Raise(fmt.Errorf("Hit bottom"))
 	}
 	return
 }
@@ -151,6 +195,13 @@ func recurseErrorReturn(depth int) (err error) {
 	}
 }
 
+// BenchmarkRewindTime times how long it takes to unwind a 1000
+// deep stack of recursive functions with each frame calling
+// the next via Check() and having a handler like:
+//
+//	defer Catch(&err)
+//
+// when the deepest call raises an error.
 func BenchmarkRewindTime(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		recurseErrorCatch(1000)
@@ -158,6 +209,29 @@ func BenchmarkRewindTime(b *testing.B) {
 	}
 }
 
+// BenchmarkNoErrorReturnTime times how long it takes to return from
+// a 1000 deep stack of recursive functions with each frame calling
+// the next via Try() and having a handler like:
+//
+//	defer Catch(&err)
+//
+// when the deepest call returns a value without an error.
+func BenchmarkNoErrorReturnTime(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		total, err := recurseNoErrorCatch(1000)
+		assert.Equal(b, 1000, total)
+		assert.NoError(b, err)
+		//assert.EqualError(b, err, "Hit bottom")
+	}
+}
+
+// BenchmarkCatchOnce times how long it takes to unwind a 1000
+// deep stack of recursive functions with only the first frame having
+// a handler like:
+//
+//	defer Catch(&err)
+//
+// when the deepest call raises an error.
 func BenchmarkCatchOnce(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		recurseErrorCatchOnce(0, 1000)
@@ -165,9 +239,45 @@ func BenchmarkCatchOnce(b *testing.B) {
 	}
 }
 
+// BenchmarkReturnTime times how long it takes to unwind a 1000
+// deep stack of recursive functions which employs traditional
+// error handling, when the deepest call returns an error.
 func BenchmarkReturnTime(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		recurseErrorReturn(1000)
 		//assert.EqualError(b, err, "Hit bottom")
+	}
+}
+
+// BenchmarkNoErrorCatch times how long it takes to process
+// a loop of 1000 successful Try() calls in a function with
+// a deferred error handler.
+func BenchmarkNoErrorCatch(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		count, err := loopNoErrorCatch(1000)
+		require.Equal(b, count, 1000)
+		require.Nil(b, err)
+	}
+}
+
+// BenchmarkNoErrorNoCatch times how long it takes to process
+// a loop of 1000 successful Try() calls in a function with
+// no error handler.
+func BenchmarkNoErrorNoCatch(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		count, err := loopNoErrorNoCatch(1000)
+		require.Equal(b, count, 1000)
+		require.Nil(b, err)
+	}
+}
+
+// BenchmarkNoError times how long it takes to process
+// a loop of 1000 successful function calls using
+// traditional error testing only.
+func BenchmarkNoError(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		count, err := loopNoError(1000)
+		require.Equal(b, count, 1000)
+		require.Nil(b, err)
 	}
 }

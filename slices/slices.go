@@ -1,6 +1,19 @@
 package slices
 
-import "sort"
+import (
+	"errors"
+	"fmt"
+	"runtime"
+	"sort"
+	"sync"
+
+	"github.com/robdavid/genutil-go/functions"
+	"github.com/robdavid/genutil-go/internal/rangehelper"
+	"github.com/robdavid/genutil-go/ordered"
+)
+
+var ErrInvalidRange = errors.New("invalid range")
+var ErrInvalidNumCPU = errors.New("invalid number of CPUs")
 
 // Concatenates a list of list of items into a list of items
 func Concat[T any](ss ...[]T) (result []T) {
@@ -10,6 +23,342 @@ func Concat[T any](ss ...[]T) (result []T) {
 		result = append(result, ss[i]...)
 	}
 	return
+}
+
+func reverse[T any](from, to []T) {
+	len := len(from)
+	for i := 0; i < len/2; i++ {
+		to[i], to[len-1-i] = from[len-1-i], from[i]
+	}
+	if len&1 != 0 && &from[0] != &to[0] {
+		mid := len / 2
+		to[mid] = from[mid]
+	}
+}
+
+/*
+ReverseI reverses the elements of s in place.
+
+	s := []int{1,2,3,4,5}
+	slices.Reverse(s)
+	s == []int{5,4,3,2,1} // true
+*/
+func ReverseI[T any](s []T) {
+	reverse(s, s)
+}
+
+/*
+Reverse creates a new slice containing all the elements
+of f in reverse order. If f is nil, nil will be returned.
+
+	slices.Reverse([]int{1,2,3,4,5}) // []int{5,4,3,2,1}
+*/
+func Reverse[T any](f []T) (t []T) {
+	if f != nil {
+		t = make([]T, len(f))
+		reverse(f, t)
+	}
+	return
+}
+
+func parChunks[T any](slice []T, minPar int, maxCpu int) (slices [][]T) {
+	if l := len(slice); l <= minPar {
+		return [][]T{slice}
+	} else {
+		var chunkSize int
+		if maxCpu < 1 {
+			panic(fmt.Errorf("%w: %d", ErrInvalidNumCPU, maxCpu))
+		}
+		idealCpu := l / minPar
+		if idealCpu <= maxCpu {
+			chunkSize = l / idealCpu
+		} else {
+			chunkSize = l / maxCpu
+		}
+		if l%chunkSize != 0 {
+			chunkSize++
+		}
+		slices = make([][]T, 0, l/chunkSize)
+		for pos := 0; pos < l; {
+			npos := pos + chunkSize
+			chunk := functions.IfElseF(npos < l,
+				func() []T { return slice[pos:npos] },
+				func() []T { return slice[pos:] })
+			slices = append(slices, chunk)
+			pos = npos
+		}
+		return
+	}
+}
+
+func sliceFill[T ordered.Real](start, aStep T, desc bool, slice []T) {
+	v := start
+	if desc {
+		for i := range slice {
+			slice[i] = v
+			v -= aStep
+		}
+	} else {
+		for i := range slice {
+			slice[i] = v
+			v += aStep
+		}
+	}
+}
+
+func parSliceFill[T ordered.Real](start, aStep T, desc bool, chunks [][]T) {
+	cstart := start
+	var wg sync.WaitGroup
+	for i := range chunks {
+		wg.Add(1)
+		n := i
+		cs := cstart
+		go func() {
+			defer wg.Done()
+			sliceFill(cs, aStep, desc, chunks[n])
+		}()
+		chunkStep := aStep * T(len(chunks[i]))
+		if desc {
+			cstart -= chunkStep
+		} else {
+			cstart += chunkStep
+		}
+	}
+	wg.Wait()
+}
+
+func rangeBy[T ordered.Real, S ordered.Real](start, end T, step S, inclusive bool, parThreshold int, maxCpu int) (result []T) {
+	if start == end {
+		if inclusive {
+			return []T{start}
+		} else {
+			return []T{}
+		}
+	}
+	if T(step) == 0 {
+		panic(fmt.Errorf("%w: step is zero", ErrInvalidRange))
+	}
+	if (step > 0 && end < start) || (step < 0 && end > start) {
+		panic(fmt.Errorf("%w: negative step or inverse range (but not both)", ErrInvalidRange))
+	}
+	size, aStep := rangehelper.RangeSize(start, end, step, inclusive)
+	result = make([]T, size)
+	if parThreshold < 1 {
+		sliceFill(start, aStep, step < 0, result)
+	} else {
+		chunks := parChunks(result, parThreshold, maxCpu)
+		if len(chunks) == 1 {
+			sliceFill(start, aStep, step < 0, result)
+		} else {
+			parSliceFill(start, aStep, step < 0, chunks)
+		}
+	}
+	return
+}
+
+// RangeBy generates a slice consisting of a sequence of real numbers. The
+// range starts at start and extends up to, but does not include, end.
+// The difference between each number will be determined by step.
+//
+// e.g.
+//
+//	slices.RangeBy(0, 5, 1) // []int{0, 1, 2, 3, 4}
+//
+// If the range is to be in descending order, the step should be negative
+// and start should be larger than end.
+//
+//	slices.RangeBy[uint](6, 0, -2) // []uint{6, 4, 2}
+//
+// If start is larger than end whilst step is positive, or if end is larger
+// than start whilst step is negative, the function panics. If start is equal to
+// end then an empty slice is returned.
+func RangeBy[T ordered.Real, S ordered.Real](start, end T, step S) (result []T) {
+	return rangeBy[T, S](start, end, step, false, 0, 0)
+}
+
+// IncRangeBy generates a slice consisting of a sequence of real numbers. The
+// range starts at start and extends up to, and includes, end.
+// The difference between each number will be determined by step.
+//
+// e.g.
+//
+//	slices.IncRangeBy(0, 5, 1) // []int{0, 1, 2, 3, 4, 5}
+//
+// If the range is to be in descending order, the step should be negative
+// and start should be larger than end.
+//
+//	slices.IncRangeBy[uint](6, 0, -2) // []uint{6, 4, 2, 0}
+//
+// If start is larger than end whilst step is positive, or if end is larger
+// than start whilst step is negative, the function panics. If start is equal to
+// end then a slice containing that value as its only element is returned.
+func IncRangeBy[T ordered.Real, S ordered.Real](start, end T, step S) (result []T) {
+	return rangeBy[T, S](start, end, step, true, 0, 0)
+}
+
+// Range generates a slice consisting of a sequence of real numbers. The
+// sequence begins at start and extends up to, but does not include, end.
+// Consecutive numbers in the sequence differ by 1 if end is greater than start,
+// and by -1 if end is less than start. If start and end are equal, an empty slice
+// is returned.
+//
+// e.g.
+//
+//	slices.Range(0, 5)         // []int{0, 1, 2, 3, 4}
+//	slices.RangeBy[uint](5, 0) // []uint{5, 4, 3, 2, 1}
+func Range[T ordered.Real](start, end T) []T {
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false, 0, 0)
+}
+
+// IncRange generates a slice consisting of a sequence of real numbers. The
+// sequence begins at start and extends up to, and includes, end.
+// Consecutive numbers in the sequence differ by 1 if end is greater than start,
+// and by -1 if end is less than start. If start and end are equal, a slice
+// containing that value as its only element is returned.
+//
+// e.g.
+//
+//	slices.IncRange(0, 5)       // []int{0, 1, 2, 3, 4, 5}
+//	slices.IncRange[uint](5, 0) // []uint{5, 4, 3, 2, 1, 0}
+func IncRange[T ordered.Real](start, end T) []T {
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true, 0, 0)
+}
+
+type parOptions struct {
+	threshold int
+	maxCpu    int
+}
+
+type ParOption func(*parOptions)
+
+func combineParOptions(opts []ParOption) parOptions {
+	result := parOptions{100000, runtime.NumCPU()}
+	for _, opt := range opts {
+		opt(&result)
+	}
+	return result
+}
+
+// ParThreshold is an option that defines the minimum size of a slice beyond which multiple goroutine
+// threads will be used to populate a slice in a Par*Range* function. Defaults to 100000.
+func ParThreshold(threshold int) ParOption { return func(o *parOptions) { o.threshold = threshold } }
+
+// ParMaxCpu is the maximum number of goroutine threads to use to populate a slice range in parallel
+// in a Par*Range* function. Defaults to `runtime.MaxCPU()`.
+func ParMaxCpu(maxCpu int) ParOption { return func(o *parOptions) { o.maxCpu = maxCpu } }
+
+// ParRange generates a slice consisting of a sequence of real numbers, potentially using
+// multiple parallel go routines to accelerate the process on multi core systems.
+//
+// The sequence begins at start and extends up to, but does not include, end.
+// Consecutive numbers in the sequence differ by 1 if end is greater than start,
+// and by -1 if end is less than start. If start and end are equal, an empty slice
+// is returned.
+//
+// e.g.
+//
+//	slices.ParRange(0, 400000)    // []int{0, 1, 2, 3, 4, ..., 399999}
+//
+// If the number of requested elements exceeds a given threshold - by default 100,000 - multiple
+// goroutines will be launched in parallel, each tasked with filling a different part of the slice.
+// The parOpts variadic parameter is used to control this threshold and the maximum number of goroutines
+// used. The number of goroutines ought not exceed the number of logical CPU cores available.
+//
+// e.g.
+//
+//	slices.ParRange(0, 400000, ParThreshold(100000), ParMaxCpu(4))
+func ParRange[T ordered.Real](start, end T, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), false, opts.threshold, opts.maxCpu)
+}
+
+// ParIncRange generates a slice consisting of a sequence of real numbers, potentially using
+// multiple parallel go routines to accelerate the process on multi core systems.
+//
+// The sequence begins at start and extends up to, and includes, end.
+// Consecutive numbers in the sequence differ by 1 if end is greater than start,
+// and by -1 if end less than start. If start and end are equal, a slice
+// containing that value as its only element is returned.
+//
+// e.g.
+//
+//	slices.ParIncRange(0, 400000)    // []int{0, 1, 2, 3, 4, ..., 400000}
+//
+// If the number of requested elements exceeds a given threshold - by default 100,000 - multiple
+// goroutines will be launched in parallel, each tasked with filling a different part of the slice.
+// The parOpts variadic parameter is used to control this threshold and the maximum number of goroutines
+// used. The number of goroutines ought not exceed the number of logical CPU cores available.
+//
+// e.g.
+//
+//	slices.ParIncRange(0, 400000, ParThreshold(100000), ParMaxCpu(4))
+func ParIncRange[T ordered.Real](start, end T, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, functions.IfElse(end < start, -1, 1), true, opts.threshold, opts.maxCpu)
+}
+
+// ParRangeBy generates a slice consisting of a sequence of real numbers, potentially using
+// multiple parallel go routines to accelerate the process on multi core systems.
+//
+// The sequence begins at start and extends up to, but does not include, end.
+// The difference between each number will be determined by step.
+//
+// e.g.
+//
+//	slices.ParRangeBy(0, 400000, 1) // []int{0, 1, 2, 3, ..., 399998, 399999}
+//
+// If the range is to be in descending order, the step should be negative
+// and start should be larger than end.
+//
+//	slices.ParRangeBy[uint](400000, 0, -2) // []uint{400000, 399998, 399996, ..., 4, 2}
+//
+// If start is larger than end whilst step is positive, or if end is larger
+// than start whilst step is negative, the function panics. If start and end are equal,
+// an empty slice is returned.
+//
+// If the number of requested elements exceeds a given threshold - by default 100,000 - multiple
+// goroutines will be launched in parallel, each tasked with filling a different part of the slice.
+// The parOpts variadic parameter can be used to control this threshold and the maximum number of goroutines
+// used. The number of goroutines ought not exceed the number of logical CPU cores available.
+//
+// e.g.
+//
+//	slices.ParRangeBy(0, 400000, 1, ParThreshold(100000), ParMaxCpu(4))
+func ParRangeBy[T ordered.Real, S ordered.Real](start, end T, step S, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, step, false, opts.threshold, opts.maxCpu)
+}
+
+// ParIncRangeBy generates a slice consisting of a sequence of real numbers, potentially using
+// multiple parallel go routines to accelerate the process on multi core systems.
+//
+// The range begins at start and extends up to, and including, end.
+// The difference between each number will be determined by step.
+//
+// e.g.
+//
+//	slices.ParIncRangeBy(0, 400000, 1) // []int{0, 1, 2, 3, ..., 399999, 400000}
+//
+// If the range is to be in descending order, the step should be negative
+// and start should be larger than end.
+//
+//	slices.ParIncRangeBy[uint](400000, 0, -2) // []uint{400000, 399998, 399996, ..., 2, 0}
+//
+// If start is larger than end whilst step is positive, or if end is larger
+// than start whilst step is negative, the function panics. If start and end are equal,
+// a slice containing that value as its only element is returned.
+//
+// If the number of requested elements exceeds a given threshold - by default 100,000 - multiple
+// goroutines will be launched in parallel, each tasked with filling a different part of the slice.
+// The parOpts variadic parameter can be used to control this threshold and the maximum number of goroutines
+// used. The number of goroutines ought not exceed the number of logical CPU cores available.
+//
+// e.g.
+//
+//	slices.ParIncRangeBy(0, 400000, 1, ParThreshold(100000), ParMaxCpu(4))
+func ParIncRangeBy[T ordered.Real, S ordered.Real](start, end T, step S, parOpts ...ParOption) []T {
+	opts := combineParOptions(parOpts)
+	return rangeBy(start, end, step, true, opts.threshold, opts.maxCpu)
 }
 
 // Returns true if predicate returns true for all elements in
@@ -23,7 +372,7 @@ func All[T any](slice []T, predicate func(v T) bool) bool {
 	return true
 }
 
-// Returns true if predicate returns true for at least one element in
+// Returns true if predicate returns true for all the elements in
 // slice. This is a variation on All in which the predicate function
 // takes a pointer to the element.
 func AllRef[T any](slice []T, predicate func(v *T) bool) bool {
