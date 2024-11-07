@@ -768,7 +768,7 @@ func (sbf SortableByFunction[T]) Less(i, j int) bool {
 
 // Sorts a slice by using a function to determine ordering. The
 // less parameter is a function of two elements of type T that should
-// return true if the first is less then (should be ordered before) the second.
+// return true if the first is less than (should be ordered before) the second.
 // The slice is sorted in place.
 func SortUsing[T any](slice []T, less func(T, T) bool) {
 	sort.Sort(SortableByFunction[T]{slice, less})
