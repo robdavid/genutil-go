@@ -613,3 +613,8 @@ func TestNonIntegerReverseRange(t *testing.T) {
 	assert.Equal(t, reversed, RangeBy(2.0, -0.5, -0.5))
 	//assert.Equal(t, reversed, RangeBy(2.5, 0.0, 0.5))
 }
+
+func TestFilled(t *testing.T) {
+	f := Filled(5, byte('-'))
+	assert.Equal(t, []byte{'-', '-', '-', '-', '-'}, f)
+}

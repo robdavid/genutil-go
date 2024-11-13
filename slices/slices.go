@@ -773,3 +773,18 @@ func (sbf SortableByFunction[T]) Less(i, j int) bool {
 func SortUsing[T any](slice []T, less func(T, T) bool) {
 	sort.Sort(SortableByFunction[T]{slice, less})
 }
+
+// Fill fills an existing slice with a specified value
+func Fill[T any](slice []T, value T) {
+	for i := range slice {
+		slice[i] = value
+	}
+}
+
+// Filled returns a new slice, of the given size, filled with a
+// given value.
+func Filled[T any](size int, value T) []T {
+	slice := make([]T, size)
+	Fill(slice, value)
+	return slice
+}
