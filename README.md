@@ -510,7 +510,7 @@ Any(input2, func(r rune) bool { return r == '!'}) // true
 
 #### Transformations
 
-The functional programming primitives of `Map`, `Filter` and `Fold` are available.
+The functional primitives of `Map`, `Filter` and `Fold` are available.
 
 The `Map` function creates a new slice by transforming all the elements of an existing slice by applying a function to each element.
 
