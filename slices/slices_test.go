@@ -407,7 +407,7 @@ func TestLargeInclusiveFloatRange(t *testing.T) {
 		assert.Equal(t, v, e)
 		v += 0.25
 	}
-	assert.Equal(t, iterator.Collect(iterator.IncRangeBy(0.0, 1000000, 0.25)), r)
+	assert.Equal(t, iterator.Collect(iterator.IncRangeBy(0.0, 1000000.0, 0.25)), r)
 }
 
 func TestLargeInclusiveIntRange(t *testing.T) {
@@ -558,6 +558,17 @@ func TestParRangeExample(t *testing.T) {
 	assert.Equal(t, uint(2), last)
 }
 
+func TestParRangeExample2(t *testing.T) {
+	actual := ParRange(0, 400000)
+	assert.Equal(t, 400000, len(actual))
+	var last int
+	for i, v := range actual {
+		assert.Equal(t, i, v)
+		last = v
+	}
+	assert.Equal(t, 399999, last)
+}
+
 func TestParIncRangeExample(t *testing.T) {
 	actual := ParIncRangeBy[uint](400000, 0, -2)
 	assert.Equal(t, 200001, len(actual))
@@ -601,4 +612,9 @@ func TestNonIntegerReverseRange(t *testing.T) {
 	reversed := Reverse(RangeBy(0.0, 2.5, 0.5))
 	assert.Equal(t, reversed, RangeBy(2.0, -0.5, -0.5))
 	//assert.Equal(t, reversed, RangeBy(2.5, 0.0, 0.5))
+}
+
+func TestFilled(t *testing.T) {
+	f := Filled(5, byte('-'))
+	assert.Equal(t, []byte{'-', '-', '-', '-', '-'}, f)
 }

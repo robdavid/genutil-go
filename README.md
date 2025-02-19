@@ -510,7 +510,7 @@ Any(input2, func(r rune) bool { return r == '!'}) // true
 
 #### Transformations
 
-The functional programming primitives of `Map`, `Filter` and `Fold` are available.
+The functional primitives of `Map`, `Filter` and `Fold` are available.
 
 The `Map` function creates a new slice by transforming all the elements of an existing slice by applying a function to each element.
 
@@ -567,4 +567,25 @@ slices.RangeBy(2.0, 0.0, -0.5) // []float64{2.0, 1.5, 1.0, 0.5}
 
 ```
 
-For very large ranges, if needed, functions are available for generating different parts of the range across multiple processor cores in parallel.  The `ParRange` 
+For very large ranges, if needed, functions are available for generating different parts of the range across multiple processor cores in parallel.  The `ParRange` function works like range, except it will try to accelerate it's execution for large ranges, across multiple cores.
+
+```go
+slices.ParRange(0, 400000) // []int{0, 1, 2, ..., 399999}
+```
+
+The function takes some optional parameters that control how the activities are parallelised. 
+
+```go
+slices.ParRange(0, 400000, ParThreshold(100000), ParMaxCpu(4))
+```
+
+The `ParThreshold` function controls the threshold beyond which the population of the slice is broken up in to parallel chunks; a range size below this value will be handled as a single chunk. The default value is 100000. The `ParMaxCpu` function controls the maximum number of parallel chunks. By default this is the number of CPU cores has; a number larger than this will typically result in lower performance.
+
+As well as `ParRange` there are parallel range functions for each of the non-parallel ones, i.e. the following functions exist:
+
+* `ParRange`
+* `ParIncRange`
+* `ParRangeBy`
+* `ParIncRangeBy`
+
+

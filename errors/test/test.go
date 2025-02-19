@@ -5,6 +5,7 @@ package test
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/robdavid/genutil-go/errors/handler"
@@ -15,6 +16,7 @@ import (
 // An interface implemented by multiple types in the "testing" package
 type TestReporting interface {
 	Error(args ...any)
+	Errorf(format string, args ...any)
 	FailNow()
 	Helper()
 }
@@ -105,6 +107,81 @@ func (r *TestableResult[T]) FailsContaining(t TestReporting, expected string) *T
 	return r
 }
 
+type stackFrame struct {
+	file     string
+	line     int
+	function string
+}
+
+func (frame *stackFrame) String() string {
+	return fmt.Sprintf("%s:%d %s", frame.file, frame.line, frame.function)
+}
+
+func (frame *stackFrame) packageName() string {
+	packageLast := strings.LastIndex(frame.function, "/")
+	if packageLast < 0 {
+		return frame.function
+	}
+	functionStart := strings.Index(frame.function[packageLast:], ".")
+	if functionStart < 0 {
+		return frame.function
+	}
+	return frame.function[:packageLast+functionStart]
+}
+
+func callStack(size int) []stackFrame {
+	callers := make([]uintptr, size)
+	n := runtime.Callers(1, callers)
+	frames := runtime.CallersFrames(callers[:n])
+	stackFrames := make([]stackFrame, 0, n)
+	for frame, _ := frames.Next(); frame.PC != 0; frame, _ = frames.Next() {
+		stackFrames = append(stackFrames, stackFrame{
+			file:     frame.File,
+			line:     frame.Line,
+			function: frame.Function,
+		})
+	}
+	return stackFrames
+}
+
+func trimCallStack(frames []stackFrame) []stackFrame {
+	const (
+		lookForTry = iota
+		lookForEndOfHandling
+	)
+	lookFor := lookForTry
+	tryFuntionPath := handler.PackageName() + ".Try"
+	for i, frame := range frames {
+		switch lookFor {
+		case lookForTry:
+			// Look for Try frame
+			if strings.HasPrefix(frame.function, tryFuntionPath) {
+				lookFor = lookForEndOfHandling
+			}
+		case lookForEndOfHandling:
+			// Look for end of calls in handler or result package
+			pkg := frame.packageName()
+			if pkg != handler.PackageName() &&
+				pkg != result.PackageName() {
+				return frames[i:]
+			}
+		}
+	}
+	return frames
+}
+
+const maxStackDepth = 255
+
+func logStack(t TestReporting) {
+	frames := callStack(maxStackDepth)
+	frames = trimCallStack(frames)
+	var trace strings.Builder
+	for _, frame := range frames {
+		fmt.Fprintln(&trace, frame.String())
+	}
+	t.Errorf("stack trace\n%s\n", trace.String())
+}
+
 // Reports any error encountered in a call to Try().
 // Should be used as part of a defer call.
 // e.g.
@@ -115,6 +192,7 @@ func ReportErr(t TestReporting) {
 	t.Helper()
 	if err := recover(); err != nil {
 		if tryErr, ok := err.(handler.TryError); ok {
+			logStack(t)
 			t.Error(tryErr.Error)
 		} else {
 			panic(err)
