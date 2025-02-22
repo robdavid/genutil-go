@@ -315,6 +315,16 @@ func (o *Option[T]) Clear() {
 	o.nonEmpty = false
 }
 
+// Makes the given option non-empty. If it is empty, it will
+// become a non-empty zero value. Otherwise it will remain
+// unchanged. The reference passed in is returned. Normal use case is
+// mutation of an empty value to a non-empty one with data, in conjunction
+// with the Mutate method.
+func (o *Option[T]) Ensure() *Option[T] {
+	o.nonEmpty = true
+	return o
+}
+
 // Map applies a function to the non-empty value of an Option.
 // If the option is non-empty, the function is applied
 // to it's value, and the result wrapped in an Option
@@ -403,6 +413,7 @@ func (o *Option[T]) ElseRef(f func()) {
 
 // Morph, inspired by the concept of [Endomorphism]: https://en.wikipedia.org/wiki/Endomorphism,
 // maps an Option value, if non-empty, to another value of the same type, wrapped in an Option.
+// If the passed Option value is empty, the same empty option is returned unchanged,
 // Mapping to values of different types via methods is not possible due to limitations in Go
 // generics. For this use the option.Map function.
 func (o Option[T]) Morph(f func(T) T) Option[T] {
@@ -416,7 +427,8 @@ func (o Option[T]) Morph(f func(T) T) Option[T] {
 // MorphRef, inspired by the concept of [Endomorphism]: https://en.wikipedia.org/wiki/Endomorphism,
 // maps a pointer to an Option value, if non-empty, to another value of the same type, wrapped in
 // in Option, returned as a pointer to the Option. The mapping function takes and returns pointers
-// to the underlying value, where present.
+// to the underlying value, where present. If the passed Option reference is empty, the same reference
+// is returned.
 // Mapping to values of different types via methods is not possible due to limitations in Go
 // generics. For this use the option.Map function.
 func (o *Option[T]) MorphRef(f func(*T) *T) *Option[T] {

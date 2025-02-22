@@ -2,7 +2,7 @@
 
 ---
 
-# DOCUMENTATION WORK IN PROGRESS
+## DOCUMENTATION WORK IN PROGRESS
 
 ---
 
@@ -12,6 +12,7 @@ See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go) f
 
 The library falls into a number of categories, subdivided into separate packages.
 
+- [DOCUMENTATION WORK IN PROGRESS](#documentation-work-in-progress)
 - [Tuple](#tuple)
 - [Errors](#errors)
   - [Handler](#handler)
@@ -36,6 +37,10 @@ The library falls into a number of categories, subdivided into separate packages
     - [Predicate functions](#predicate-functions)
     - [Transformations](#transformations)
   - [Range functions](#range-functions)
+- [Option type](#option-type)
+  - [Usage](#usage)
+  - [Zero value](#zero-value)
+  - [Comparisons](#comparisons)
 
 ## Tuple
 
@@ -587,5 +592,68 @@ As well as `ParRange` there are parallel range functions for each of the non-par
 * `ParIncRange`
 * `ParRangeBy`
 * `ParIncRangeBy`
+
+## Option type
+
+Option types are used to hold "nullable" values whilst providing a greater degree of null safety than simple pointers. An option either holds a value (referred to as non-empty) or holds nothing (an empty option). Option types avoid potential additional heap allocation by avoiding the use of a pointer; they are implemented as an underlying value plus a boolean flag. They are particularly useful for representing nullable basic types.
+
+### Usage
+
+A simple option value can be created with the `Value` function.
+
+```go
+optInt := option.Value(10) // optInt is a non-empty option.Option[int] type
+```
+
+This creates a "non-empty" option holding an `int` value. Options implement the `Stringer` interface, so they can be printed directly.
+
+```go
+message := fmt.Sprintf("Hello %s", option.Value("world")) // message == "Hello world"
+```
+
+However, the underlying value cannot be accessed directly but only via access methods. This is to encourage the programmer to give adequate attention to the empty case. The `Get` method will return the value of a non-empty option but it will panic if the option is empty. The `IsEmpty` method can be used to detect the empty case. Consider the following function adding a number to an option.Option[int].
+
+```go
+func optAdd(o option.Option[int], n int) option.Option[int] {
+  if o.IsEmpty() {
+    return option.Empty[int]()
+  } else {
+    return option.Value(o.Get() + n)
+  }
+}
+```
+
+The function is using `IsEmpty` to validate the option is non-empty before attempting to access the value with `Get`. It returns an option as a result as it may return no value if there is no value in the option supplied. If a value is supplied, an option is returned with result of the addition. This kind of pattern is actually quite common and the option library has utility functions to perform this kind of option chaining. The effect of the above function can be achieved with the `Morph` method that applies a function to a non empty option.
+
+```go
+func optAdd(o option.Option[int], n int) option.Option[int] {
+  return o.Morph(func (x int) int { return x + n })
+}
+```
+
+An alternative approach, if the option is expected to be non-empty and is an error otherwise, is to access the value with a `Try` method.
+
+```go
+func optAdd(o option.Option[int], n int) (result int, err error) {
+  defer Catch(&err)
+  result = o.Try() + n
+  return
+}
+```
+
+Here the `Catch` function in the error handling package is used to ensure the function just returns an error value in response to an unexpectedly empty option rather than causing panics. The error returned with be `option.ErrOptionIsEmpty`. This kind of approach can be especially useful in functions that process a number of options which should not be empty. It is not recommended for options for which empty values are a non-exceptional condition due to the extra overhead of handling the error processing path.
+
+### Zero value
+
+The zero value of an option is empty. For example.
+
+``` go
+var zero Option[int]
+fmt.Println(zero.IsEmpty()) // true
+```
+
+### Comparisons
+
+Two options of the same type can be compared successfully with `==` provided the underlying types can be likewise compared. An empty option will always compare as not equal to a non-empty one.
 
 

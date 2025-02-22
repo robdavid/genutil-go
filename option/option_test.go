@@ -71,6 +71,11 @@ func TestEmpty(t *testing.T) {
 	assert.True(t, vm.IsEmpty())
 }
 
+func TestZero(t *testing.T) {
+	var zero Option[int]
+	assert.True(t, zero.IsEmpty())
+}
+
 func TestNewStruct(t *testing.T) {
 	opt := New[struct {
 		num  int
@@ -275,6 +280,32 @@ func TestMutate(t *testing.T) {
 	assert.Equal(0, nopt.GetOrZero())
 }
 
+func TestCompare(t *testing.T) {
+	assert := assert.New(t)
+	type nv struct{ name, value string }
+	var opt1, opt2 Option[nv]
+	assert.True(opt1 == opt2)
+	opt1.Ensure()
+	assert.False(opt1 == opt2)
+	opt2.Ensure()
+	assert.True(opt1 == opt2)
+	opt1.Set(nv{"name", "value"})
+	assert.False(opt1 == opt2)
+	opt2.Set(nv{"name", "value"})
+	assert.True(opt1 == opt2)
+}
+
+func TestMutateFromEmpty(t *testing.T) {
+	assert := assert.New(t)
+	type nv struct{ name, value string }
+	opt := Empty[nv]()
+	opt.Ensure().Mutate(func(n *nv) {
+		n.name = "name"
+		n.value = "value"
+	})
+	assert.Equal(Value(nv{"name", "value"}), opt)
+}
+
 func TestThenElse(t *testing.T) {
 	const (
 		none int = iota
@@ -318,6 +349,11 @@ func TestPrintFormatting(t *testing.T) {
 	assert.Equal(t, "String is 5 by 5 and num is 25", actual)
 	actual = fmt.Sprintf("String is %s and num is %s", Empty[string](), Empty[int]())
 	assert.Equal(t, "String is  and num is ", actual)
+}
+
+func TestPrintExample(t *testing.T) {
+	actual := fmt.Sprintf("Hello %s", Value("world"))
+	assert.Equal(t, "Hello world", actual)
 }
 
 func TestJSONMarshallOmitOption(t *testing.T) {
