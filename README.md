@@ -41,6 +41,8 @@ The library falls into a number of categories, subdivided into separate packages
   - [Usage](#usage)
   - [Zero value](#zero-value)
   - [Comparisons](#comparisons)
+  - [Mutations](#mutations)
+  - [Marshalling and Unmarshalling](#marshalling-and-unmarshalling)
 
 ## Tuple
 
@@ -647,7 +649,7 @@ Here the `Catch` function in the error handling package is used to ensure the fu
 
 The zero value of an option is empty. For example.
 
-``` go
+```go
 var zero Option[int]
 fmt.Println(zero.IsEmpty()) // true
 ```
@@ -656,4 +658,19 @@ fmt.Println(zero.IsEmpty()) // true
 
 Two options of the same type can be compared successfully with `==` provided the underlying types can be likewise compared. An empty option will always compare as not equal to a non-empty one.
 
+### Mutations
 
+If you are wrapping a `struct` inside an option, there are methods that allow mutation in place, avoiding any need for wholesale copying of structure data. The `Ensure` method will set a given option to non-empty, if it isn't already, and `Mutate` allows actions to be performed against a non-empty option value. These together allows an empty option containing no data to be mutated to contain any desired values.
+
+```go
+type nv struct{ name, value string }
+opt := Empty[nv]()
+opt.Ensure().Mutate(func(n *nv) {
+  n.name = "name"
+  n.value = "value"
+})
+```
+
+### Marshalling and Unmarshalling
+
+Option values support being marshalled and unmarshalled to and from JSON and YAML representations.
