@@ -41,6 +41,7 @@ The library falls into a number of categories, subdivided into separate packages
   - [Usage](#usage)
   - [Zero value](#zero-value)
   - [Comparisons](#comparisons)
+  - [Marshalling and Unmarshalling](#marshalling-and-unmarshalling)
 
 ## Tuple
 
@@ -641,7 +642,7 @@ func optAdd(o option.Option[int], n int) (result int, err error) {
 }
 ```
 
-Here the `Catch` function in the error handling package is used to ensure the function just returns an error value in response to an unexpectedly empty option rather than causing panics. The error returned with be `option.ErrOptionIsEmpty`. This kind of approach can be especially useful in functions that process a number of options which should not be empty. It is not recommended for options for which empty values are a non-exceptional condition due to the extra overhead of handling the error processing path.
+Here the `Catch` function in the error handling package is used to ensure the function just returns an error value in response to an unexpectedly empty option rather than causing panics. The error returned will be `option.ErrOptionIsEmpty`. This kind of approach can be especially useful in functions that process a number of options which should not be empty. It is not recommended for options for which empty values are a non-exceptional condition due to the extra overhead of handling the error processing path.
 
 ### Zero value
 
@@ -655,5 +656,49 @@ fmt.Println(zero.IsEmpty()) // true
 ### Comparisons
 
 Two options of the same type can be compared successfully with `==` provided the underlying types can be likewise compared. An empty option will always compare as not equal to a non-empty one.
+
+### Marshalling and Unmarshalling
+
+Option types support marshalling and unmarshalling via the `encoding/json` or `gopkg.in/yaml.v2` packages. Note that `yaml.v3` is not yet supported. A non-empty option is marshalled as simply the value it contains in both JSON and YAML, e.g.
+
+```go
+type testOptMarshall struct {
+  Name  Option[string] `json:"name,omitempty" yaml:"name,omitempty"`
+  Value Option[int]    `json:"value,omitempty" yaml:"value,omitempty"`
+}
+```
+
+```go
+testData := testOptMarshall{
+  Name:  Value("a name"),
+  Value: Value(123),
+}
+y := Try(json.Marshal(&testData))
+text := string(y) // "{\"name\":\"a name\",\"value\":123}"
+```
+
+For JSON, empty options are rendered as "null":
+
+```go
+testData := testOptMarshall{
+  Name:  Value("a name"),
+  Value: Empty[int](),
+}
+y := Try(json.Marshal(&testData))
+text := string(y) // "{\"name\":\"a name\",\"value\":null}"
+```
+
+However, rendering as YAML honours the `omitempty` annotation if present, and empty values will be omitted:
+
+```go
+testData := testOptMarshall{
+  Name:  Value("a name"),
+  Value: Empty[int](),
+}
+y := Try(json.Marshal(&testData))
+text := string(y) // "name: a name\n"
+```
+
+
 
 
