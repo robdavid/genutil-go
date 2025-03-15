@@ -42,6 +42,7 @@ The library falls into a number of categories, subdivided into separate packages
   - [Zero value](#zero-value)
   - [Comparisons](#comparisons)
   - [Marshalling and Unmarshalling](#marshalling-and-unmarshalling)
+    - [Unmarshalling](#unmarshalling)
 
 ## Tuple
 
@@ -677,7 +678,7 @@ y := Try(json.Marshal(&testData))
 text := string(y) // "{\"name\":\"a name\",\"value\":123}"
 ```
 
-For JSON, empty options are rendered as "null":
+Empty options are rendered as "null":
 
 ```go
 testData := testOptMarshall{
@@ -688,7 +689,7 @@ y := Try(json.Marshal(&testData))
 text := string(y) // "{\"name\":\"a name\",\"value\":null}"
 ```
 
-However, rendering as YAML honours the `omitempty` annotation if present, and empty values will be omitted:
+However, when rendering YAML, the `omitempty` annotation is present, and empty values will be omitted:
 
 ```go
 testData := testOptMarshall{
@@ -699,6 +700,19 @@ y := Try(json.Marshal(&testData))
 text := string(y) // "name: a name\n"
 ```
 
+This is unfortunately not true of JSON marshalling, due to limitations of the `json.Marshalling` interface.
+#### Unmarshalling
 
+When unmarshalling to option values, omitted keys and `null` values in JSON or YAML are unmarshalled as an empty option.
+
+Eg unmarshalling YAML:
+
+```go
+const input := "name: a name\n"
+var unmarshalledData testOptMarshall
+Try0(yaml.Unmarshall([]byte(input), &unmarshalledData))
+unmarshalled.Name.HasValue()  // true
+unmarshalled.Value.HasValue() // false
+```
 
 
