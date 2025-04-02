@@ -1,18 +1,11 @@
 # genutil-go - A generics utility library for Go
 
----
-
-## DOCUMENTATION WORK IN PROGRESS
-
----
-
-A library of utility functions made possible by Go generics, providing features missing from the standard libraries. This library is still in its early stages, and breaking changes are still possible. Additional functionality is likely to be added.
+A library of utility functions made possible by Go generics, providing features previously missing from the standard libraries. This library is still in its early stages, and breaking changes are still possible. Additional functionality is likely to be added.
 
 See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go) for more details.
 
 The library falls into a number of categories, subdivided into separate packages.
 
-- [DOCUMENTATION WORK IN PROGRESS](#documentation-work-in-progress)
 - [Tuple](#tuple)
 - [Errors](#errors)
   - [Handler](#handler)
@@ -661,7 +654,7 @@ Two options of the same type can be compared successfully with `==` provided the
 
 ### Mutations
 
-If you are wrapping a `struct` inside an option, there are methods that allow mutation in place, avoiding any need for wholesale copying of structure data. The `Ensure` method will set a given option to non-empty, if it isn't already, and `Mutate` allows actions to be performed against a non-empty option value. These together allows an empty option containing no data to be mutated to contain any desired values.
+If you are wrapping a `struct` inside an option, there are methods that allow mutation in place, avoiding any need for wholesale copying of the struct data. The `Ensure` method will set a given option to non-empty, if it isn't already, and `Mutate` allows updates to be performed against a non-empty option value (against an empty option, it is a no-op). These together allows an empty option containing no data to be mutated to contain any desired values.
 
 ```go
 type nv struct{ name, value string }
@@ -703,7 +696,7 @@ y := Try(json.Marshal(&testData))
 text := string(y) // "{\"name\":\"a name\",\"value\":null}"
 ```
 
-However, when rendering YAML, the `omitempty` annotation is present, and empty values will be omitted:
+However, when rendering YAML, and the `omitempty` annotation is present, any empty values will be omitted:
 
 ```go
 testData := testOptMarshall{
