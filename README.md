@@ -1,12 +1,6 @@
 # genutil-go - A generics utility library for Go
 
----
-
-# DOCUMENTATION WORK IN PROGRESS
-
----
-
-A library of utility functions made possible by Go generics, providing features missing from the standard libraries. This library is still in its early stages, and breaking changes are still possible. Additional functionality is likely to be added.
+A library of utility functions made possible by Go generics, providing features previously missing from the standard libraries. This library is still in its early stages, and breaking changes are still possible. Additional functionality is likely to be added.
 
 See the [API Documentation](https://pkg.go.dev/github.com/robdavid/genutil-go) for more details.
 
@@ -36,6 +30,13 @@ The library falls into a number of categories, subdivided into separate packages
     - [Predicate functions](#predicate-functions)
     - [Transformations](#transformations)
   - [Range functions](#range-functions)
+- [Option type](#option-type)
+  - [Usage](#usage)
+  - [Zero value](#zero-value)
+  - [Comparisons](#comparisons)
+  - [Mutations](#mutations)
+  - [Marshalling and Unmarshalling](#marshalling-and-unmarshalling)
+    - [Unmarshalling](#unmarshalling)
 
 ## Tuple
 
@@ -510,7 +511,7 @@ Any(input2, func(r rune) bool { return r == '!'}) // true
 
 #### Transformations
 
-The functional programming primitives of `Map`, `Filter` and `Fold` are available.
+The functional primitives of `Map`, `Filter` and `Fold` are available.
 
 The `Map` function creates a new slice by transforming all the elements of an existing slice by applying a function to each element.
 
@@ -588,4 +589,135 @@ As well as `ParRange` there are parallel range functions for each of the non-par
 * `ParRangeBy`
 * `ParIncRangeBy`
 
+## Option type
 
+Option types are used to hold "nullable" values whilst providing a greater degree of null safety than simple pointers. An option either holds a value (referred to as non-empty) or holds nothing (an empty option). Option types avoid potential additional heap allocation by avoiding the use of a pointer; they are implemented as an underlying value plus a boolean flag. They are particularly useful for representing nullable basic types.
+
+### Usage
+
+A simple option value can be created with the `Value` function.
+
+```go
+optInt := option.Value(10) // optInt is a non-empty option.Option[int] type
+```
+
+This creates a "non-empty" option holding an `int` value. Options implement the `Stringer` interface, so they can be printed directly.
+
+```go
+message := fmt.Sprintf("Hello %s", option.Value("world")) // message == "Hello world"
+```
+
+However, the underlying value cannot be accessed directly but only via access methods. This is to encourage the programmer to give adequate attention to the empty case. The `Get` method will return the value of a non-empty option but it will panic if the option is empty. The `IsEmpty` method can be used to detect the empty case. Consider the following function adding a number to an option.Option[int].
+
+```go
+func optAdd(o option.Option[int], n int) option.Option[int] {
+  if o.IsEmpty() {
+    return option.Empty[int]()
+  } else {
+    return option.Value(o.Get() + n)
+  }
+}
+```
+
+The function is using `IsEmpty` to validate the option is non-empty before attempting to access the value with `Get`. It returns an option as a result as it may return no value if there is no value in the option supplied. If a value is supplied, an option is returned with result of the addition. This kind of pattern is actually quite common and the option library has utility functions to perform this kind of option chaining. The effect of the above function can be achieved with the `Morph` method that applies a function to a non empty option.
+
+```go
+func optAdd(o option.Option[int], n int) option.Option[int] {
+  return o.Morph(func (x int) int { return x + n })
+}
+```
+
+An alternative approach, if the option is expected to be non-empty and is an error otherwise, is to access the value with a `Try` method.
+
+```go
+func optAdd(o option.Option[int], n int) (result int, err error) {
+  defer Catch(&err)
+  result = o.Try() + n
+  return
+}
+```
+
+Here the `Catch` function in the error handling package is used to ensure the function just returns an error value in response to an unexpectedly empty option rather than causing panics. The error returned will be `option.ErrOptionIsEmpty`. This kind of approach can be especially useful in functions that process a number of options which should not be empty. It is not recommended for options for which empty values are a non-exceptional condition due to the extra overhead of handling the error processing path.
+
+### Zero value
+
+The zero value of an option is empty. For example.
+
+```go
+var zero Option[int]
+fmt.Println(zero.IsEmpty()) // true
+```
+
+### Comparisons
+
+Two options of the same type can be compared successfully with `==` provided the underlying types can be likewise compared. An empty option will always compare as not equal to a non-empty one.
+
+### Mutations
+
+If you are wrapping a `struct` inside an option, there are methods that allow mutation in place, avoiding any need for wholesale copying of the struct data. The `Ensure` method will set a given option to non-empty, if it isn't already, and `Mutate` allows updates to be performed against a non-empty option value (against an empty option, it is a no-op). These together allows an empty option containing no data to be mutated to contain any desired values.
+
+```go
+type nv struct{ name, value string }
+opt := Empty[nv]()
+opt.Ensure().Mutate(func(n *nv) {
+  n.name = "name"
+  n.value = "value"
+})
+```
+
+### Marshalling and Unmarshalling
+
+Option types support marshalling and unmarshalling via the `encoding/json` or `gopkg.in/yaml.v2` packages. Note that `yaml.v3` is not yet supported. A non-empty option is marshalled as simply the value it contains in both JSON and YAML, e.g.
+
+```go
+type testOptMarshall struct {
+  Name  Option[string] `json:"name,omitempty" yaml:"name,omitempty"`
+  Value Option[int]    `json:"value,omitempty" yaml:"value,omitempty"`
+}
+```
+
+```go
+testData := testOptMarshall{
+  Name:  Value("a name"),
+  Value: Value(123),
+}
+y := Try(json.Marshal(&testData))
+text := string(y) // "{\"name\":\"a name\",\"value\":123}"
+```
+
+Empty options are rendered as "null":
+
+```go
+testData := testOptMarshall{
+  Name:  Value("a name"),
+  Value: Empty[int](),
+}
+y := Try(json.Marshal(&testData))
+text := string(y) // "{\"name\":\"a name\",\"value\":null}"
+```
+
+However, when rendering YAML, and the `omitempty` annotation is present, any empty values will be omitted:
+
+```go
+testData := testOptMarshall{
+  Name:  Value("a name"),
+  Value: Empty[int](),
+}
+y := Try(json.Marshal(&testData))
+text := string(y) // "name: a name\n"
+```
+
+This is unfortunately not true of JSON marshalling, due to limitations of the `json.Marshalling` interface.
+#### Unmarshalling
+
+When unmarshalling to option values, omitted keys and `null` values in JSON or YAML are unmarshalled as an empty option.
+
+Eg unmarshalling YAML:
+
+```go
+const input := "name: a name\n"
+var unmarshalledData testOptMarshall
+Try0(yaml.Unmarshall([]byte(input), &unmarshalledData))
+unmarshalled.Name.HasValue()  // true
+unmarshalled.Value.HasValue() // false
+```

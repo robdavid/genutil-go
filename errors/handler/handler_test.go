@@ -204,8 +204,8 @@ func recurseErrorReturn(depth int) (err error) {
 // when the deepest call raises an error.
 func BenchmarkRewindTime(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		recurseErrorCatch(1000)
-		//assert.EqualError(b, err, "Hit bottom")
+		err := recurseErrorCatch(1000)
+		assert.Error(b, err, "Hit bottom")
 	}
 }
 
@@ -221,7 +221,6 @@ func BenchmarkNoErrorReturnTime(b *testing.B) {
 		total, err := recurseNoErrorCatch(1000)
 		assert.Equal(b, 1000, total)
 		assert.NoError(b, err)
-		//assert.EqualError(b, err, "Hit bottom")
 	}
 }
 
@@ -234,8 +233,8 @@ func BenchmarkNoErrorReturnTime(b *testing.B) {
 // when the deepest call raises an error.
 func BenchmarkCatchOnce(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		recurseErrorCatchOnce(0, 1000)
-		//assert.EqualError(b, err, "Hit bottom")
+		err := recurseErrorCatchOnce(0, 1000)
+		assert.EqualError(b, err, "Hit bottom")
 	}
 }
 
@@ -244,8 +243,8 @@ func BenchmarkCatchOnce(b *testing.B) {
 // error handling, when the deepest call returns an error.
 func BenchmarkReturnTime(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		recurseErrorReturn(1000)
-		//assert.EqualError(b, err, "Hit bottom")
+		err := recurseErrorReturn(1000)
+		assert.EqualError(b, err, "Hit bottom")
 	}
 }
 

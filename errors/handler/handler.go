@@ -60,7 +60,7 @@ type TryError struct {
 	Error error
 }
 
-// Display a messaging including the underlying error
+// Display a message including the underlying error
 func (te TryError) String() string {
 	return fmt.Sprintf("uncaught error: %s", te.Error.Error())
 }

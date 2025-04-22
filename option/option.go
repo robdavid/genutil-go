@@ -102,7 +102,7 @@ func isUnsafe[T any](value T) bool {
 
 // Get the options' value. If the option is empty, this call will panic
 func (o Option[T]) Get() T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		panic(ErrOptionIsEmpty)
 	} else {
 		return o.value
@@ -111,7 +111,7 @@ func (o Option[T]) Get() T {
 
 // Get a pointer to the options' value. If the option is empty, this call will panic
 func (o *Option[T]) GetRef() *T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		panic(ErrOptionIsEmpty)
 	} else {
 		return &o.value
@@ -121,7 +121,7 @@ func (o *Option[T]) GetRef() *T {
 // Returns a pointer to the value in the option. If the value is empty,
 // nil will be returned.
 func (o *Option[T]) Ref() *T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		return nil
 	} else {
 		return &o.value
@@ -145,7 +145,7 @@ func (o *Option[T]) GetOrZeroRef() *T {
 // Either return a value if non-empty, or return the default
 // provided in the parameter.
 func (o Option[T]) GetOr(def T) T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		return def
 	} else {
 		return o.value
@@ -155,7 +155,7 @@ func (o Option[T]) GetOr(def T) T {
 // Either return a pointer to the value if non-empty, or return the
 // default pointer provided in the parameter.
 func (o *Option[T]) GetOrRef(def *T) *T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		return def
 	} else {
 		return &o.value
@@ -172,7 +172,7 @@ func (o Option[T]) GetOK() (T, bool) {
 // the option is non-empty. If the option is empty the pointer returned will
 // be nil.
 func (o *Option[T]) RefOK() (*T, bool) {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		return nil, false
 	} else {
 		return &o.value, true
@@ -206,7 +206,7 @@ func (o Option[T]) Try() T {
 //	  v := ov.TryErr(myerr)
 //	}
 func (o Option[T]) TryErr(err error) T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		eh.Check(err)
 	}
 	return o.value
@@ -227,7 +227,7 @@ func (o Option[T]) TryErr(err error) T {
 //	 v := ov.TryErrF(fnErr)
 //	}
 func (o Option[T]) TryErrF(err func() error) T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		eh.Check(err())
 	}
 	return o.value
@@ -237,7 +237,7 @@ func (o Option[T]) TryErrF(err func() error) T {
 // the method will panic with a try value that can be caught with
 // handler.Catch() or handler.Handle().
 func (o *Option[T]) TryRef() *T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		eh.Check(ErrOptionIsEmpty)
 	}
 	return &o.value
@@ -256,7 +256,7 @@ func (o Option[T]) ToRef() *Option[T] {
 // Render an option to a string. An empty option
 // results in an empty string.
 func (o Option[T]) String() string {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		return ""
 	} else {
 		return fmt.Sprintf("%v", o.value)
@@ -273,7 +273,7 @@ func (o *Option[T]) RefOrNil() *T {
 // the default pointer will be returned. The primary use case is to allow
 // mutation of the value held in the option.
 func (o *Option[T]) RefOr(def *T) *T {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		return def
 	} else {
 		return &o.value
@@ -313,6 +313,16 @@ func (o *Option[T]) Clear() {
 	var zero T
 	o.value = zero
 	o.nonEmpty = false
+}
+
+// Makes the given option non-empty. If it is empty, it will
+// become a non-empty zero value. Otherwise it will remain
+// unchanged. The reference passed in is returned. Normal use case is
+// mutation of an empty value to a non-empty one with data, in conjunction
+// with the Mutate method.
+func (o *Option[T]) Ensure() *Option[T] {
+	o.nonEmpty = true
+	return o
 }
 
 // Map applies a function to the non-empty value of an Option.
@@ -368,8 +378,7 @@ func FlatMapRef[T, U any](o *Option[T], f func(*T) *Option[U]) *Option[U] {
 
 // Then invokes the supplied function with the Option's value
 // if the Option is non-empty. Otherwise, this is a no-op. It
-//
-//	always returns the option instance it wal called with.
+// always returns the option instance it was called with.
 func (o Option[T]) Then(f func(T)) Option[T] {
 	if o.nonEmpty {
 		f(o.value)
@@ -379,7 +388,7 @@ func (o Option[T]) Then(f func(T)) Option[T] {
 
 // Then invokes the supplied function with a pointer to the Option's value
 // if the Option is non-empty. Otherwise, this is a no-op. It always returns
-// the pointer to the Option it is called with
+// the pointer to the Option it is called with.
 func (o *Option[T]) ThenRef(f func(*T)) *Option[T] {
 	if o.nonEmpty {
 		f(&o.value)
@@ -404,6 +413,7 @@ func (o *Option[T]) ElseRef(f func()) {
 
 // Morph, inspired by the concept of [Endomorphism]: https://en.wikipedia.org/wiki/Endomorphism,
 // maps an Option value, if non-empty, to another value of the same type, wrapped in an Option.
+// If the passed Option value is empty, the same empty option is returned unchanged,
 // Mapping to values of different types via methods is not possible due to limitations in Go
 // generics. For this use the option.Map function.
 func (o Option[T]) Morph(f func(T) T) Option[T] {
@@ -417,7 +427,8 @@ func (o Option[T]) Morph(f func(T) T) Option[T] {
 // MorphRef, inspired by the concept of [Endomorphism]: https://en.wikipedia.org/wiki/Endomorphism,
 // maps a pointer to an Option value, if non-empty, to another value of the same type, wrapped in
 // in Option, returned as a pointer to the Option. The mapping function takes and returns pointers
-// to the underlying value, where present.
+// to the underlying value, where present. If the passed Option reference is empty, the same reference
+// is returned.
 // Mapping to values of different types via methods is not possible due to limitations in Go
 // generics. For this use the option.Map function.
 func (o *Option[T]) MorphRef(f func(*T) *T) *Option[T] {
@@ -444,7 +455,7 @@ func (o *Option[T]) Mutate(f func(*T)) *Option[T] {
 // marshalled as "null". Non-empty options are marshalled
 // as their underlying value.
 func (o *Option[T]) MarshalJSON() ([]byte, error) {
-	if o.IsEmpty() {
+	if !o.nonEmpty {
 		return []byte("null"), nil
 	} else {
 		return json.Marshal(o.value)
@@ -467,7 +478,7 @@ func (o *Option[T]) UnmarshalJSON(j []byte) error {
 // Returns true if the option is empty. Used by the YAML
 // marshalling/un-marshalling interface.
 func (o Option[T]) IsZero() bool {
-	return o.IsEmpty()
+	return !o.nonEmpty
 }
 
 func (o Option[T]) MarshalYAML() (interface{}, error) {
