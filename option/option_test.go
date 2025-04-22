@@ -329,7 +329,7 @@ func TestThenElse(t *testing.T) {
 	assert.Equal(more, condition(Value(150)))
 }
 
-type testMarshall struct {
+type testMarshal struct {
 	Name  string          `json:"name" yaml:"name"`
 	Value int             `json:"value" yaml:"value"`
 	Opt   Option[testOpt] `json:"opt" yaml:"opt,omitempty"`
@@ -340,12 +340,12 @@ type testOpt struct {
 	ItemList []string `json:"itemList,omitempty" yaml:"itemList,omitempty"`
 }
 
-type testOptMarshall struct {
+type testOptMarshal struct {
 	Name  Option[string] `json:"name,omitempty" yaml:"name,omitempty"`
 	Value Option[int]    `json:"value,omitempty" yaml:"value,omitempty"`
 }
 
-type testOptNoOmitMarshall struct {
+type testOptNoOmitMarshal struct {
 	Name  Option[string] `json:"name" yaml:"name"`
 	Value Option[int]    `json:"value" yaml:"value"`
 }
@@ -362,8 +362,8 @@ func TestPrintExample(t *testing.T) {
 	assert.Equal(t, "Hello world", actual)
 }
 
-func TestJSONMarshallOmitOption(t *testing.T) {
-	testData := testMarshall{
+func TestJSONMarshalOmitOption(t *testing.T) {
+	testData := testMarshal{
 		Name:  "test1",
 		Value: 1,
 		Opt:   Empty[testOpt](),
@@ -372,15 +372,15 @@ func TestJSONMarshallOmitOption(t *testing.T) {
 	require.NoError(t, err)
 	text := string(y)
 	assert.Contains(t, text, "\"opt\":null")
-	var testData2 testMarshall
+	var testData2 testMarshal
 	assert.NoError(t, json.Unmarshal(y, &testData2))
 	assert.Equal(t, testData, testData2)
 }
 
-func TestJSONMarshallOption(t *testing.T) {
+func TestJSONMarshalOption(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	testData := testMarshall{
+	testData := testMarshal{
 		Name:  "test1",
 		Value: 1,
 		Opt:   Value(testOpt{"Hello", nil}),
@@ -401,9 +401,9 @@ func TestJSONMarshallOption(t *testing.T) {
 	assert.Equal(expected, testDataMap)
 }
 
-func TestJSONMarshallEmptyOption(t *testing.T) {
+func TestJSONMarshalEmptyOption(t *testing.T) {
 	require := require.New(t)
-	testData := testMarshall{
+	testData := testMarshal{
 		Name:  "test1",
 		Value: 1,
 		Opt:   Empty[testOpt](),
@@ -420,27 +420,31 @@ func TestJSONMarshallEmptyOption(t *testing.T) {
 	assert.Equal(t, expected, testDataMap)
 }
 
-func TestJSONMarshallOptionSimple(t *testing.T) {
+func TestJSONMarshalOptionSimple(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	testData := testOptMarshall{
+	testData := testOptMarshal{
 		Name:  Value("a name"),
 		Value: Empty[int](),
 	}
 	y, err := json.Marshal(&testData)
 	require.NoError(err)
-	text := string(y)
-	assert.Contains(text, "\"name\":\"a name\"")
-	assert.NotContains(text, "\"value\"")
-	var testData2 testOptMarshall
+	var testDataMap map[string]any
+	require.NoError(json.Unmarshal(y, &testDataMap))
+	expected := map[string]any{
+		"name":  "a name",
+		"value": nil,
+	}
+	assert.Equal(expected, testDataMap)
+	var testData2 testOptMarshal
 	assert.NoError(json.Unmarshal(y, &testData2))
 	assert.Equal(testData, testData2)
 }
 
-func TestJSONMarshallOptionSimpleNoEmpty(t *testing.T) {
+func TestJSONMarshalOptionSimpleNoEmpty(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	testData := testOptMarshall{
+	testData := testOptMarshal{
 		Name:  Value("a name"),
 		Value: Value(123),
 	}
@@ -449,15 +453,15 @@ func TestJSONMarshallOptionSimpleNoEmpty(t *testing.T) {
 	text := string(y)
 	assert.Contains(text, "\"name\":\"a name\"")
 	assert.Contains(text, "\"value\":123")
-	var testData2 testOptMarshall
+	var testData2 testOptMarshal
 	assert.NoError(json.Unmarshal(y, &testData2))
 	assert.Equal(testData, testData2)
 }
 
-func TestJSONUnMarshallOmitOption(t *testing.T) {
+func TestJSONUnMarshalOmitOption(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	var unmarshalled testOptMarshall
+	var unmarshalled testOptMarshal
 	var testData = `{ "name": "a name" }`
 	err := json.Unmarshal([]byte(testData), &unmarshalled)
 	require.NoError(err)
@@ -466,10 +470,10 @@ func TestJSONUnMarshallOmitOption(t *testing.T) {
 	assert.Equal("a name", unmarshalled.Name.Get())
 }
 
-func TestJSONMarshallNoOmitOption(t *testing.T) {
+func TestJSONMarshalNoOmitOption(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	testData := testOptNoOmitMarshall{
+	testData := testOptNoOmitMarshal{
 		Name:  Value("a name"),
 		Value: Empty[int](),
 	}
@@ -478,13 +482,13 @@ func TestJSONMarshallNoOmitOption(t *testing.T) {
 	text := string(y)
 	assert.Contains(text, "\"name\":\"a name\"")
 	assert.Contains(text, "\"value\":null")
-	var testData2 testOptNoOmitMarshall
+	var testData2 testOptNoOmitMarshal
 	assert.NoError(json.Unmarshal(y, &testData2))
 	assert.Equal(testData, testData2)
 }
 
-func TestYAMLMarshallOption(t *testing.T) {
-	testData := testMarshall{
+func TestYAMLMarshalOption(t *testing.T) {
+	testData := testMarshal{
 		Name:  "test1",
 		Value: 1,
 		Opt:   Value(testOpt{Metadata: "md", ItemList: []string{"item1"}}),
@@ -495,14 +499,14 @@ func TestYAMLMarshallOption(t *testing.T) {
 		assert.Contains(t, text, "opt:")
 		assert.Contains(t, text, "metadata:")
 		assert.Contains(t, text, "itemList:")
-		var testData2 testMarshall
+		var testData2 testMarshal
 		assert.NoError(t, yaml.Unmarshal(y, &testData2))
 		assert.Equal(t, testData, testData2)
 	}
 }
 
-func TestYAMLMarshallOmitOption(t *testing.T) {
-	testData := testMarshall{
+func TestYAMLMarshalOmitOption(t *testing.T) {
+	testData := testMarshal{
 		Name:  "test1",
 		Value: 1,
 		Opt:   Empty[testOpt](),
@@ -513,16 +517,16 @@ func TestYAMLMarshallOmitOption(t *testing.T) {
 		assert.NotContains(t, text, "opt:")
 		assert.NotContains(t, text, "metadata:")
 		assert.NotContains(t, text, "itemList:")
-		var testData2 testMarshall
+		var testData2 testMarshal
 		assert.NoError(t, yaml.Unmarshal(y, &testData2))
 		assert.Equal(t, testData, testData2)
 	}
 }
 
-func TestYAMLMarshallOmitSimpleOption(t *testing.T) {
+func TestYAMLMarshalOmitSimpleOption(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	testData := testOptMarshall{
+	testData := testOptMarshal{
 		Name:  Value("a name"),
 		Value: Empty[int](),
 	}
@@ -532,15 +536,15 @@ func TestYAMLMarshallOmitSimpleOption(t *testing.T) {
 	text := string(y)
 	assert.Contains(text, "name:")
 	assert.NotContains(text, "value:")
-	var testData2 testOptMarshall
+	var testData2 testOptMarshal
 	require.NoError(yaml.Unmarshal(y, &testData2))
 	assert.Equal(testData, testData2)
 }
 
-func TestYAMLUnMarshallOmitOption(t *testing.T) {
+func TestYAMLUnMarshalOmitOption(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	var unmarshalled testOptMarshall
+	var unmarshalled testOptMarshal
 	var testData = `name: "a name"`
 	err := yaml.Unmarshal([]byte(testData), &unmarshalled)
 	require.NoError(err)
