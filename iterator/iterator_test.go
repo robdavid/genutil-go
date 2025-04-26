@@ -131,6 +131,16 @@ func TestSliceIterChan(t *testing.T) {
 	}
 }
 
+func TestSliceIterSeq(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := Slice(input)
+	i := 1
+	for v := range iter.Seq() {
+		assert.Equal(t, v, i)
+		i++
+	}
+}
+
 func TestRange(t *testing.T) {
 	r := Range(0, 10)
 	seq := Collect(r)
@@ -159,10 +169,30 @@ func TestRangeChan(t *testing.T) {
 	assert.Equal(t, 10, i)
 }
 
+func TestRangeSeq(t *testing.T) {
+	r := Range(0, 10)
+	i := 0
+	for v := range r.Seq() {
+		assert.Equal(t, i, v)
+		i += 1
+	}
+	assert.Equal(t, 10, i)
+}
+
 func TestInclusiveRangeChan(t *testing.T) {
 	r := IncRange(0, 10)
 	i := 0
 	for v := range r.Chan() {
+		assert.Equal(t, i, v)
+		i += 1
+	}
+	assert.Equal(t, 11, i)
+}
+
+func TestInclusiveRangeSeq(t *testing.T) {
+	r := IncRange(0, 10)
+	i := 0
+	for v := range r.Seq() {
 		assert.Equal(t, i, v)
 		i += 1
 	}
@@ -182,6 +212,15 @@ func TestEmptyRange(t *testing.T) {
 	r := Range(10, 9)
 	seq := Collect(r)
 	assert.Empty(t, seq)
+}
+
+func TestEmptySeq(t *testing.T) {
+	e := Empty[int]()
+	for range e.Seq() {
+		assert.Fail(t, "empty iterator should produce no values")
+	}
+	slice := Collect(e)
+	assert.Empty(t, slice)
 }
 
 func TestNegativeRange(t *testing.T) {
@@ -229,6 +268,35 @@ func TestSliceIterChanAbort(t *testing.T) {
 		}
 	}
 	assert.Equal(t, i, 3)
+}
+
+func TestSliceIterSeqAbort(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := Slice(input)
+	i := 1
+	for v := range iter.Seq() {
+		assert.Equal(t, v, i)
+		i++
+		if i == 3 {
+			iter.Abort()
+		}
+	}
+	assert.Equal(t, i, 3)
+}
+
+func TestSliceIterSeqBreak(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := Slice(input)
+	i := 1
+	for v := range iter.Seq() {
+		assert.Equal(t, v, i)
+		i++
+		if i == 3 {
+			break
+		}
+	}
+	assert.Equal(t, i, 3)
+	assert.False(t, iter.Next())
 }
 
 func TestMapIter(t *testing.T) {

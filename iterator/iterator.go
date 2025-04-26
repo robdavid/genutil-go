@@ -3,6 +3,7 @@ package iterator
 
 import (
 	"fmt"
+	"iter"
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
@@ -26,6 +27,17 @@ type SimpleIterator[T any] interface {
 	Abort()
 }
 
+// SeqOf is a generic iter.Seq implementation for any simple iterator
+func SeqOf[T any](i SimpleIterator[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for i.Next() {
+			if !yield(i.Value()) {
+				i.Abort()
+			}
+		}
+	}
+}
+
 // SizedIterator is an extension of SimpleIterator that also holds some sizing information
 type SizedIterator[T any] interface {
 	SimpleIterator[T]
@@ -38,6 +50,7 @@ type Iterator[T any] interface {
 	SizedIterator[T]
 	// Chan returns iterator as a channel.
 	Chan() <-chan T
+	Seq() iter.Seq[T]
 }
 
 // IteratorSize holds iterator sizing information
@@ -212,6 +225,10 @@ func (ei *autoChannelIterator[T]) Abort() {
 	}
 }
 
+func (ei *autoChannelIterator[T]) Seq() iter.Seq[T] {
+	return SeqOf(ei)
+}
+
 // mapIter wraps an iterator and adds a mapping function
 type mapIter[T, U any] struct {
 	base    Iterator[T]
@@ -252,6 +269,10 @@ func (i *mapIter[T, U]) Chan() <-chan U {
 
 func (i *mapIter[T, U]) Size() IteratorSize {
 	return i.size
+}
+
+func (i *mapIter[T, U]) Seq() iter.Seq[U] {
+	return SeqOf(i)
 }
 
 // wrapFunc creates a new iterator from an existing operator and a function that consumes it, yielding
@@ -339,6 +360,10 @@ func (ri *rangeIter[T, S]) Chan() <-chan T {
 	return iterChan[T](ri)
 }
 
+func (ri *rangeIter[T, S]) Seq() iter.Seq[T] {
+	return SeqOf(ri)
+}
+
 func (ri *rangeIter[T, S]) Size() IteratorSize {
 	var size int
 	if (ri.index > ri.to && ri.by > 0) || (ri.index < ri.to && ri.by < 0) {
@@ -401,6 +426,11 @@ func (emptyIter[T]) Chan() <-chan T {
 	c := make(chan T)
 	close(c)
 	return c
+}
+func (emptyIter[T]) Seq() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		return
+	}
 }
 
 // Empty creates an iterator that returns no items.
@@ -568,6 +598,10 @@ func (pi *genIter[T]) Abort() {
 
 func (pi *genIter[T]) Size() IteratorSize {
 	return SizeUnknown
+}
+
+func (pi *genIter[T]) Seq() iter.Seq[T] {
+	return SeqOf(pi)
 }
 
 // AbortGenerator is a panic type that will be raised if a Generator function is to be
