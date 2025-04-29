@@ -6,6 +6,7 @@ import (
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
+	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -339,6 +340,19 @@ func TestGenerator(t *testing.T) {
 	actual := Collect(gen)
 	expected := Collect(Range(0, 10))
 	assert.Equal(t, expected, actual)
+}
+
+func TestFromSeq(t *testing.T) {
+	seq := func(yield func(int) bool) {
+		for i := range 5 {
+			if !yield(i) {
+				break
+			}
+		}
+	}
+	itr := FromSeq(seq)
+	slice := Collect(itr)
+	assert.Equal(t, slices.Range(0, 5), slice)
 }
 
 func fib() Iterator[int] {

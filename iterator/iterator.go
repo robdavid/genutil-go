@@ -27,8 +27,8 @@ type SimpleIterator[T any] interface {
 	Abort()
 }
 
-// SeqOf is a generic iter.Seq implementation for any simple iterator
-func SeqOf[T any](i SimpleIterator[T]) iter.Seq[T] {
+// Seq is a generic iter.Seq implementation for any simple iterator
+func Seq[T any](i SimpleIterator[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for i.Next() {
 			if !yield(i.Value()) {
@@ -145,7 +145,7 @@ func safeSend[T any](ch chan<- T, val T) (ok bool) {
 
 // Generic channel implementation. Produces a channel yielding
 // values from the iterator
-func iterChan[T any](iter SimpleIterator[T]) (out chan T) {
+func Chan[T any](iter SimpleIterator[T]) (out chan T) {
 	out = make(chan T)
 	go func() {
 		defer safeClose(out)
@@ -212,7 +212,7 @@ func MakeIteratorOfSizeFromSimple[T any](base SimpleIterator[T], size IteratorSi
 
 func (ei *autoChannelIterator[T]) Chan() <-chan T {
 	if ei.OutChan == nil {
-		ei.OutChan = iterChan[T](ei)
+		ei.OutChan = Chan[T](ei)
 	}
 	return ei.OutChan
 }
@@ -226,7 +226,7 @@ func (ei *autoChannelIterator[T]) Abort() {
 }
 
 func (ei *autoChannelIterator[T]) Seq() iter.Seq[T] {
-	return SeqOf(ei)
+	return Seq(ei)
 }
 
 // mapIter wraps an iterator and adds a mapping function
@@ -262,7 +262,7 @@ func (i *mapIter[T, U]) Abort() {
 
 func (i *mapIter[T, U]) Chan() <-chan U {
 	if i.outChan == nil {
-		i.outChan = iterChan[U](i)
+		i.outChan = Chan[U](i)
 	}
 	return i.outChan
 }
@@ -272,7 +272,7 @@ func (i *mapIter[T, U]) Size() IteratorSize {
 }
 
 func (i *mapIter[T, U]) Seq() iter.Seq[U] {
-	return SeqOf(i)
+	return Seq(i)
 }
 
 // wrapFunc creates a new iterator from an existing operator and a function that consumes it, yielding
@@ -357,11 +357,11 @@ func (ri *rangeIter[T, S]) Abort() {
 }
 
 func (ri *rangeIter[T, S]) Chan() <-chan T {
-	return iterChan[T](ri)
+	return Chan[T](ri)
 }
 
 func (ri *rangeIter[T, S]) Seq() iter.Seq[T] {
-	return SeqOf(ri)
+	return Seq(ri)
 }
 
 func (ri *rangeIter[T, S]) Size() IteratorSize {
@@ -601,7 +601,7 @@ func (pi *genIter[T]) Size() IteratorSize {
 }
 
 func (pi *genIter[T]) Seq() iter.Seq[T] {
-	return SeqOf(pi)
+	return Seq(pi)
 }
 
 // AbortGenerator is a panic type that will be raised if a Generator function is to be
@@ -763,4 +763,45 @@ func (ti *takeIterator[T]) Size() IteratorSize {
 // than n elements available, they are all returned.
 func Take[T any](n int, iter Iterator[T]) Iterator[T] {
 	return MakeIterator[T](&takeIterator[T]{0, n, false, iter})
+}
+
+// seqIterator is an iterator based on a Go iter.Seq
+type seqIterator[T any] struct {
+	seq     iter.Seq[T]
+	seqNext func() (T, bool)
+	seqStop func()
+	value   T
+}
+
+// FromSeq creates an iterator from a Go iter.Seq function
+func FromSeq[T any](seq iter.Seq[T]) Iterator[T] {
+	var si seqIterator[T]
+	si.seq = seq
+	si.seqNext, si.seqStop = iter.Pull(seq)
+	return &si
+}
+
+func (si *seqIterator[T]) Next() (next bool) {
+	si.value, next = si.seqNext()
+	return
+}
+
+func (si *seqIterator[T]) Value() T {
+	return si.value
+}
+
+func (si *seqIterator[T]) Abort() {
+	si.seqStop()
+}
+
+func (si *seqIterator[T]) Seq() iter.Seq[T] {
+	return si.seq
+}
+
+func (si *seqIterator[T]) Chan() <-chan T {
+	return Chan(si)
+}
+
+func (si *seqIterator[T]) Size() IteratorSize {
+	return SizeUnknown
 }
