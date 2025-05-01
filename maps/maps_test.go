@@ -231,6 +231,16 @@ func TestIterKeys(t *testing.T) {
 	assert.ElementsMatch(t, []string{"one", "two", "three"}, keys)
 }
 
+func TestIterItems(t *testing.T) {
+	mymap := map[string]int{
+		"one":   1,
+		"three": 3,
+		"two":   2,
+	}
+	items := iterator.Collect(IterItems(mymap))
+	assert.ElementsMatch(t, []tuple.Tuple2[string, int]{tuple.Of2("one", 1), tuple.Of2("two", 2), tuple.Of2("three", 3)}, items)
+}
+
 func generateMap(size int) map[string]int {
 	mymap := make(map[string]int)
 	for j := 0; j < size; j++ {

@@ -10,6 +10,7 @@ import (
 	"github.com/robdavid/genutil-go/internal/rangehelper"
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/ordered"
+	"github.com/robdavid/genutil-go/tuple"
 )
 
 // The largest slice capacity we are prepared to allocate to collect
@@ -33,6 +34,19 @@ func Seq[T any](i SimpleIterator[T]) iter.Seq[T] {
 		for i.Next() {
 			if !yield(i.Value()) {
 				i.Abort()
+				break
+			}
+		}
+	}
+}
+
+// Seq2 is a generic iter.Seq2 implementation for any simple iterator returning a 2-tuple
+func Seq2[K any, V any](i SimpleIterator[tuple.Tuple2[K, V]]) iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		for i.Next() {
+			if !yield(i.Value().First, i.Value().Second) {
+				i.Abort()
+				break
 			}
 		}
 	}
@@ -765,8 +779,8 @@ func Take[T any](n int, iter Iterator[T]) Iterator[T] {
 	return MakeIterator[T](&takeIterator[T]{0, n, false, iter})
 }
 
-// seqIterator is an iterator based on a Go iter.Seq
-type seqIterator[T any] struct {
+// SeqIterator is an iterator based on a Go iter.Seq
+type SeqIterator[T any] struct {
 	seq     iter.Seq[T]
 	seqNext func() (T, bool)
 	seqStop func()
@@ -775,33 +789,52 @@ type seqIterator[T any] struct {
 
 // FromSeq creates an iterator from a Go iter.Seq function
 func FromSeq[T any](seq iter.Seq[T]) Iterator[T] {
-	var si seqIterator[T]
+	var si SeqIterator[T]
 	si.seq = seq
 	si.seqNext, si.seqStop = iter.Pull(seq)
 	return &si
 }
 
-func (si *seqIterator[T]) Next() (next bool) {
+// FromSeq creates an iterator from a Go iter.Seq2 function
+func FromSeq2[K any, V any](seq iter.Seq2[K, V]) Iterator[tuple.Tuple2[K, V]] {
+	var si SeqIterator[tuple.Tuple2[K, V]]
+	si.seq = func(yield func(tuple.Tuple2[K, V]) bool) {
+		for k, v := range seq {
+			if !yield(tuple.Pair(k, v)) {
+				break
+			}
+		}
+	}
+	var seq2Next func() (K, V, bool)
+	seq2Next, si.seqStop = iter.Pull2(seq)
+	si.seqNext = func() (tuple.Tuple2[K, V], bool) {
+		k, v, b := seq2Next()
+		return tuple.Pair(k, v), b
+	}
+	return &si
+}
+
+func (si *SeqIterator[T]) Next() (next bool) {
 	si.value, next = si.seqNext()
 	return
 }
 
-func (si *seqIterator[T]) Value() T {
+func (si *SeqIterator[T]) Value() T {
 	return si.value
 }
 
-func (si *seqIterator[T]) Abort() {
+func (si *SeqIterator[T]) Abort() {
 	si.seqStop()
 }
 
-func (si *seqIterator[T]) Seq() iter.Seq[T] {
+func (si *SeqIterator[T]) Seq() iter.Seq[T] {
 	return si.seq
 }
 
-func (si *seqIterator[T]) Chan() <-chan T {
+func (si *SeqIterator[T]) Chan() <-chan T {
 	return Chan(si)
 }
 
-func (si *seqIterator[T]) Size() IteratorSize {
+func (si *SeqIterator[T]) Size() IteratorSize {
 	return SizeUnknown
 }
