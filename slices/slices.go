@@ -9,6 +9,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/internal/rangehelper"
+	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/ordered"
 )
 
@@ -654,6 +655,34 @@ func FilterRef[T any](s []T, f func(*T) bool) (result []T) {
 	for i := range s {
 		if f(&s[i]) {
 			result = append(result, s[i])
+		}
+	}
+	return
+}
+
+// Combines Filter and Map functionality. The mapping function f is applied to each
+// element in the slice of type T, and returns an Option value of type U. If the option
+// is non-empty, the value of type U is appended to the result slice. Otherwise,
+// the element is skipped.
+func FilterMap[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
+	result = make([]U, 0, len(s))
+	for _, v := range s {
+		if o := f(v); o.HasValue() {
+			result = append(result, o.Get())
+		}
+	}
+	return
+}
+
+// Combines Filter and Map functionality. The mapping function f is applied to a reference
+// to each element in the slice of type T, and returns an Option value of type U. If the option
+// is non-empty, the value of type U is appended to the result slice. Otherwise,
+// the element is skipped.
+func FilterMapRef[T any, U any](s []T, f func(*T) option.Option[U]) (result []U) {
+	result = make([]U, 0, len(s))
+	for i := range s {
+		if o := f(&s[i]); o.HasValue() {
+			result = append(result, o.Get())
 		}
 	}
 	return
