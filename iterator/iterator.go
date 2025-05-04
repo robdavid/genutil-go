@@ -67,6 +67,26 @@ type Iterator[T any] interface {
 	Seq() iter.Seq[T]
 }
 
+type DefaultIterator[T any] struct {
+	SizedIterator[T]
+}
+
+func (di DefaultIterator[T]) Next() bool {
+	ok := di.SizedIterator.Next()
+	if ok {
+		di.Size().Decrement()
+	}
+	return ok
+}
+
+func (di DefaultIterator[T]) Chan() <-chan T {
+	return Chan(di)
+}
+
+func (di DefaultIterator[T]) Seq() iter.Seq[T] {
+	return Seq(di)
+}
+
 // IteratorSize holds iterator sizing information
 type IteratorSize interface {
 	// Allocate returns a value for the size of slice required to hold all elements returned by the iterator.
@@ -74,62 +94,71 @@ type IteratorSize interface {
 	Allocate() int
 	// Subset returns a new iterator size based on some unknown subset of iterator values.
 	Subset() IteratorSize
+	// Mutate the size when a single element is consumed from the iterator.
+	Decrement()
 }
 
 // Iterator sizing information; size is unknown
 type sizeUnknown struct{}
 
 func (sizeUnknown) Allocate() int        { return 0 }
-func (sizeUnknown) Subset() IteratorSize { return SizeUnknown }
+func (sizeUnknown) Subset() IteratorSize { return sizeUnknownConst }
+func (sizeUnknown) Decrement()           {}
 
-// SizeUnknown is a value implementing IteratorSize, representing an iterator of unknown size
-var SizeUnknown = sizeUnknown{}
+// sizeUnknownConst is a value implementing IteratorSize, representing an iterator of unknown size
+var sizeUnknownConst = sizeUnknown{}
+
+func NewSizeUnknown() sizeUnknown {
+	return sizeUnknownConst
+}
 
 // IsSizeUnknown returns true if the given IteratorSize instance represents
 // an unknown size
 func IsSizeUnknown(size IteratorSize) bool {
-	return size == SizeUnknown
+	return size == sizeUnknownConst
 }
 
-// SizeKnown holds Iterator sizing information where the size is known with certainty.
-type SizeKnown struct {
+// sizeKnown holds Iterator sizing information where the size is known with certainty.
+type sizeKnown struct {
 	Size int
 }
 
-func (sk SizeKnown) Allocate() int        { return sk.Size }
-func (sk SizeKnown) Subset() IteratorSize { return SizeAtMost(sk) }
+func (sk *sizeKnown) Allocate() int        { return sk.Size }
+func (sk *sizeKnown) Subset() IteratorSize { return NewSizeAtMost(sk.Size) }
+func (sk *sizeKnown) Decrement()           { sk.Size-- }
 
 // NewSize creates an `IteratorSize` implementation that has a fixed size of `n`.
-func NewSize(n int) IteratorSize { return SizeKnown{n} }
+func NewSize(n int) IteratorSize { return &sizeKnown{n} }
 
 // IsSizeKnown returns true if the iterator size is one whose actual size is known.
 func IsSizeKnown(size IteratorSize) bool {
-	_, ok := size.(SizeKnown)
+	_, ok := size.(*sizeKnown)
 	return ok
 }
 
-// SizeAtMost holds Iterator sizing information where only an upper bound is known.
-type SizeAtMost struct {
+// sizeAtMost holds Iterator sizing information where only an upper bound is known.
+type sizeAtMost struct {
 	Size int
 }
 
-func (sm SizeAtMost) Allocate() int {
+func (sm *sizeAtMost) Allocate() int {
 	alloc := sm.Size / 2
 	if alloc > maxUncertainAllocation {
 		alloc = maxUncertainAllocation
 	}
 	return alloc
 }
-func (sm SizeAtMost) Subset() IteratorSize { return sm }
+func (sm *sizeAtMost) Subset() IteratorSize { return sm }
+func (sm *sizeAtMost) Decrement()           { sm.Size-- }
 
 // NewSizeAtMost creates an `IteratorSize` implementation that has a size no more than n.
 func NewSizeAtMost(n int) IteratorSize {
-	return SizeAtMost{n}
+	return &sizeAtMost{n}
 }
 
 // IsSizeAtMost returns true if the iterator size is one whose maximum size is known.
 func IsSizeAtMost(size IteratorSize) bool {
-	_, ok := size.(SizeAtMost)
+	_, ok := size.(*sizeAtMost)
 	return ok
 }
 
@@ -172,20 +201,6 @@ func Chan[T any](iter SimpleIterator[T]) (out chan T) {
 	return
 }
 
-type unknownSizeIterator[T any] struct {
-	SimpleIterator[T]
-}
-
-func (usi unknownSizeIterator[T]) Size() IteratorSize {
-	return SizeUnknown
-}
-
-// MakeSizedIterator creates a sized iterator from a simple iterator; the iterator size will
-// be unknown.
-func MakeSizedIterator[T any](si SimpleIterator[T]) SizedIterator[T] {
-	return unknownSizeIterator[T]{si}
-}
-
 type sizedIterator[T any] struct {
 	SimpleIterator[T]
 	size IteratorSize
@@ -195,52 +210,21 @@ func (si sizedIterator[T]) Size() IteratorSize {
 	return si.size
 }
 
-// MakeIteratorOfSize creates a sized iterator from a simple iterator; the iterator size will be the
-// size provided.
-func MakeIteratorOfSize[T any](si SimpleIterator[T], size IteratorSize) SizedIterator[T] {
+// MakeSizedIterator makes a sized iterator from a simple iterator and provided size.
+func MakeSizedIterator[T any](si SimpleIterator[T], size IteratorSize) SizedIterator[T] {
 	return sizedIterator[T]{si, size}
 }
 
-type autoChannelIterator[T any] struct {
-	SizedIterator[T]
-	OutChan chan T
+// MakeIteratorOfSize creates an iterator from a simple iterator; the iterator size will be the
+// size provided.
+func MakeIteratorOfSize[T any](si SimpleIterator[T], size IteratorSize) Iterator[T] {
+	return DefaultIterator[T]{SizedIterator: MakeSizedIterator(si, size)}
 }
 
 // MakeIterator creates a generic iterator from a simple iterator. Provides an implementation
 // of a source of elements over a channel.
-func MakeIterator[T any](base SizedIterator[T]) Iterator[T] {
-	return &autoChannelIterator[T]{base, nil}
-}
-
-// MakeIteratorFromSimple creates a generic iterator from a sized iterator, providing an implementation
-// of a source of elements over a channel. The size of the iterator will be unknown.
-func MakeIteratorFromSimple[T any](base SimpleIterator[T]) Iterator[T] {
-	return MakeIterator(MakeSizedIterator(base))
-}
-
-// MakeIteratorOfSizeFromSimple creates a generic iterator from a sized iterator, providing an implementation
-// of a source of elements over a channel. The size of the iterator will be the size provided.
-func MakeIteratorOfSizeFromSimple[T any](base SimpleIterator[T], size IteratorSize) Iterator[T] {
-	return MakeIterator(MakeIteratorOfSize(base, size))
-}
-
-func (ei *autoChannelIterator[T]) Chan() <-chan T {
-	if ei.OutChan == nil {
-		ei.OutChan = Chan[T](ei)
-	}
-	return ei.OutChan
-}
-
-func (ei *autoChannelIterator[T]) Abort() {
-	ei.SizedIterator.Abort()
-	if ei.OutChan != nil {
-		safeClose(ei.OutChan)
-		ei.OutChan = nil
-	}
-}
-
-func (ei *autoChannelIterator[T]) Seq() iter.Seq[T] {
-	return Seq(ei)
+func MakeIterator[T any](base SimpleIterator[T]) Iterator[T] {
+	return DefaultIterator[T]{SizedIterator: MakeSizedIterator(base, NewSizeUnknown())}
 }
 
 // mapIter wraps an iterator and adds a mapping function
@@ -320,15 +304,11 @@ func (si *sliceIter[T]) Abort() {
 	si.index = len(si.slice)
 }
 
-func (si *sliceIter[T]) Size() IteratorSize {
-	return SizeKnown{len(si.slice) - si.index}
-}
-
 // Slice makes an Iterator[T] from slice []T, containing all the elements
 // from the slice in order.
 func Slice[T any](slice []T) Iterator[T] {
 	var t T
-	return MakeIterator[T](&sliceIter[T]{slice, 0, t})
+	return MakeIteratorOfSize(&sliceIter[T]{slice, 0, t}, NewSize(len(slice)))
 }
 
 // Of makes an Iterator[T] containing the variadic arguments of type T
@@ -385,7 +365,7 @@ func (ri *rangeIter[T, S]) Size() IteratorSize {
 	} else {
 		size, _ = rangehelper.RangeSize[T, S](ri.index, ri.to, ri.by, ri.inclusive)
 	}
-	return SizeKnown{size}
+	return NewSize(size)
 }
 
 // Range creates an iterator that ranges from `from` to
@@ -434,7 +414,7 @@ type emptyIter[T any] struct{}
 
 func (emptyIter[T]) Next() bool         { return false }
 func (emptyIter[T]) Value() T           { var zero T; return zero }
-func (emptyIter[T]) Size() IteratorSize { return SizeKnown{0} }
+func (emptyIter[T]) Size() IteratorSize { return NewSize(0) }
 func (emptyIter[T]) Abort()             {}
 func (emptyIter[T]) Chan() <-chan T {
 	c := make(chan T)
@@ -523,7 +503,7 @@ func CollectInto[T any](iter Iterator[T], slice *[]T) []T {
 // Collect collects all elements from an iterator into a slice.
 func Collect[T any](iter Iterator[T]) []T {
 	result := make([]T, 0, iter.Size().Allocate())
-	return CollectInto[T](iter, &result)
+	return CollectInto(iter, &result)
 }
 
 // CollectResults collects all elements from an iterator of results into a result of slice of the iterator's underlying type
@@ -611,7 +591,7 @@ func (pi *genIter[T]) Abort() {
 }
 
 func (pi *genIter[T]) Size() IteratorSize {
-	return SizeUnknown
+	return NewSizeUnknown()
 }
 
 func (pi *genIter[T]) Seq() iter.Seq[T] {
@@ -749,26 +729,11 @@ func (ti *takeIterator[T]) Abort() {
 }
 
 func (ti *takeIterator[T]) Next() bool {
-	if ti.count < ti.max {
+	if !ti.aborted && ti.count < ti.max {
 		ti.count++
-		next := ti.iterator.Next()
-		if next && ti.count == ti.max {
-			ti.Abort()
-		}
-		return next
+		return ti.iterator.Next()
 	} else {
 		return false
-	}
-}
-
-func (ti *takeIterator[T]) Size() IteratorSize {
-	switch s := ti.iterator.Size().(type) {
-	case SizeKnown:
-		return NewSize(ordered.Min(s.Size, ti.max))
-	case SizeAtMost:
-		return NewSizeAtMost(ordered.Min(s.Size, ti.max))
-	default:
-		return NewSizeAtMost(ti.max)
 	}
 }
 
@@ -776,11 +741,21 @@ func (ti *takeIterator[T]) Size() IteratorSize {
 // first n elements of the original iterator. If there are less
 // than n elements available, they are all returned.
 func Take[T any](n int, iter Iterator[T]) Iterator[T] {
-	return MakeIterator[T](&takeIterator[T]{0, n, false, iter})
+	var newSize IteratorSize
+	switch s := iter.Size().(type) {
+	case *sizeKnown:
+		newSize = NewSize(ordered.Min(s.Size, n))
+	case *sizeAtMost:
+		newSize = NewSizeAtMost(ordered.Min(s.Size, n))
+	default:
+		newSize = NewSizeAtMost(n)
+	}
+	return MakeIteratorOfSize(&takeIterator[T]{0, n, false, iter}, newSize)
 }
 
 // SeqIterator is an iterator based on a Go iter.Seq
 type SeqIterator[T any] struct {
+	DefaultIterator[T]
 	seq     iter.Seq[T]
 	seqNext func() (T, bool)
 	seqStop func()
@@ -790,6 +765,7 @@ type SeqIterator[T any] struct {
 // FromSeq creates an iterator from a Go iter.Seq function
 func FromSeq[T any](seq iter.Seq[T]) Iterator[T] {
 	var si SeqIterator[T]
+	si.SizedIterator = &si
 	si.seq = seq
 	si.seqNext, si.seqStop = iter.Pull(seq)
 	return &si
@@ -831,10 +807,10 @@ func (si *SeqIterator[T]) Seq() iter.Seq[T] {
 	return si.seq
 }
 
-func (si *SeqIterator[T]) Chan() <-chan T {
-	return Chan(si)
-}
+// func (si *SeqIterator[T]) Chan() <-chan T {
+// 	return Chan(si)
+// }
 
 func (si *SeqIterator[T]) Size() IteratorSize {
-	return SizeUnknown
+	return NewSizeUnknown()
 }

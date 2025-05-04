@@ -33,7 +33,7 @@ func TestInclusiveCollectInto(t *testing.T) {
 func TestFloatingRange(t *testing.T) {
 	iter := Range(0.0, 5.0)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 5, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 5, iter.Size().Allocate())
 	output := Collect(iter)
 	expected := []float64{0.0, 1.0, 2.0, 3.0, 4.0}
 	assert.Equal(t, expected, output)
@@ -42,7 +42,7 @@ func TestFloatingRange(t *testing.T) {
 func TestFloatingRangeBy(t *testing.T) {
 	iter := RangeBy(0.0, 5.0, 0.5)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 10, iter.Size().Allocate())
 	output := Collect(iter)
 	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}
 	assert.Equal(t, expected, output)
@@ -51,7 +51,7 @@ func TestFloatingRangeBy(t *testing.T) {
 func TestInclusiveFloatingRangeBy(t *testing.T) {
 	iter := IncRangeBy(0.0, 5.0, 0.5)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 11, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 11, iter.Size().Allocate())
 	output := Collect(iter)
 	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0}
 	assert.Equal(t, expected, output)
@@ -60,7 +60,7 @@ func TestInclusiveFloatingRangeBy(t *testing.T) {
 func TestFloatingRangeDesc(t *testing.T) {
 	iter := RangeBy(5.0, 0.0, -0.5)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 10, iter.Size().Allocate())
 	output := Collect(iter)
 	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5}
 	assert.Equal(t, expected, output)
@@ -69,7 +69,7 @@ func TestFloatingRangeDesc(t *testing.T) {
 func TestInclusiveFloatingRangeDesc(t *testing.T) {
 	iter := IncRangeBy(5.0, 0.0, -0.5)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 11, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 11, iter.Size().Allocate())
 	output := Collect(iter)
 	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.0}
 	assert.Equal(t, expected, output)
@@ -78,7 +78,7 @@ func TestInclusiveFloatingRangeDesc(t *testing.T) {
 func TestInvalidRange(t *testing.T) {
 	iter := RangeBy(5.0, 0.0, 0.5)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 0, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 0, iter.Size().Allocate())
 	output := Collect(iter)
 	assert.Empty(t, output)
 }
@@ -86,7 +86,7 @@ func TestInvalidRange(t *testing.T) {
 func TestZeroRange(t *testing.T) {
 	iter := RangeBy(1, 1, 0)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 0, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 0, iter.Size().Allocate())
 	output := Collect(iter)
 	assert.Empty(t, output)
 }
@@ -94,7 +94,7 @@ func TestZeroRange(t *testing.T) {
 func TestInclusiveZeroRange(t *testing.T) {
 	iter := IncRangeBy(1, 1, 0)
 	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 1, iter.Size().(SizeKnown).Size)
+	assert.Equal(t, 1, iter.Size().Allocate())
 	output := Collect(iter)
 	assert.Equal(t, []int{1}, output)
 }
@@ -107,10 +107,37 @@ func TestSliceIter(t *testing.T) {
 	assert.Equal(t, input, output)
 }
 
+func TestTake(t *testing.T) {
+	input := slices.Range(0, 10)
+	iter := Take(4, Slice(input))
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 4, iter.Size().Allocate())
+	output := Collect(iter)
+	assert.Equal(t, slices.Range(0, 4), output)
+}
+
+func TestTakeNext(t *testing.T) {
+	assert := assert.New(t)
+	input := slices.Range(0, 10)
+	sliceIter := Slice(input)
+	iter := Take(4, sliceIter)
+	assert.True(iter.Next())
+	assert.True(IsSizeKnown(iter.Size()))
+	assert.Equal(3, iter.Size().Allocate())
+	output := Collect(iter)
+	assert.Equal(slices.Range(1, 4), output)
+	assert.True(IsSizeKnown(sliceIter.Size()))
+	assert.Equal(6, sliceIter.Size().Allocate())
+	remain := Collect(sliceIter)
+	assert.Equal(slices.Range(4, 10), remain)
+	assert.Equal(6, cap(remain))
+}
+
 func TestTakeMore(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	iter := Take(10, Slice(input))
 	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 4, iter.Size().Allocate())
 	output := Collect(iter)
 	assert.Equal(t, input, output)
 }
@@ -227,7 +254,7 @@ func TestEmptySeq(t *testing.T) {
 func TestNegativeRange(t *testing.T) {
 	r := RangeBy(9, -1, -1)
 	assert.True(t, IsSizeKnown(r.Size()))
-	assert.Equal(t, 10, r.Size().(SizeKnown).Size)
+	assert.Equal(t, 10, r.Size().Allocate())
 	seq := Collect(r)
 	expected := []int{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
 	assert.Equal(t, expected, seq)
@@ -355,6 +382,22 @@ func TestFromSeq(t *testing.T) {
 	assert.Equal(t, slices.Range(0, 5), slice)
 }
 
+func TestFromSeqToChan(t *testing.T) {
+	seq := func(yield func(int) bool) {
+		for i := range 5 {
+			if !yield(i) {
+				break
+			}
+		}
+	}
+	itr := FromSeq(seq)
+	slice := make([]int, 0, 5)
+	for i := range itr.Chan() {
+		slice = append(slice, i)
+	}
+	assert.Equal(t, slices.Range(0, 5), slice)
+}
+
 func fib() Iterator[int] {
 	return Generate(func(c Consumer[int]) {
 		tail := [2]int{0, 1}
@@ -363,6 +406,23 @@ func fib() Iterator[int] {
 		for {
 			next := tail[0] + tail[1]
 			c.Yield(next)
+			tail[0] = tail[1]
+			tail[1] = next
+		}
+	})
+}
+
+func fibSeq() Iterator[int] {
+	return FromSeq(func(yield func(int) bool) {
+		tail := [2]int{0, 1}
+		if !(yield(tail[0]) && yield(tail[1])) {
+			return
+		}
+		for {
+			next := tail[0] + tail[1]
+			if !yield(next) {
+				return
+			}
 			tail[0] = tail[1]
 			tail[1] = next
 		}
@@ -389,6 +449,14 @@ func BenchmarkGenerateFib(b *testing.B) {
 	var sum uint64 = 0
 	for iter.Next() {
 		sum += uint64(iter.Value())
+	}
+}
+
+func BenchmarkGenerateFibSeq(b *testing.B) {
+	iter := Take(b.N, fibSeq())
+	var sum uint64 = 0
+	for v := range iter.Seq() {
+		sum += uint64(v)
 	}
 }
 
@@ -445,7 +513,7 @@ func (sf *SimpleFib) Abort() {
 }
 
 func NewFib() Iterator[int] {
-	return MakeIteratorFromSimple[int](NewSimpleFib())
+	return MakeIterator[int](NewSimpleFib())
 }
 
 func TestSimpleFib(t *testing.T) {
@@ -476,7 +544,7 @@ func (is *iterSlice[T]) Abort() {
 func TestMakeSizedIterator(t *testing.T) {
 	slice := []string{"red", "orange", "hello"}
 	simpleIter := &iterSlice[string]{slice, -1}
-	actual := Collect(MakeIteratorOfSizeFromSimple[string](simpleIter, NewSize(len(slice))))
+	actual := Collect(MakeIteratorOfSize[string](simpleIter, NewSize(len(slice))))
 	assert.Equal(t, slice, actual)
 }
 
