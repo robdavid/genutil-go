@@ -412,21 +412,23 @@ func fib() Iterator[int] {
 	})
 }
 
-func fibSeq() Iterator[int] {
-	return FromSeq(func(yield func(int) bool) {
-		tail := [2]int{0, 1}
-		if !(yield(tail[0]) && yield(tail[1])) {
+func fibPureSeq(yield func(int) bool) {
+	tail := [2]int{0, 1}
+	if !(yield(tail[0]) && yield(tail[1])) {
+		return
+	}
+	for {
+		next := tail[0] + tail[1]
+		if !yield(next) {
 			return
 		}
-		for {
-			next := tail[0] + tail[1]
-			if !yield(next) {
-				return
-			}
-			tail[0] = tail[1]
-			tail[1] = next
-		}
-	})
+		tail[0] = tail[1]
+		tail[1] = next
+	}
+}
+
+func fibSeq() Iterator[int] {
+	return FromSeq(fibPureSeq)
 }
 
 func TestGenerateFib(t *testing.T) {
@@ -457,6 +459,32 @@ func BenchmarkGenerateFibSeq(b *testing.B) {
 	var sum uint64 = 0
 	for v := range iter.Seq() {
 		sum += uint64(v)
+	}
+}
+
+func BenchmarkGenerateFibSeqNoTake(b *testing.B) {
+	iter := fibSeq()
+	var sum uint64 = 0
+	i := 0
+	for v := range iter.Seq() {
+		if i >= b.N {
+			break
+		}
+		sum += uint64(v)
+		i++
+	}
+}
+
+func BenchmarkGenerateFibSeqPure(b *testing.B) {
+	iter := fibPureSeq
+	var sum uint64 = 0
+	i := 0
+	for v := range iter {
+		if i >= b.N {
+			break
+		}
+		sum += uint64(v)
+		i++
 	}
 }
 
@@ -541,16 +569,9 @@ func (is *iterSlice[T]) Abort() {
 	is.index = len(is.slice)
 }
 
-func TestMakeSizedIterator(t *testing.T) {
-	slice := []string{"red", "orange", "hello"}
-	simpleIter := &iterSlice[string]{slice, -1}
-	actual := Collect(MakeIteratorOfSize[string](simpleIter, NewSize(len(slice))))
-	assert.Equal(t, slice, actual)
-}
-
 func TestGeneratorChan(t *testing.T) {
 	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c.Yield(i)
 		}
 	})
@@ -566,7 +587,7 @@ func TestGeneratorChan(t *testing.T) {
 
 func TestGeneratorChanAbort(t *testing.T) {
 	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c.Yield(i)
 		}
 	})
@@ -585,7 +606,7 @@ func TestGeneratorChanAbort(t *testing.T) {
 
 func TestGeneratorIterAbort(t *testing.T) {
 	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c.Yield(i)
 		}
 	})
@@ -604,7 +625,7 @@ func TestGeneratorIterAbort(t *testing.T) {
 
 func TestGeneratorMap(t *testing.T) {
 	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c.Yield(i)
 		}
 	})
@@ -618,7 +639,7 @@ func TestGeneratorMap(t *testing.T) {
 
 func TestGeneratorError(t *testing.T) {
 	gen := Generate(func(c Consumer[result.Result[int]]) {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c.Yield(result.Value(i))
 		}
 		c.Yield(result.Error[int](fmt.Errorf("iterator failed")))
@@ -636,7 +657,7 @@ func TestGeneratorError(t *testing.T) {
 // function returns an error.
 func TestGeneratorResultError(t *testing.T) {
 	gen := GenerateResults(func(c ResultConsumer[int]) error {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c.YieldValue(i)
 		}
 		return fmt.Errorf("iterator failed")
@@ -662,7 +683,7 @@ func TestGeneratorResultTry(t *testing.T) {
 		}
 	}
 	gen := GenerateResults(func(c ResultConsumer[int]) error {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c.YieldValue(eh.Try(validate(i)))
 		}
 		return nil
