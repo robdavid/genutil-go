@@ -2,6 +2,7 @@ package iterator
 
 import (
 	"fmt"
+	"iter"
 	"testing"
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
@@ -46,6 +47,7 @@ func TestFloatingRangeBy(t *testing.T) {
 	output := Collect(iter)
 	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}
 	assert.Equal(t, expected, output)
+	assert.Equal(t, 10, cap(output))
 }
 
 func TestInclusiveFloatingRangeBy(t *testing.T) {
@@ -167,6 +169,19 @@ func TestSliceIterSeq(t *testing.T) {
 		assert.Equal(t, v, i)
 		i++
 	}
+}
+
+func TestSeqIterMix(t *testing.T) {
+	assert := assert.New(t)
+	itr := Range(0, 10)
+	var first []int
+	for v := range Take(5, itr).Seq() {
+		first = append(first, v)
+	}
+	assert.Equal(slices.Range(0, 5), first)
+	second := Collect(itr)
+	assert.Equal(slices.Range(5, 10), second)
+	assert.Equal(5, cap(second))
 }
 
 func TestRange(t *testing.T) {
@@ -446,15 +461,42 @@ func TestGenerateFibChan(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func BenchmarkGenerateFib(b *testing.B) {
-	iter := Take(b.N, fib())
+func BenchmarkGenerateSimpleFib(b *testing.B) {
+	iter := newFib()
 	var sum uint64 = 0
-	for iter.Next() {
+	var count int
+	for range b.N {
+		iter.Next()
 		sum += uint64(iter.Value())
+		count++
 	}
+	assert.Equal(b, b.N, count)
 }
 
-func BenchmarkGenerateFibSeq(b *testing.B) {
+func BenchmarkGenerateFib(b *testing.B) {
+	iter := fib()
+	var sum uint64 = 0
+	var count int
+	for range b.N {
+		iter.Next()
+		sum += uint64(iter.Value())
+		count++
+	}
+	assert.Equal(b, b.N, count)
+}
+
+func BenchmarkGenerateTakeFib(b *testing.B) {
+	iter := Take(b.N, fib())
+	var sum uint64 = 0
+	var count int
+	for iter.Next() {
+		sum += uint64(iter.Value())
+		count++
+	}
+	assert.Equal(b, b.N, count)
+}
+
+func BenchmarkGenerateTakeFibSeq(b *testing.B) {
 	iter := Take(b.N, fibSeq())
 	var sum uint64 = 0
 	for v := range iter.Seq() {
@@ -462,7 +504,7 @@ func BenchmarkGenerateFibSeq(b *testing.B) {
 	}
 }
 
-func BenchmarkGenerateFibSeqNoTake(b *testing.B) {
+func BenchmarkGenerateFibSeq(b *testing.B) {
 	iter := fibSeq()
 	var sum uint64 = 0
 	i := 0
@@ -486,6 +528,23 @@ func BenchmarkGenerateFibSeqPure(b *testing.B) {
 		sum += uint64(v)
 		i++
 	}
+}
+
+func BenchmarkGenerateFibSeqPull(b *testing.B) {
+	itr := fibPureSeq
+	next, stop := iter.Pull(itr)
+	defer stop()
+	var sum uint64 = 0
+	var count int
+	for range b.N {
+		if v, ok := next(); !ok {
+			break
+		} else {
+			sum += uint64(v)
+			count++
+		}
+	}
+	assert.Equal(b, b.N, count)
 }
 
 func BenchmarkGenerateFib2(b *testing.B) {
@@ -531,7 +590,8 @@ func (sf *SimpleFib) Next() bool {
 	if sf[1] == 0 {
 		return false
 	} else {
-		*sf = SimpleFib{sf[1], sf[0] + sf[1]}
+		sf[0], sf[1] = sf[1], sf[0]+sf[1]
+		// *sf = SimpleFib{sf[1], sf[0] + sf[1]}
 		return true
 	}
 }
@@ -540,15 +600,120 @@ func (sf *SimpleFib) Abort() {
 	sf[1] = 0
 }
 
-func NewFib() Iterator[int] {
+func newFib() Iterator[int] {
 	return MakeIterator[int](NewSimpleFib())
 }
 
 func TestSimpleFib(t *testing.T) {
-	fib := NewFib()
+	fib := newFib()
 	seq := Collect(Take(10, fib))
 	expected := []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
 	assert.Equal(t, expected, seq)
+}
+
+func repeatSeq[T any](r int, v T) func(func(T) bool) {
+	return func(yield func(T) bool) {
+		for range r {
+			if !yield(v) {
+				break
+			}
+		}
+	}
+}
+
+var repeatSeqInt func(int, int) func(func(int) bool) = repeatSeq[int]
+
+func repeatSeqIter[T any](r int, v T) Iterator[T] {
+	return FromSeq(repeatSeq(r, v))
+}
+
+type repeatSimpleIter[T any] struct {
+	DefaultIterator[T]
+	index, repetitions int
+	value              T
+}
+
+func (rsi *repeatSimpleIter[T]) Next() bool {
+	if rsi.index < rsi.repetitions {
+		rsi.index++
+		return true
+	} else {
+		return false
+	}
+}
+
+func (rsi *repeatSimpleIter[T]) Value() T {
+	return rsi.value
+}
+
+func (rsi *repeatSimpleIter[T]) Abort() {
+	rsi.index = rsi.repetitions
+}
+
+func repeatIter[T any](r int, v T) Iterator[T] {
+	rsi := &repeatSimpleIter[T]{repetitions: r, value: v}
+	rsi.SimpleIterator = rsi
+	return rsi
+}
+
+func BenchmarkBaseSeq(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeq(b.N, value)
+	for v := range seqIter {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBaseSeqNonopt(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeqInt(b.N, value)
+	for v := range seqIter {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBaseSeqIter(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeqIter(b.N, value)
+	for v := range seqIter.Seq() {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBaseSimple(b *testing.B) {
+	var sum uint64
+	const value = 3
+	itr := repeatIter(b.N, value)
+	for itr.Next() {
+		sum += uint64(itr.Value())
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkSeqSimple(b *testing.B) {
+	var sum uint64
+	const value = 3
+	itr := repeatIter(b.N, value)
+	for v := range itr.Seq() {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBSimpleSeq(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeqIter(b.N, value)
+	for seqIter.Next() {
+		sum += uint64(seqIter.Value())
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
 }
 
 type iterSlice[T any] struct {

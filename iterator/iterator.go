@@ -718,10 +718,12 @@ type takeIterator[T any] struct {
 	count, max int
 	aborted    bool
 	iterator   Iterator[T]
+	value      T
 }
 
 func (ti *takeIterator[T]) Value() T {
-	return ti.iterator.Value()
+	ti.value = ti.iterator.Value()
+	return ti.value
 }
 
 func (ti *takeIterator[T]) Abort() {
@@ -742,14 +744,17 @@ func (ti *takeIterator[T]) Next() bool {
 
 func (ti *takeIterator[T]) Seq() iter.Seq[T] {
 	return func(yield func(T) bool) {
-		if ti.count < ti.max {
-			for v := range ti.iterator.Seq() {
-				if !yield(v) {
-					ti.Abort()
-					break
-				}
-				ti.count++
-				if ti.count >= ti.max {
+		if ti.count < ti.max && !ti.aborted {
+			next, _ := iter.Pull(ti.iterator.Seq())
+			for ti.count < ti.max {
+				var ok bool
+				if ti.value, ok = next(); ok {
+					if !yield(ti.value) {
+						ti.aborted = true
+						break
+					}
+					ti.count++
+				} else {
 					break
 				}
 			}
@@ -769,8 +774,9 @@ func (ti *takeIterator[T]) Size() IteratorSize {
 		return NewSizeAtMost(min(remain, itrSize.Size))
 	case SizeInfinite:
 		return NewSize(remain)
+	default:
+		panic(ErrInvalidIteratorSizeType)
 	}
-	panic(ErrInvalidIteratorSizeType)
 }
 
 // Take transforms an iterator into an iterator the returns the
