@@ -9,6 +9,7 @@ import (
 	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCollectInto(t *testing.T) {
@@ -37,6 +38,15 @@ func TestFloatingRange(t *testing.T) {
 	assert.Equal(t, 5, iter.Size().Allocate())
 	output := Collect(iter)
 	expected := []float64{0.0, 1.0, 2.0, 3.0, 4.0}
+	assert.Equal(t, expected, output)
+}
+
+func TestReverseFloatingRange(t *testing.T) {
+	iter := Range(5.0, 0.0)
+	assert.True(t, IsSizeKnown(iter.Size()))
+	assert.Equal(t, 5, iter.Size().Allocate())
+	output := Collect(iter)
+	expected := []float64{5.0, 4.0, 3.0, 2.0, 1.0}
 	assert.Equal(t, expected, output)
 }
 
@@ -78,11 +88,12 @@ func TestInclusiveFloatingRangeDesc(t *testing.T) {
 }
 
 func TestInvalidRange(t *testing.T) {
-	iter := RangeBy(5.0, 0.0, 0.5)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 0, iter.Size().Allocate())
-	output := Collect(iter)
-	assert.Empty(t, output)
+	defer func() {
+		r := recover()
+		require.NotNil(t, r)
+		assert.ErrorIs(t, r.(error), ErrInvalidIteratorRange)
+	}()
+	RangeBy(5.0, 0.0, 0.5)
 }
 
 func TestZeroRange(t *testing.T) {
@@ -222,6 +233,16 @@ func TestRangeSeq(t *testing.T) {
 	assert.Equal(t, 10, i)
 }
 
+func TestReverseRangeSeq(t *testing.T) {
+	r := Range(10, 0)
+	i := 10
+	for v := range r.Seq() {
+		assert.Equal(t, i, v)
+		i -= 1
+	}
+	assert.Equal(t, 0, i)
+}
+
 func TestInclusiveRangeChan(t *testing.T) {
 	r := IncRange(0, 10)
 	i := 0
@@ -252,7 +273,7 @@ func TestRangeFor(t *testing.T) {
 }
 
 func TestEmptyRange(t *testing.T) {
-	r := Range(10, 9)
+	r := Range(10, 10)
 	seq := Collect(r)
 	assert.Empty(t, seq)
 }
@@ -276,7 +297,7 @@ func TestNegativeRange(t *testing.T) {
 }
 
 func TestEmptyNegativeRange(t *testing.T) {
-	r := RangeBy(0, 10, -1)
+	r := RangeBy(10, 10, -1)
 	seq := Collect(r)
 	assert.Empty(t, seq)
 }
@@ -714,6 +735,34 @@ func BenchmarkBSimpleSeq(b *testing.B) {
 		sum += uint64(seqIter.Value())
 	}
 	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func rangeSum(from, to int) uint64 {
+	return (uint64(to-from) * (uint64(from) + uint64(to-1))) / 2
+}
+
+func BenchmarkSeqRange(b *testing.B) {
+	var sum uint64
+	for v := range Range(0, b.N).Seq() {
+		sum += uint64(v)
+	}
+	assert.Equal(b, rangeSum(0, b.N), sum)
+}
+
+func BenchmarkSimpleRange(b *testing.B) {
+	var sum uint64
+	for itr := Range(0, b.N); itr.Next(); {
+		sum += uint64(itr.Value())
+	}
+	assert.Equal(b, rangeSum(0, b.N), sum)
+}
+
+func BenchmarkSeqFromSimpleRange(b *testing.B) {
+	var sum uint64
+	for v := range Seq(Range(0, b.N)) {
+		sum += uint64(v)
+	}
+	assert.Equal(b, rangeSum(0, b.N), sum)
 }
 
 type iterSlice[T any] struct {

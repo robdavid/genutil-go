@@ -8,6 +8,7 @@ import (
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/internal/rangehelper"
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/ordered"
@@ -20,6 +21,7 @@ const maxUncertainAllocation = 100000
 
 var ErrAllocationSizeInfinite = errors.New("cannot allocate storage for an infinite iterator")
 var ErrInvalidIteratorSizeType = errors.New("invalid iterator size type")
+var ErrInvalidIteratorRange = errors.New("invalid iterator range")
 
 // SimpleIterator supports a simple sequence of elements
 type SimpleIterator[T any] interface {
@@ -325,18 +327,39 @@ type rangeIter[T ordered.Real, S ordered.Real] struct {
 	inclusive bool
 }
 
+func (ri *rangeIter[T, S]) incdec() {
+	if ri.by < 0 {
+		ri.index -= T(-ri.by) // T might not be signed
+	} else {
+		ri.index += T(ri.by)
+	}
+}
+
+func (ri *rangeIter[T, S]) validateRange() {
+	if ri.by == 0 && ri.index != ri.to {
+		panic(fmt.Errorf("%w: step is zero", ErrInvalidIteratorRange))
+	}
+	if (ri.by > 0 && ri.to < ri.index) || (ri.by < 0 && ri.to > ri.index) {
+		panic(fmt.Errorf("%w: negative step or inverse range (but not both)", ErrInvalidIteratorRange))
+	}
+}
+
 func (ri *rangeIter[T, S]) Next() bool {
-	if !ri.inclusive && ri.index == ri.to {
-		return false
-	} else if ri.by < 0 {
-		if ri.index < ri.to {
+	if ri.index == ri.to {
+		// Handles the case where by is zero, which is valid if index is at the end
+		if ri.inclusive {
+			ri.value = ri.index
+			ri.inclusive = false // Causes iterator to terminate next time
+			return true
+		} else {
 			return false
 		}
-	} else if ri.index > ri.to {
+	}
+	if (ri.by < 0 && ri.index < ri.to) || (ri.by > 0 && ri.index > ri.to) {
 		return false
 	}
 	ri.value = ri.index
-	ri.index += T(ri.by)
+	ri.incdec()
 	return true
 }
 
@@ -345,41 +368,71 @@ func (ri *rangeIter[T, S]) Value() T {
 }
 
 func (ri *rangeIter[T, S]) Abort() {
-	if ri.inclusive {
-		ri.index = ri.to + T(ri.by)
-	} else {
-		ri.index = ri.to
-	}
+	ri.index = ri.to
+	ri.inclusive = false
 }
 
 func (ri *rangeIter[T, S]) Chan() <-chan T {
-	return Chan[T](ri)
+	return Chan(ri)
 }
 
 func (ri *rangeIter[T, S]) Seq() iter.Seq[T] {
-	return Seq(ri)
+	return func(yield func(T) bool) {
+		defer ri.Abort()
+		if ri.index == ri.to {
+			if ri.inclusive {
+				yield(ri.index)
+			}
+			return
+		}
+		size, aStep := rangehelper.RangeSize(ri.index, ri.to, ri.by, ri.inclusive)
+		if ri.by < 0 {
+			for range size {
+				if !yield(ri.index) {
+					break
+				}
+				ri.index -= aStep
+			}
+		} else {
+			for range size {
+				if !yield(ri.index) {
+					break
+				}
+				ri.index += aStep
+			}
+		}
+
+	}
 }
 
 func (ri *rangeIter[T, S]) Size() IteratorSize {
 	var size int
-	if (ri.index > ri.to && ri.by > 0) || (ri.index < ri.to && ri.by < 0) {
+	if ri.index == ri.to {
+		size = functions.IfElse(ri.inclusive, 1, 0)
+	} else if (ri.index > ri.to && ri.by > 0) || (ri.index < ri.to && ri.by < 0) {
 		size = 0
 	} else {
-		size, _ = rangehelper.RangeSize[T, S](ri.index, ri.to, ri.by, ri.inclusive)
+		size, _ = rangehelper.RangeSize(ri.index, ri.to, ri.by, ri.inclusive)
 	}
 	return NewSize(size)
+}
+
+func newRangeIter[T ordered.Real, S ordered.Real](from, upto T, by S, inclusive bool) *rangeIter[T, S] {
+	itr := rangeIter[T, S]{index: from, to: upto, by: by, inclusive: inclusive}
+	itr.validateRange()
+	return &itr
 }
 
 // Range creates an iterator that ranges from `from` to
 // `upto` exclusive
 func Range[T ordered.Real](from, upto T) Iterator[T] {
-	return &rangeIter[T, int]{from, upto, 1, 0, false}
+	return newRangeIter(from, upto, functions.IfElse(upto < from, -1, 1), false)
 }
 
 // Range creates an iterator that ranges from `from` to
 // `upto` inclusive
 func IncRange[T ordered.Real](from, upto T) Iterator[T] {
-	return &rangeIter[T, int]{from, upto, 1, 0, true}
+	return newRangeIter(from, upto, functions.IfElse(upto < from, -1, 1), true)
 }
 
 // RangeBy creates an iterator that ranges from `from` up to
@@ -388,28 +441,16 @@ func IncRange[T ordered.Real](from, upto T) Iterator[T] {
 // but it cannot be zero unless from == upto, in which case
 // an empty iterator is returned.
 func RangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] {
-	if by == 0 {
-		if from == upto {
-			return Empty[T]()
-		}
-		panic("Illegal range by zero")
-	}
-	return &rangeIter[T, S]{from, upto, by, 0, false}
+	return newRangeIter(from, upto, by, false)
 }
 
 // RangeBy creates an iterator that ranges from `from` up to
 // `upto` inclusive, incrementing by `by` each step.
 // This can be negative (and `upto` should be less than `from`),
 // but it cannot be zero unless from == upto, in which case
-// an empty iterator is returned.
+// an iterator with a single value is returned.
 func IncRangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] {
-	if by == 0 {
-		if from != upto {
-			panic("Illegal range by zero")
-		}
-		return &rangeIter[T, S]{from, upto, 1, 0, true}
-	}
-	return &rangeIter[T, S]{from, upto, by, 0, true}
+	return newRangeIter(from, upto, by, true)
 }
 
 type emptyIter[T any] struct{}
