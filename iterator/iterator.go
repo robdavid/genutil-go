@@ -388,17 +388,19 @@ func (ri *rangeIter[T, S]) Seq() iter.Seq[T] {
 		size, aStep := rangehelper.RangeSize(ri.index, ri.to, ri.by, ri.inclusive)
 		if ri.by < 0 {
 			for range size {
-				if !yield(ri.index) {
+				index := ri.index
+				ri.index -= aStep
+				if !yield(index) {
 					break
 				}
-				ri.index -= aStep
 			}
 		} else {
 			for range size {
-				if !yield(ri.index) {
+				index := ri.index
+				ri.index += aStep
+				if !yield(index) {
 					break
 				}
-				ri.index += aStep
 			}
 		}
 
