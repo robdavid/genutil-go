@@ -171,9 +171,9 @@ func IsSizeInfinite(size IteratorSize) bool {
 	return size.Type == SizeInfinite
 }
 
-// FuncNext is a function supporting a transforming operation by consuming
+// funcNext is a function supporting a transforming operation by consuming
 // all or part of an iterator, returning the next value
-type FuncNext[T any, U any] func(Iterator[T]) (bool, U)
+type funcNext[T any, U any] func(Iterator[T]) (bool, U)
 
 func safeClose[T any](ch chan T) (ok bool) {
 	defer func() {
@@ -210,15 +210,6 @@ func Chan[T any](iter SimpleIterator[T]) (out chan T) {
 	return
 }
 
-type sizedIterator[T any] struct {
-	SimpleIterator[T]
-	size IteratorSize
-}
-
-func (si sizedIterator[T]) Size() IteratorSize {
-	return si.size
-}
-
 // MakeIterator creates a generic iterator from a simple iterator. Provides an implementation
 // of additional Iterator methods.
 func MakeIterator[T any](base SimpleIterator[T]) Iterator[T] {
@@ -227,11 +218,11 @@ func MakeIterator[T any](base SimpleIterator[T]) Iterator[T] {
 
 // mapIter wraps an iterator and adds a mapping function
 type mapIter[T, U any] struct {
-	base    Iterator[T]
-	mapping FuncNext[T, U]
-	value   option.Option[U]
-	outChan chan U
-	size    IteratorSize
+	DefaultIterator[U]
+	base     Iterator[T]
+	mapping  funcNext[T, U]
+	value    U
+	sizeFunc func(IteratorSize) IteratorSize
 }
 
 func (i *mapIter[T, U]) Next() bool {
@@ -239,42 +230,29 @@ func (i *mapIter[T, U]) Next() bool {
 	if !ok {
 		return false
 	} else {
-		i.value.Set(value)
+		i.value = value
 		return true
 	}
 }
 
 func (i *mapIter[T, U]) Value() U {
-	return i.value.GetOrZero()
+	return i.value
 }
 
 func (i *mapIter[T, U]) Abort() {
-	if i.outChan != nil {
-		safeClose(i.outChan)
-		i.outChan = nil
-	}
 	i.base.Abort()
 }
 
-func (i *mapIter[T, U]) Chan() <-chan U {
-	if i.outChan == nil {
-		i.outChan = Chan[U](i)
-	}
-	return i.outChan
-}
-
 func (i *mapIter[T, U]) Size() IteratorSize {
-	return i.size
+	return i.sizeFunc(i.base.Size())
 }
 
-func (i *mapIter[T, U]) Seq() iter.Seq[U] {
-	return Seq(i)
-}
-
-// wrapFunc creates a new iterator from an existing operator and a function that consumes it, yielding
+// wrapFunc creates a new iterator from an existing iterator and a function that consumes it, yielding
 // one element at a time.
-func wrapFunc[T any, U any](iterator Iterator[T], f FuncNext[T, U], size IteratorSize) Iterator[U] {
-	return &mapIter[T, U]{base: iterator, mapping: f, value: option.Empty[U](), size: size}
+func wrapFunc[T any, U any](iterator Iterator[T], f funcNext[T, U], sizeFunc func(sz IteratorSize) IteratorSize) Iterator[U] {
+	itr := &mapIter[T, U]{base: iterator, mapping: f, sizeFunc: sizeFunc}
+	itr.SimpleIterator = itr
+	return itr
 }
 
 // Iterator over a slice
@@ -305,6 +283,18 @@ func (si *sliceIter[T]) Abort() {
 
 func (si *sliceIter[T]) Size() IteratorSize {
 	return NewSize(len(si.slice) - si.index)
+}
+
+func (si *sliceIter[T]) Seq() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		defer si.Abort()
+		for si.index = 0; si.index < len(si.slice); si.index++ {
+			si.value = si.slice[si.index]
+			if !yield(si.value) {
+				break
+			}
+		}
+	}
 }
 
 // Slice makes an Iterator[T] from slice []T, containing all the elements
@@ -467,9 +457,7 @@ func (emptyIter[T]) Chan() <-chan T {
 	return c
 }
 func (emptyIter[T]) Seq() iter.Seq[T] {
-	return func(yield func(T) bool) {
-		return
-	}
+	return func(yield func(T) bool) {}
 }
 
 // Empty creates an iterator that returns no items.
@@ -484,7 +472,7 @@ func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
 		}
 		return
 	}
-	return wrapFunc(iter, mapNext, iter.Size())
+	return wrapFunc(iter, mapNext, functions.Id)
 }
 
 // Filter applies a filter function `predicate` of type `func(T) bool`, producing
@@ -502,7 +490,7 @@ func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
 			return
 		}
 	}
-	return wrapFunc(iter, filterNext, iter.Size().Subset())
+	return wrapFunc(iter, filterNext, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
 
 // FilterMap applies both transformation and filtering logic to an iterator. The function `mapping` is
@@ -520,7 +508,7 @@ func FilterMap[T any, U any](iter Iterator[T], mapping func(T) option.Option[U])
 			return
 		}
 	}
-	return wrapFunc(iter, filterMapNext, iter.Size().Subset())
+	return wrapFunc(iter, filterMapNext, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
 
 // FilterValues takes an iterator of results and returns an iterator of the underlying

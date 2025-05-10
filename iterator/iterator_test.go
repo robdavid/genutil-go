@@ -259,6 +259,7 @@ func TestInclusiveRangeSeq(t *testing.T) {
 	for v := range r.Seq() {
 		assert.Equal(t, i, v)
 		i += 1
+		assert.Equal(t, 11-i, r.Size().Size)
 	}
 	assert.Equal(t, 11, i)
 }
@@ -269,6 +270,7 @@ func TestRangeFor(t *testing.T) {
 	for r.Next() {
 		assert.Equal(t, i, r.Value())
 		i += 1
+		assert.Equal(t, 10-i, r.Size().Size)
 	}
 }
 
@@ -367,6 +369,48 @@ func TestMapIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
 	actual := Collect(Map(Slice(input), func(n int) int { return n * 2 }))
+	assert.Equal(t, expected, actual)
+}
+
+func TestMapIterChan(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	mi := Map(Slice(input), func(n int) int { return n * 2 })
+	actual := make([]int, 0, mi.Size().Allocate())
+	for v := range mi.Chan() {
+		actual = append(actual, v)
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestMapIterSeq(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	mi := Map(Slice(input), func(n int) int { return n * 2 })
+	actual := make([]int, 0, mi.Size().Allocate())
+	size := len(input)
+	assert.Equal(t, size, mi.Size().Size)
+	for v := range mi.Seq() {
+		actual = append(actual, v)
+		size--
+		assert.Equal(t, size, mi.Size().Size)
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestMapIterChanAbort(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4}
+	mi := Map(Slice(input), func(n int) int { return n * 2 })
+	actual := make([]int, 0, mi.Size().Allocate())
+	i := 0
+	for v := range mi.Chan() {
+		actual = append(actual, v)
+		i++
+		if i == 2 {
+			mi.Abort()
+		}
+	}
 	assert.Equal(t, expected, actual)
 }
 
