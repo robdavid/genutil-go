@@ -68,8 +68,9 @@ type SizedIterator[T any] interface {
 // Generic iterator
 type Iterator[T any] interface {
 	SizedIterator[T]
-	// Chan returns iterator as a channel.
+	// Chan returns the iterator as a channel.
 	Chan() <-chan T
+	// Seq returns the iterator as a Go iter.Seq function.
 	Seq() iter.Seq[T]
 }
 
@@ -540,14 +541,12 @@ func Collect[T any](iter Iterator[T]) []T {
 }
 
 // CollectResults collects all elements from an iterator of results into a result of slice of the iterator's underlying type
-// If the iterator returns an error result at any point, this call will terminate and return that error in the
-// result, along with the elements collected thus far.
+// If the iterator returns an error result at any point, this call will terminate and return that error, along with the elements
+// collected thus far.
 func CollectResults[T any](iter Iterator[result.Result[T]]) ([]T, error) {
 	collectResult := make([]T, 0, iter.Size().Allocate())
-	for iter.Next() {
-		res := iter.Value()
+	for res := range iter.Seq() {
 		if res.IsError() {
-			iter.Abort()
 			return collectResult, res.GetErr()
 		}
 		collectResult = append(collectResult, res.Get())
@@ -560,8 +559,8 @@ func CollectResults[T any](iter Iterator[result.Result[T]]) ([]T, error) {
 func PartitionResults[T any](iter Iterator[result.Result[T]]) ([]T, []error) {
 	values := make([]T, 0, iter.Size().Allocate())
 	var errs []error
-	for iter.Next() {
-		if res := iter.Value(); res.IsError() {
+	for res := range iter.Seq() {
+		if res.IsError() {
 			errs = append(errs, res.GetErr())
 		} else {
 			values = append(values, res.Must())
@@ -575,9 +574,8 @@ func PartitionResults[T any](iter Iterator[result.Result[T]]) ([]T, []error) {
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns false.
 func All[T any](iter Iterator[T], predicate func(v T) bool) bool {
-	for iter.Next() {
-		if !predicate(iter.Value()) {
-			iter.Abort()
+	for v := range iter.Seq() {
+		if !predicate(v) {
 			return false
 		}
 	}
@@ -589,9 +587,8 @@ func All[T any](iter Iterator[T], predicate func(v T) bool) bool {
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns true.
 func Any[T any](iter Iterator[T], predicate func(v T) bool) bool {
-	for iter.Next() {
-		if predicate(iter.Value()) {
-			iter.Abort()
+	for v := range iter.Seq() {
+		if predicate(v) {
 			return true
 		}
 	}
