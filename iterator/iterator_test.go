@@ -457,7 +457,7 @@ func TestFromSeq(t *testing.T) {
 			}
 		}
 	}
-	itr := FromSeq(seq)
+	itr := New(seq)
 	slice := Collect(itr)
 	assert.Equal(t, slices.Range(0, 5), slice)
 }
@@ -470,7 +470,7 @@ func TestFromSeqToChan(t *testing.T) {
 			}
 		}
 	}
-	itr := FromSeq(seq)
+	itr := New(seq)
 	slice := make([]int, 0, 5)
 	for i := range itr.Chan() {
 		slice = append(slice, i)
@@ -508,7 +508,7 @@ func fibPureSeq(yield func(int) bool) {
 }
 
 func fibSeq() Iterator[int] {
-	return FromSeq(fibPureSeq)
+	return New(fibPureSeq)
 }
 
 func TestGenerateFib(t *testing.T) {
@@ -689,7 +689,7 @@ func repeatSeq[T any](r int, v T) func(func(T) bool) {
 var repeatSeqInt func(int, int) func(func(int) bool) = repeatSeq[int]
 
 func repeatSeqIter[T any](r int, v T) Iterator[T] {
-	return FromSeq(repeatSeq(r, v))
+	return New(repeatSeq(r, v))
 }
 
 type repeatSimpleIter[T any] struct {

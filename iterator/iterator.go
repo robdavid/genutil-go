@@ -95,14 +95,14 @@ func (di DefaultIterator[T]) Size() IteratorSize {
 	return NewSizeUnknown()
 }
 
-type DefaultSeqIterator[T any] struct {
+type SeqIterator[T any] struct {
 	seq   iter.Seq[T]
 	stop  func()
 	next  func() (T, bool)
 	value T
 }
 
-func (si *DefaultSeqIterator[T]) Next() (ok bool) {
+func (si *SeqIterator[T]) Next() (ok bool) {
 	if si.next == nil {
 		si.next, si.stop = iter.Pull(si.seq)
 	}
@@ -110,15 +110,73 @@ func (si *DefaultSeqIterator[T]) Next() (ok bool) {
 	return
 }
 
-func (si *DefaultSeqIterator[T]) Value() T {
+func (si *SeqIterator[T]) Value() T {
 	return si.value
 }
 
-func (si *DefaultSeqIterator[T]) Abort() {
+func (si *SeqIterator[T]) Abort() {
 	if si.next == nil {
 		si.next, si.stop = iter.Pull(si.seq)
 	}
 	si.stop()
+}
+
+func (si *SeqIterator[T]) Seq() iter.Seq[T] {
+	return si.seq
+}
+
+func (*SeqIterator[T]) Size() IteratorSize {
+	return NewSizeUnknown()
+}
+
+func (si *SeqIterator[T]) Chan() <-chan T {
+	out := make(chan T)
+	go func() {
+		defer safeClose(out)
+		for v := range si.seq {
+			if !safeSend(out, v) {
+				break
+			}
+		}
+	}()
+	return out
+}
+
+func NewSeqIterator[T any](seq iter.Seq[T]) *SeqIterator[T] {
+	return &SeqIterator[T]{seq: seq}
+}
+
+func New[T any](seq iter.Seq[T]) Iterator[T] {
+	return NewSeqIterator(seq)
+}
+
+type Seq2Iterator[K any, V any] struct {
+	SeqIterator[tuple.Tuple2[K, V]]
+	seq2 iter.Seq2[K, V]
+}
+
+func (si *Seq2Iterator[K, V]) Seq2() iter.Seq2[K, V] {
+	return si.seq2
+}
+
+func NewSeqIterator2[K any, V any](seq2 iter.Seq2[K, V]) *Seq2Iterator[K, V] {
+	type pair = tuple.Tuple2[K, V]
+	seq := func(yield func(pair) bool) {
+		for k, v := range seq2 {
+			if !yield(tuple.Of2(k, v)) {
+				break
+			}
+		}
+	}
+	itr2 := Seq2Iterator[K, V]{
+		seq2:        seq2,
+		SeqIterator: *NewSeqIterator(seq),
+	}
+	return &itr2
+}
+
+func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
+	return NewSeqIterator2(seq2)
 }
 
 type IteratorSizeType int
@@ -845,62 +903,4 @@ func Take[T any](n int, iter Iterator[T]) Iterator[T] {
 	i := &takeIterator[T]{iterator: iter, max: n}
 	i.SimpleIterator = i
 	return i
-}
-
-// SeqIterator is an iterator based on a Go iter.Seq
-type SeqIterator[T any] struct {
-	DefaultIterator[T]
-	seq     iter.Seq[T]
-	seqNext func() (T, bool)
-	seqStop func()
-	value   T
-}
-
-// FromSeq creates an iterator from a Go iter.Seq function
-func FromSeq[T any](seq iter.Seq[T]) Iterator[T] {
-	var si SeqIterator[T]
-	si.SimpleIterator = &si
-	si.seq = seq
-	si.seqNext, si.seqStop = iter.Pull(seq)
-	return &si
-}
-
-// FromSeq creates an iterator from a Go iter.Seq2 function
-func FromSeq2[K any, V any](seq iter.Seq2[K, V]) Iterator[tuple.Tuple2[K, V]] {
-	var si SeqIterator[tuple.Tuple2[K, V]]
-	si.seq = func(yield func(tuple.Tuple2[K, V]) bool) {
-		for k, v := range seq {
-			if !yield(tuple.Pair(k, v)) {
-				break
-			}
-		}
-	}
-	var seq2Next func() (K, V, bool)
-	seq2Next, si.seqStop = iter.Pull2(seq)
-	si.seqNext = func() (tuple.Tuple2[K, V], bool) {
-		k, v, b := seq2Next()
-		return tuple.Pair(k, v), b
-	}
-	return &si
-}
-
-func (si *SeqIterator[T]) Next() (next bool) {
-	si.value, next = si.seqNext()
-	return
-}
-
-func (si *SeqIterator[T]) Value() T {
-	return si.value
-}
-
-func (si *SeqIterator[T]) Abort() {
-	si.seqStop()
-}
-
-func (si *SeqIterator[T]) Seq() iter.Seq[T] {
-	return si.seq
-}
-
-func (si *SeqIterator[T]) Size() IteratorSize {
-	return NewSizeUnknown()
 }

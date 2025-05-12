@@ -286,7 +286,7 @@ func FindUsingRef[K comparable, T any](m map[K]T, p func(*K, *T) bool) option.Op
 
 // Returns an iterator over the keys of a map.
 func IterKeys[K comparable, T any](m map[K]T) iterator.Iterator[K] {
-	return iterator.FromSeq(func(yield func(K) bool) {
+	return iterator.New(func(yield func(K) bool) {
 		for k := range m {
 			if !yield(k) {
 				break
@@ -297,7 +297,7 @@ func IterKeys[K comparable, T any](m map[K]T) iterator.Iterator[K] {
 
 // Returns an iterator over the values of a map.
 func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
-	return iterator.FromSeq(func(yield func(T) bool) {
+	return iterator.New(func(yield func(T) bool) {
 		for _, v := range m {
 			if !yield(v) {
 				break
@@ -308,8 +308,8 @@ func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
 
 // Returns an iterator over the keys and values of a map, returning each pair
 // as 2-tuple
-func IterItems[K comparable, T any](m map[K]T) iterator.Iterator[tuple.Tuple2[K, T]] {
-	return iterator.FromSeq2(func(yield func(K, T) bool) {
+func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
+	return iterator.New2(func(yield func(K, T) bool) {
 		for k, v := range m {
 			if !yield(k, v) {
 				break
