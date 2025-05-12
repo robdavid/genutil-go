@@ -74,6 +74,11 @@ type Iterator[T any] interface {
 	Seq() iter.Seq[T]
 }
 
+type Iterator2[K any, V any] interface {
+	Iterator[tuple.Tuple2[K, V]]
+	Seq2() iter.Seq2[K, V]
+}
+
 type DefaultIterator[T any] struct {
 	SimpleIterator[T]
 }
@@ -88,6 +93,32 @@ func (di DefaultIterator[T]) Seq() iter.Seq[T] {
 
 func (di DefaultIterator[T]) Size() IteratorSize {
 	return NewSizeUnknown()
+}
+
+type DefaultSeqIterator[T any] struct {
+	seq   iter.Seq[T]
+	stop  func()
+	next  func() (T, bool)
+	value T
+}
+
+func (si *DefaultSeqIterator[T]) Next() (ok bool) {
+	if si.next == nil {
+		si.next, si.stop = iter.Pull(si.seq)
+	}
+	si.value, ok = si.next()
+	return
+}
+
+func (si *DefaultSeqIterator[T]) Value() T {
+	return si.value
+}
+
+func (si *DefaultSeqIterator[T]) Abort() {
+	if si.next == nil {
+		si.next, si.stop = iter.Pull(si.seq)
+	}
+	si.stop()
 }
 
 type IteratorSizeType int
