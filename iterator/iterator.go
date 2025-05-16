@@ -58,8 +58,8 @@ func Seq2[K any, V any](i SimpleIterator[tuple.Tuple2[K, V]]) iter.Seq2[K, V] {
 	}
 }
 
-// SizedIterator is an extension of SimpleIterator that also holds some sizing information
-type SizedIterator[T any] interface {
+// SimpleSizedIterator is an extension of SimpleIterator that also holds some sizing information
+type SimpleSizedIterator[T any] interface {
 	SimpleIterator[T]
 	// Size is an estimate, where possible, of the number of elements remaining.
 	Size() IteratorSize
@@ -67,7 +67,7 @@ type SizedIterator[T any] interface {
 
 // Generic iterator
 type Iterator[T any] interface {
-	SizedIterator[T]
+	SimpleSizedIterator[T]
 	// Chan returns the iterator as a channel.
 	Chan() <-chan T
 	// Seq returns the iterator as a Go iter.Seq function.
@@ -81,7 +81,7 @@ type Iterator2[K any, V any] interface {
 }
 
 type DefaultIterator[T any] struct {
-	SizedIterator[T]
+	SimpleSizedIterator[T]
 }
 
 func (di DefaultIterator[T]) Chan() <-chan T {
@@ -93,7 +93,7 @@ func (di DefaultIterator[T]) Seq() iter.Seq[T] {
 }
 
 type enumeratedSizedIterator[T any] struct {
-	base  SizedIterator[T]
+	base  SimpleSizedIterator[T]
 	index int
 }
 
@@ -119,14 +119,14 @@ func (esi *enumeratedSizedIterator[T]) Size() IteratorSize {
 
 func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
 	itr2 := DefaultIterator[tuple.Tuple2[int, T]]{
-		SizedIterator: &enumeratedSizedIterator[T]{
-			base: di.SizedIterator,
+		SimpleSizedIterator: &enumeratedSizedIterator[T]{
+			base: di.SimpleSizedIterator,
 		},
 	}
 	return New2FromIterator(itr2)
 }
 
-type SizedSeqIterator[T any] interface {
+type SizedSeq[T any] interface {
 	Seq() iter.Seq[T]
 	Size() IteratorSize
 }
@@ -144,7 +144,7 @@ func (unknownSizeSeqIterator[T]) Size() IteratorSize {
 }
 
 type SeqIterator[T any] struct {
-	SizedSeqIterator[T]
+	SizedSeq[T]
 	stop  func()
 	next  func() (T, bool)
 	value T
@@ -182,12 +182,33 @@ func (si *SeqIterator[T]) Chan() <-chan T {
 	return out
 }
 
-func (si *SeqIterator[T]) Enumerate() Iterator2[int, T] {
+type enumeratedSizedSeq[T any] struct {
+	size func() IteratorSize
+	seq  iter.Seq[T]
+}
 
+func (ess enumeratedSizedSeq[T]) Size() IteratorSize { return ess.size() }
+
+func (ess enumeratedSizedSeq[T]) Seq() iter.Seq[tuple.Tuple2[int, T]] {
+	return func(yield func(yield tuple.Tuple2[int, T]) bool) {
+		i := 0
+		for v := range ess.seq {
+			if !yield(tuple.Of2(i, v)) {
+				break
+			}
+			i++
+		}
+	}
+}
+
+func (si *SeqIterator[T]) Enumerate() Iterator2[int, T] {
+	esSeq := enumeratedSizedSeq[T]{size: si.Size, seq: si.Seq()}
+	seq := SeqIterator[tuple.Tuple2[int, T]]{SizedSeq: esSeq}
+	return New2FromIterator(&seq)
 }
 
 func NewSeqIterator[T any](seq iter.Seq[T]) *SeqIterator[T] {
-	return &SeqIterator[T]{SizedSeqIterator: unknownSizeSeqIterator[T]{seq}}
+	return &SeqIterator[T]{SizedSeq: unknownSizeSeqIterator[T]{seq}}
 }
 
 func New[T any](seq iter.Seq[T]) Iterator[T] {
@@ -393,7 +414,7 @@ func (i *mapIter[T, U]) Size() IteratorSize {
 // one element at a time.
 func wrapFunc[T any, U any](iterator Iterator[T], f funcNext[T, U], sizeFunc func(sz IteratorSize) IteratorSize) Iterator[U] {
 	itr := &mapIter[T, U]{base: iterator, mapping: f, sizeFunc: sizeFunc}
-	itr.SizedIterator = itr
+	itr.SimpleSizedIterator = itr
 	return itr
 }
 
@@ -443,7 +464,7 @@ func (si *sliceIter[T]) Seq() iter.Seq[T] {
 // from the slice in order.
 func Slice[T any](slice []T) Iterator[T] {
 	iter := &sliceIter[T]{slice: slice, index: 0}
-	iter.SimpleIterator = iter
+	iter.SimpleSizedIterator = iter
 	return iter
 }
 
@@ -453,6 +474,7 @@ func Of[T any](elements ...T) Iterator[T] {
 }
 
 type rangeIter[T ordered.Real, S ordered.Real] struct {
+	DefaultIterator[T]
 	index, to T
 	by        S
 	value     T
@@ -553,6 +575,7 @@ func (ri *rangeIter[T, S]) Size() IteratorSize {
 
 func newRangeIter[T ordered.Real, S ordered.Real](from, upto T, by S, inclusive bool) *rangeIter[T, S] {
 	itr := rangeIter[T, S]{index: from, to: upto, by: by, inclusive: inclusive}
+	itr.SimpleSizedIterator = &itr
 	itr.validateRange()
 	return &itr
 }
@@ -587,7 +610,7 @@ func IncRangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] 
 	return newRangeIter(from, upto, by, true)
 }
 
-type emptyIter[T any] struct{}
+type emptyIter[T any] struct{ DefaultIterator[T] }
 
 func (emptyIter[T]) Next() bool         { return false }
 func (emptyIter[T]) Value() T           { var zero T; return zero }
@@ -603,7 +626,11 @@ func (emptyIter[T]) Seq() iter.Seq[T] {
 }
 
 // Empty creates an iterator that returns no items.
-func Empty[T any]() Iterator[T] { return emptyIter[T]{} }
+func Empty[T any]() Iterator[T] {
+	empty := emptyIter[T]{}
+	empty.SimpleSizedIterator = empty
+	return empty
+}
 
 // Map applies function `mapping` of type `func(T) U` to each value, producing
 // a new iterator over `U`.

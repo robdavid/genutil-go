@@ -717,7 +717,7 @@ func (rsi *repeatSimpleIter[T]) Abort() {
 
 func repeatIter[T any](r int, v T) Iterator[T] {
 	rsi := &repeatSimpleIter[T]{repetitions: r, value: v}
-	rsi.SimpleIterator = rsi
+	rsi.SimpleSizedIterator = rsi
 	return rsi
 }
 
