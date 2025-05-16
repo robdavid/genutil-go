@@ -72,6 +72,7 @@ type Iterator[T any] interface {
 	Chan() <-chan T
 	// Seq returns the iterator as a Go iter.Seq function.
 	Seq() iter.Seq[T]
+	Enumerate() Iterator2[int, T]
 }
 
 type Iterator2[K any, V any] interface {
@@ -80,7 +81,7 @@ type Iterator2[K any, V any] interface {
 }
 
 type DefaultIterator[T any] struct {
-	SimpleIterator[T]
+	SizedIterator[T]
 }
 
 func (di DefaultIterator[T]) Chan() <-chan T {
@@ -91,12 +92,59 @@ func (di DefaultIterator[T]) Seq() iter.Seq[T] {
 	return Seq(di)
 }
 
-func (di DefaultIterator[T]) Size() IteratorSize {
+type enumeratedSizedIterator[T any] struct {
+	base  SizedIterator[T]
+	index int
+}
+
+func (esi *enumeratedSizedIterator[T]) Next() bool {
+	if !esi.base.Next() {
+		return false
+	}
+	esi.index++
+	return true
+}
+
+func (esi *enumeratedSizedIterator[T]) Value() tuple.Tuple2[int, T] {
+	return tuple.Of2(esi.index-1, esi.base.Value())
+}
+
+func (esi *enumeratedSizedIterator[T]) Abort() {
+	esi.Abort()
+}
+
+func (esi *enumeratedSizedIterator[T]) Size() IteratorSize {
+	return esi.Size()
+}
+
+func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
+	itr2 := DefaultIterator[tuple.Tuple2[int, T]]{
+		SizedIterator: &enumeratedSizedIterator[T]{
+			base: di.SizedIterator,
+		},
+	}
+	return New2FromIterator(itr2)
+}
+
+type SizedSeqIterator[T any] interface {
+	Seq() iter.Seq[T]
+	Size() IteratorSize
+}
+
+type unknownSizeSeqIterator[T any] struct {
+	seq iter.Seq[T]
+}
+
+func (usi unknownSizeSeqIterator[T]) Seq() iter.Seq[T] {
+	return usi.seq
+}
+
+func (unknownSizeSeqIterator[T]) Size() IteratorSize {
 	return NewSizeUnknown()
 }
 
 type SeqIterator[T any] struct {
-	seq   iter.Seq[T]
+	SizedSeqIterator[T]
 	stop  func()
 	next  func() (T, bool)
 	value T
@@ -104,7 +152,7 @@ type SeqIterator[T any] struct {
 
 func (si *SeqIterator[T]) Next() (ok bool) {
 	if si.next == nil {
-		si.next, si.stop = iter.Pull(si.seq)
+		si.next, si.stop = iter.Pull(si.Seq())
 	}
 	si.value, ok = si.next()
 	return
@@ -116,24 +164,16 @@ func (si *SeqIterator[T]) Value() T {
 
 func (si *SeqIterator[T]) Abort() {
 	if si.next == nil {
-		si.next, si.stop = iter.Pull(si.seq)
+		si.next, si.stop = iter.Pull(si.Seq())
 	}
 	si.stop()
-}
-
-func (si *SeqIterator[T]) Seq() iter.Seq[T] {
-	return si.seq
-}
-
-func (*SeqIterator[T]) Size() IteratorSize {
-	return NewSizeUnknown()
 }
 
 func (si *SeqIterator[T]) Chan() <-chan T {
 	out := make(chan T)
 	go func() {
 		defer safeClose(out)
-		for v := range si.seq {
+		for v := range si.Seq() {
 			if !safeSend(out, v) {
 				break
 			}
@@ -142,8 +182,12 @@ func (si *SeqIterator[T]) Chan() <-chan T {
 	return out
 }
 
+func (si *SeqIterator[T]) Enumerate() Iterator2[int, T] {
+
+}
+
 func NewSeqIterator[T any](seq iter.Seq[T]) *SeqIterator[T] {
-	return &SeqIterator[T]{seq: seq}
+	return &SeqIterator[T]{SizedSeqIterator: unknownSizeSeqIterator[T]{seq}}
 }
 
 func New[T any](seq iter.Seq[T]) Iterator[T] {
@@ -151,7 +195,7 @@ func New[T any](seq iter.Seq[T]) Iterator[T] {
 }
 
 type Seq2Iterator[K any, V any] struct {
-	SeqIterator[tuple.Tuple2[K, V]]
+	Iterator[tuple.Tuple2[K, V]]
 	seq2 iter.Seq2[K, V]
 }
 
@@ -159,24 +203,32 @@ func (si *Seq2Iterator[K, V]) Seq2() iter.Seq2[K, V] {
 	return si.seq2
 }
 
-func NewSeqIterator2[K any, V any](seq2 iter.Seq2[K, V]) *Seq2Iterator[K, V] {
+func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
 	type pair = tuple.Tuple2[K, V]
-	seq := func(yield func(pair) bool) {
+	itr2 := Seq2Iterator[K, V]{
+		seq2: seq2,
+	}
+	itr2.Iterator = New(func(yield func(pair) bool) {
 		for k, v := range seq2 {
 			if !yield(tuple.Of2(k, v)) {
 				break
 			}
 		}
-	}
-	itr2 := Seq2Iterator[K, V]{
-		seq2:        seq2,
-		SeqIterator: *NewSeqIterator(seq),
-	}
+	})
 	return &itr2
 }
 
-func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
-	return NewSeqIterator2(seq2)
+func New2FromIterator[K any, V any](itr Iterator[tuple.Tuple2[K, V]]) Iterator2[K, V] {
+	return &Seq2Iterator[K, V]{
+		Iterator: itr,
+		seq2: func(yield func(K, V) bool) {
+			for kv := range itr.Seq() {
+				if !yield(kv.First, kv.Second) {
+					break
+				}
+			}
+		},
+	}
 }
 
 type IteratorSizeType int
@@ -341,7 +393,7 @@ func (i *mapIter[T, U]) Size() IteratorSize {
 // one element at a time.
 func wrapFunc[T any, U any](iterator Iterator[T], f funcNext[T, U], sizeFunc func(sz IteratorSize) IteratorSize) Iterator[U] {
 	itr := &mapIter[T, U]{base: iterator, mapping: f, sizeFunc: sizeFunc}
-	itr.SimpleIterator = itr
+	itr.SizedIterator = itr
 	return itr
 }
 
