@@ -58,99 +58,166 @@ func Seq2[K any, V any](i SimpleIterator[tuple.Tuple2[K, V]]) iter.Seq2[K, V] {
 	}
 }
 
-// SimpleSizedIterator is an extension of SimpleIterator that also holds some sizing information
-type SimpleSizedIterator[T any] interface {
+type OptSeq[T any] = option.Option[iter.Seq[T]]
+
+func OptSeqFrom[T any](seq iter.Seq[T]) OptSeq[T] {
+	return option.From(seq)
+}
+
+// CoreIterator is an extension of SimpleIterator that also holds some additional information
+// about what is being iterated over.
+type CoreIterator[T any] interface {
 	SimpleIterator[T]
+	// Seq returns the iterator as a Go iter.Seq function.
+	Seq() iter.Seq[T]
 	// Size is an estimate, where possible, of the number of elements remaining.
 	Size() IteratorSize
+	// PreferSeq returns true if the underlying iterator does not have the most efficient implementation
+	// of the simple iterator. For example, an iterator based purely on iter.Seq must use iter.Pull
+	// to create an implementation of Next(), Value() etc., which carries a performance hit. An iterator
+	// of this type would return true for this method.
+	PreferSeq() bool
+}
+
+type IteratorExtensions[T any] interface {
+	// Chan returns the iterator as a channel.
+	Chan() <-chan T
+	Enumerate() Iterator2[int, T]
 }
 
 // Generic iterator
 type Iterator[T any] interface {
-	SimpleSizedIterator[T]
-	// Chan returns the iterator as a channel.
-	Chan() <-chan T
-	// Seq returns the iterator as a Go iter.Seq function.
-	Seq() iter.Seq[T]
-	Enumerate() Iterator2[int, T]
+	CoreIterator[T]
+	IteratorExtensions[T]
 }
 
-type Iterator2[K any, V any] interface {
-	Iterator[tuple.Tuple2[K, V]]
+type CoreIterator2[K any, V any] interface {
+	CoreIterator[V]
 	Seq2() iter.Seq2[K, V]
+	Key() K
+}
+type Iterator2[K any, V any] interface {
+	CoreIterator2[K, V]
+	IteratorExtensions[V]
+}
+
+type SimpleCoreIterator[T any] struct {
+	SimpleIterator[T]
+	size func() IteratorSize
+}
+
+func NewSimpleCoreIterator[T any](itr SimpleIterator[T]) *SimpleCoreIterator[T] {
+	return &SimpleCoreIterator[T]{SimpleIterator: itr}
+}
+
+func NewSimpleCoreIteratorWithSize[T any](itr SimpleIterator[T], size func() IteratorSize) *SimpleCoreIterator[T] {
+	return &SimpleCoreIterator[T]{SimpleIterator: itr, size: size}
+}
+
+func (itr *SimpleCoreIterator[T]) Size() IteratorSize {
+	if itr.size == nil {
+		return NewSizeUnknown()
+	} else {
+		return itr.size()
+	}
+}
+
+func (itr *SimpleCoreIterator[T]) Seq() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for itr.Next() {
+			if !yield(itr.Value()) {
+				itr.Abort()
+				break
+			}
+		}
+	}
+}
+
+func (itr *SimpleCoreIterator[T]) PreferSeq() bool {
+	return false
 }
 
 type DefaultIterator[T any] struct {
-	SimpleSizedIterator[T]
+	CoreIterator[T]
+}
+
+func NewDefaultIterator[T any](citr CoreIterator[T]) DefaultIterator[T] {
+	return DefaultIterator[T]{CoreIterator: citr}
 }
 
 func (di DefaultIterator[T]) Chan() <-chan T {
 	return Chan(di)
 }
 
-func (di DefaultIterator[T]) Seq() iter.Seq[T] {
-	return Seq(di)
+func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
+	return Enumerate(di)
 }
 
-type enumeratedSizedIterator[T any] struct {
-	base  SimpleSizedIterator[T]
-	index int
+type Indexed[T any] = tuple.Tuple2[int, T]
+
+func IndexValue[T any](index int, value T) Indexed[T] {
+	return tuple.Of2(index, value)
 }
 
-func (esi *enumeratedSizedIterator[T]) Next() bool {
-	if !esi.base.Next() {
+type enumeratedCoreIterator[T any] struct {
+	CoreIterator[T]
+	key, index int
+}
+
+func newEnumeratedCoreIterator[T any](citr CoreIterator[T]) *enumeratedCoreIterator[T] {
+	return &enumeratedCoreIterator[T]{CoreIterator: citr, key: 0, index: 0}
+}
+func (eci *enumeratedCoreIterator[T]) Next() bool {
+	if !eci.CoreIterator.Next() {
 		return false
 	}
-	esi.index++
+	eci.key = eci.index
+	eci.index++
 	return true
 }
 
-func (esi *enumeratedSizedIterator[T]) Value() tuple.Tuple2[int, T] {
-	return tuple.Of2(esi.index-1, esi.base.Value())
+func (eci *enumeratedCoreIterator[T]) Key() int {
+	return eci.key
 }
 
-func (esi *enumeratedSizedIterator[T]) Abort() {
-	esi.Abort()
-}
-
-func (esi *enumeratedSizedIterator[T]) Size() IteratorSize {
-	return esi.Size()
-}
-
-func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
-	itr2 := DefaultIterator[tuple.Tuple2[int, T]]{
-		SimpleSizedIterator: &enumeratedSizedIterator[T]{
-			base: di.SimpleSizedIterator,
-		},
+func (eci *enumeratedCoreIterator[T]) Seq2() iter.Seq2[int, T] {
+	return func(yield func(int, T) bool) {
+		for v := range eci.Seq() {
+			eci.key = eci.index
+			if !yield(eci.key, v) {
+				eci.Abort()
+				break
+			}
+			eci.index++
+		}
 	}
-	return New2FromIterator(itr2)
 }
 
-type SizedSeq[T any] interface {
-	Seq() iter.Seq[T]
-	Size() IteratorSize
-}
-
-type unknownSizeSeqIterator[T any] struct {
-	seq iter.Seq[T]
-}
-
-func (usi unknownSizeSeqIterator[T]) Seq() iter.Seq[T] {
-	return usi.seq
-}
-
-func (unknownSizeSeqIterator[T]) Size() IteratorSize {
-	return NewSizeUnknown()
-}
-
-type SeqIterator[T any] struct {
-	SizedSeq[T]
+type SeqCoreIterator[T any] struct {
+	seq   iter.Seq[T]
+	size  func() IteratorSize
 	stop  func()
 	next  func() (T, bool)
 	value T
 }
 
-func (si *SeqIterator[T]) Next() (ok bool) {
+func (si *SeqCoreIterator[T]) Seq() iter.Seq[T] {
+	return si.seq
+}
+
+func (si *SeqCoreIterator[T]) Size() IteratorSize {
+	if si.size == nil {
+		return NewSizeUnknown()
+	} else {
+		return si.size()
+	}
+}
+
+func (si *SeqCoreIterator[T]) PreferSeq() bool {
+	return true
+}
+
+func (si *SeqCoreIterator[T]) Next() (ok bool) {
 	if si.next == nil {
 		si.next, si.stop = iter.Pull(si.Seq())
 	}
@@ -158,98 +225,80 @@ func (si *SeqIterator[T]) Next() (ok bool) {
 	return
 }
 
-func (si *SeqIterator[T]) Value() T {
+func (si *SeqCoreIterator[T]) Value() T {
 	return si.value
 }
 
-func (si *SeqIterator[T]) Abort() {
+func (si *SeqCoreIterator[T]) Abort() {
 	if si.next == nil {
 		si.next, si.stop = iter.Pull(si.Seq())
 	}
 	si.stop()
 }
 
-func (si *SeqIterator[T]) Chan() <-chan T {
-	out := make(chan T)
-	go func() {
-		defer safeClose(out)
-		for v := range si.Seq() {
-			if !safeSend(out, v) {
-				break
-			}
-		}
-	}()
-	return out
+func NewSeqCoreIterator[T any](seq iter.Seq[T]) *SeqCoreIterator[T] {
+	return &SeqCoreIterator[T]{seq: seq}
 }
 
-type enumeratedSizedSeq[T any] struct {
-	size func() IteratorSize
-	seq  iter.Seq[T]
-}
-
-func (ess enumeratedSizedSeq[T]) Size() IteratorSize { return ess.size() }
-
-func (ess enumeratedSizedSeq[T]) Seq() iter.Seq[tuple.Tuple2[int, T]] {
-	return func(yield func(yield tuple.Tuple2[int, T]) bool) {
-		i := 0
-		for v := range ess.seq {
-			if !yield(tuple.Of2(i, v)) {
-				break
-			}
-			i++
-		}
-	}
-}
-
-func (si *SeqIterator[T]) Enumerate() Iterator2[int, T] {
-	esSeq := enumeratedSizedSeq[T]{size: si.Size, seq: si.Seq()}
-	seq := SeqIterator[tuple.Tuple2[int, T]]{SizedSeq: esSeq}
-	return New2FromIterator(&seq)
-}
-
-func NewSeqIterator[T any](seq iter.Seq[T]) *SeqIterator[T] {
-	return &SeqIterator[T]{SizedSeq: unknownSizeSeqIterator[T]{seq}}
+func NewSeqCoreIteratorWithSize[T any](seq iter.Seq[T], size func() IteratorSize) *SeqCoreIterator[T] {
+	return &SeqCoreIterator[T]{seq: seq, size: size}
 }
 
 func New[T any](seq iter.Seq[T]) Iterator[T] {
-	return NewSeqIterator(seq)
+	return &DefaultIterator[T]{CoreIterator: NewSeqCoreIterator(seq)}
 }
 
-type Seq2Iterator[K any, V any] struct {
-	Iterator[tuple.Tuple2[K, V]]
+func NewWithSize[T any](seq iter.Seq[T], size func() IteratorSize) Iterator[T] {
+	return &DefaultIterator[T]{CoreIterator: NewSeqCoreIteratorWithSize(seq, size)}
+}
+
+type SeqCoreIterator2[K any, V any] struct {
+	CoreIterator[V]
 	seq2 iter.Seq2[K, V]
+	key  K
 }
 
-func (si *Seq2Iterator[K, V]) Seq2() iter.Seq2[K, V] {
-	return si.seq2
-}
-
-func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
-	type pair = tuple.Tuple2[K, V]
-	itr2 := Seq2Iterator[K, V]{
+func NewSeqCoreIterator2[K any, V any](seq2 iter.Seq2[K, V]) CoreIterator2[K, V] {
+	itr2 := SeqCoreIterator2[K, V]{
 		seq2: seq2,
 	}
-	itr2.Iterator = New(func(yield func(pair) bool) {
-		for k, v := range seq2 {
-			if !yield(tuple.Of2(k, v)) {
+	seq := func(yield func(V) bool) {
+		for _, v := range itr2.Seq2() {
+			if !yield(v) {
 				break
 			}
 		}
-	})
+	}
+	itr2.CoreIterator = NewSeqCoreIterator(seq)
 	return &itr2
 }
 
-func New2FromIterator[K any, V any](itr Iterator[tuple.Tuple2[K, V]]) Iterator2[K, V] {
-	return &Seq2Iterator[K, V]{
-		Iterator: itr,
-		seq2: func(yield func(K, V) bool) {
-			for kv := range itr.Seq() {
-				if !yield(kv.First, kv.Second) {
-					break
-				}
+func (si *SeqCoreIterator2[K, V]) Seq2() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		var value V
+		for si.key, value = range si.seq2 {
+			if !yield(si.key, value) {
+				break
 			}
-		},
+		}
 	}
+}
+
+func (si *SeqCoreIterator2[K, V]) Key() K {
+	return si.key
+}
+
+type DefaultIterator2[K any, V any] struct {
+	CoreIterator2[K, V]
+	DefaultIterator[V]
+}
+
+func NewDefaultIterator2[K any, V any](core CoreIterator2[K, V]) DefaultIterator2[K, V] {
+	return DefaultIterator2[K, V]{DefaultIterator: DefaultIterator[V]{CoreIterator: core}, CoreIterator2: core}
+}
+
+func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
+	return NewDefaultIterator2(NewSeqCoreIterator2(seq2))
 }
 
 type IteratorSizeType int
@@ -360,28 +409,40 @@ func safeSend[T any](ch chan<- T, val T) (ok bool) {
 
 // Generic channel implementation. Produces a channel yielding
 // values from the iterator
-func Chan[T any](iter SimpleIterator[T]) (out chan T) {
+func Chan[T any](itr CoreIterator[T]) (out chan T) {
 	out = make(chan T)
 	go func() {
 		defer safeClose(out)
-		for iter.Next() {
-			if !safeSend(out, iter.Value()) {
-				break
+		if _, ok := itr.(*SimpleCoreIterator[T]); ok {
+			for itr.Next() {
+				if !safeSend(out, itr.Value()) {
+					break
+				}
+			}
+		} else {
+			for v := range itr.Seq() {
+				if !safeSend(out, v) {
+					itr.Abort()
+					break
+				}
 			}
 		}
 	}()
 	return
 }
 
+func Enumerate[T any](itr CoreIterator[T]) Iterator2[int, T] {
+	return NewDefaultIterator2(newEnumeratedCoreIterator(itr))
+}
+
 // MakeIterator creates a generic iterator from a simple iterator. Provides an implementation
 // of additional Iterator methods.
 func MakeIterator[T any](base SimpleIterator[T]) Iterator[T] {
-	return DefaultIterator[T]{base}
+	return DefaultIterator[T]{NewSimpleCoreIterator(base)}
 }
 
 // mapIter wraps an iterator and adds a mapping function
 type mapIter[T, U any] struct {
-	DefaultIterator[U]
 	base     Iterator[T]
 	mapping  funcNext[T, U]
 	value    U
@@ -410,17 +471,26 @@ func (i *mapIter[T, U]) Size() IteratorSize {
 	return i.sizeFunc(i.base.Size())
 }
 
+func (i *mapIter[T, U]) PreferSeq() bool { return false }
+
+func (i *mapIter[T, U]) Seq() iter.Seq[U] {
+	return func(yield func(U) bool) {
+		for i.Next() {
+			if !yield(i.Value()) {
+				break
+			}
+		}
+	}
+}
+
 // wrapFunc creates a new iterator from an existing iterator and a function that consumes it, yielding
 // one element at a time.
 func wrapFunc[T any, U any](iterator Iterator[T], f funcNext[T, U], sizeFunc func(sz IteratorSize) IteratorSize) Iterator[U] {
-	itr := &mapIter[T, U]{base: iterator, mapping: f, sizeFunc: sizeFunc}
-	itr.SimpleSizedIterator = itr
-	return itr
+	return NewDefaultIterator(&mapIter[T, U]{base: iterator, mapping: f, sizeFunc: sizeFunc})
 }
 
 // Iterator over a slice
 type sliceIter[T any] struct {
-	DefaultIterator[T]
 	slice []T
 	index int
 	value T
@@ -460,12 +530,13 @@ func (si *sliceIter[T]) Seq() iter.Seq[T] {
 	}
 }
 
+func (si *sliceIter[T]) PreferSeq() bool { return false }
+
 // Slice makes an Iterator[T] from slice []T, containing all the elements
 // from the slice in order.
 func Slice[T any](slice []T) Iterator[T] {
 	iter := &sliceIter[T]{slice: slice, index: 0}
-	iter.SimpleSizedIterator = iter
-	return iter
+	return NewDefaultIterator(iter)
 }
 
 // Of makes an Iterator[T] containing the variadic arguments of type T
@@ -474,7 +545,6 @@ func Of[T any](elements ...T) Iterator[T] {
 }
 
 type rangeIter[T ordered.Real, S ordered.Real] struct {
-	DefaultIterator[T]
 	index, to T
 	by        S
 	value     T
@@ -526,10 +596,6 @@ func (ri *rangeIter[T, S]) Abort() {
 	ri.inclusive = false
 }
 
-func (ri *rangeIter[T, S]) Chan() <-chan T {
-	return Chan(ri)
-}
-
 func (ri *rangeIter[T, S]) Seq() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		defer ri.Abort()
@@ -573,11 +639,12 @@ func (ri *rangeIter[T, S]) Size() IteratorSize {
 	return NewSize(size)
 }
 
-func newRangeIter[T ordered.Real, S ordered.Real](from, upto T, by S, inclusive bool) *rangeIter[T, S] {
+func (ri *rangeIter[T, S]) PreferSeq() bool { return false }
+
+func newRangeIter[T ordered.Real, S ordered.Real](from, upto T, by S, inclusive bool) Iterator[T] {
 	itr := rangeIter[T, S]{index: from, to: upto, by: by, inclusive: inclusive}
-	itr.SimpleSizedIterator = &itr
 	itr.validateRange()
-	return &itr
+	return NewDefaultIterator(&itr)
 }
 
 // Range creates an iterator that ranges from `from` to
@@ -610,26 +677,18 @@ func IncRangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] 
 	return newRangeIter(from, upto, by, true)
 }
 
-type emptyIter[T any] struct{ DefaultIterator[T] }
+type emptyIter[T any] struct{}
 
 func (emptyIter[T]) Next() bool         { return false }
 func (emptyIter[T]) Value() T           { var zero T; return zero }
 func (emptyIter[T]) Size() IteratorSize { return NewSize(0) }
 func (emptyIter[T]) Abort()             {}
-func (emptyIter[T]) Chan() <-chan T {
-	c := make(chan T)
-	close(c)
-	return c
-}
-func (emptyIter[T]) Seq() iter.Seq[T] {
-	return func(yield func(T) bool) {}
-}
+func (emptyIter[T]) PreferSeq() bool    { return false }
+func (emptyIter[T]) Seq() iter.Seq[T]   { return func(yield func(T) bool) {} }
 
 // Empty creates an iterator that returns no items.
 func Empty[T any]() Iterator[T] {
-	empty := emptyIter[T]{}
-	empty.SimpleSizedIterator = empty
-	return empty
+	return NewDefaultIterator(emptyIter[T]{})
 }
 
 // Map applies function `mapping` of type `func(T) U` to each value, producing
@@ -695,15 +754,21 @@ func FilterValues[T any](iter Iterator[result.Result[T]]) Iterator[T] {
 // CollectInto collects all elements from an iterator into a pointer to a slice.
 // The slice referenced may be reallocated as the append function is used to add
 // elements to the slice. The slice may be a nil slice.
-func CollectInto[T any](iter Iterator[T], slice *[]T) []T {
-	for iter.Next() {
-		*slice = append(*slice, iter.Value())
+func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
+	if iter.PreferSeq() {
+		for v := range iter.Seq() {
+			*slice = append(*slice, v)
+		}
+	} else {
+		for iter.Next() {
+			*slice = append(*slice, iter.Value())
+		}
 	}
 	return *slice
 }
 
 // Collect collects all elements from an iterator into a slice.
-func Collect[T any](iter Iterator[T]) []T {
+func Collect[T any](iter CoreIterator[T]) []T {
 	result := make([]T, 0, iter.Size().Allocate())
 	return CollectInto(iter, &result)
 }
@@ -711,7 +776,7 @@ func Collect[T any](iter Iterator[T]) []T {
 // CollectResults collects all elements from an iterator of results into a result of slice of the iterator's underlying type
 // If the iterator returns an error result at any point, this call will terminate and return that error, along with the elements
 // collected thus far.
-func CollectResults[T any](iter Iterator[result.Result[T]]) ([]T, error) {
+func CollectResults[T any](iter CoreIterator[result.Result[T]]) ([]T, error) {
 	collectResult := make([]T, 0, iter.Size().Allocate())
 	for res := range iter.Seq() {
 		if res.IsError() {
@@ -724,7 +789,7 @@ func CollectResults[T any](iter Iterator[result.Result[T]]) ([]T, error) {
 
 // PartitionResults collects the elements from an iterator of result types into two slices, one of
 // successful (nil error) values, and the other of error values.
-func PartitionResults[T any](iter Iterator[result.Result[T]]) ([]T, []error) {
+func PartitionResults[T any](iter CoreIterator[result.Result[T]]) ([]T, []error) {
 	values := make([]T, 0, iter.Size().Allocate())
 	var errs []error
 	for res := range iter.Seq() {
@@ -741,7 +806,7 @@ func PartitionResults[T any](iter Iterator[result.Result[T]]) ([]T, []error) {
 // by the iterator. This function short circuits and does not
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns false.
-func All[T any](iter Iterator[T], predicate func(v T) bool) bool {
+func All[T any](iter CoreIterator[T], predicate func(v T) bool) bool {
 	for v := range iter.Seq() {
 		if !predicate(v) {
 			return false
@@ -754,7 +819,7 @@ func All[T any](iter Iterator[T], predicate func(v T) bool) bool {
 // by the iterator. This function short circuits and does not
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns true.
-func Any[T any](iter Iterator[T], predicate func(v T) bool) bool {
+func Any[T any](iter CoreIterator[T], predicate func(v T) bool) bool {
 	for v := range iter.Seq() {
 		if predicate(v) {
 			return true
@@ -763,11 +828,15 @@ func Any[T any](iter Iterator[T], predicate func(v T) bool) bool {
 	return false
 }
 
-// An iterator that obtains values (or an error) from
+// A core iterator that obtains values (or an error) from
 // a channel
 type genIter[T any] struct {
 	source chan T
 	value  T
+}
+
+func newGenIter[T any](source chan T) *genIter[T] {
+	return &genIter[T]{source: source}
 }
 
 func (pi *genIter[T]) Next() bool {
@@ -794,6 +863,10 @@ func (pi *genIter[T]) Size() IteratorSize {
 
 func (pi *genIter[T]) Seq() iter.Seq[T] {
 	return Seq(pi)
+}
+
+func (pi *genIter[T]) PreferSeq() bool {
+	return false
 }
 
 // AbortGenerator is a panic type that will be raised if a Generator function is to be
@@ -895,7 +968,7 @@ func Generate[T any](generator Generator[T]) Iterator[T] {
 	ch := make(chan T)
 	yield := Consumer[T]{ch}
 	go runGenerator(yield, generator)
-	return &genIter[T]{source: ch}
+	return NewDefaultIterator(newGenIter(ch))
 }
 
 // GenerateResults is a variation on Generate that produces an iterator of result types. If the
@@ -905,12 +978,11 @@ func GenerateResults[T any](generator ResultGenerator[T]) Iterator[result.Result
 	ch := make(chan result.Result[T])
 	yield := ResultConsumer[T](Consumer[result.Result[T]]{ch})
 	go runResultGenerator(yield, generator)
-	return &genIter[result.Result[T]]{source: ch}
+	return NewDefaultIterator(newGenIter(ch))
 }
 
 // Iterators over iterators
 type takeIterator[T any] struct {
-	DefaultIterator[T]
 	count, max int
 	aborted    bool
 	iterator   Iterator[T]
@@ -937,6 +1009,9 @@ func (ti *takeIterator[T]) Next() bool {
 		return false
 	}
 }
+
+// Non-seq is more efficient  here
+func (ti *takeIterator[T]) PreferSeq() bool { return false }
 
 func (ti *takeIterator[T]) Seq() iter.Seq[T] {
 	return func(yield func(T) bool) {
@@ -979,7 +1054,5 @@ func (ti *takeIterator[T]) Size() IteratorSize {
 // first n elements of the original iterator. If there are less
 // than n elements available, they are all returned.
 func Take[T any](n int, iter Iterator[T]) Iterator[T] {
-	i := &takeIterator[T]{iterator: iter, max: n}
-	i.SimpleIterator = i
-	return i
+	return NewDefaultIterator(&takeIterator[T]{iterator: iter, max: n})
 }

@@ -322,6 +322,27 @@ func TestInclusiveRangeBy(t *testing.T) {
 	}
 }
 
+func TestEnumeratedRange(t *testing.T) {
+	e := Range(10, 20).Enumerate()
+	i := 0
+	for e.Next() {
+		assert.Equal(t, i, e.Key())
+		assert.Equal(t, i+10, e.Value())
+		i++
+	}
+}
+
+func TestEnumeratedRangeSeq(t *testing.T) {
+	e := Range(10, 20).Enumerate()
+	i := 0
+	for n, v := range e.Seq2() {
+		assert.Equal(t, i, n)
+		assert.Equal(t, i+10, v)
+		assert.Equal(t, i, e.Key())
+		i++
+	}
+}
+
 func TestSliceIterChanAbort(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	iter := Slice(input)
@@ -717,7 +738,7 @@ func (rsi *repeatSimpleIter[T]) Abort() {
 
 func repeatIter[T any](r int, v T) Iterator[T] {
 	rsi := &repeatSimpleIter[T]{repetitions: r, value: v}
-	rsi.SimpleSizedIterator = rsi
+	rsi.CoreIterator = rsi
 	return rsi
 }
 
@@ -807,24 +828,6 @@ func BenchmarkSeqFromSimpleRange(b *testing.B) {
 		sum += uint64(v)
 	}
 	assert.Equal(b, rangeSum(0, b.N), sum)
-}
-
-type iterSlice[T any] struct {
-	slice []T
-	index int
-}
-
-func (is *iterSlice[T]) Next() bool {
-	is.index++
-	return is.index < len(is.slice)
-}
-
-func (is *iterSlice[T]) Value() T {
-	return is.slice[is.index]
-}
-
-func (is *iterSlice[T]) Abort() {
-	is.index = len(is.slice)
 }
 
 func TestGeneratorChan(t *testing.T) {

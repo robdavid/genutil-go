@@ -78,7 +78,7 @@ func isNil[T any](value T) bool {
 		return true
 	}
 	switch typ.Kind() {
-	case reflect.Pointer, reflect.Chan, reflect.Slice, reflect.Interface, reflect.Map, reflect.Func:
+	case reflect.Pointer, reflect.UnsafePointer, reflect.Chan, reflect.Slice, reflect.Interface, reflect.Map, reflect.Func:
 		return reflect.ValueOf(value).IsNil()
 	default:
 		return false
