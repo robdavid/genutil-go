@@ -82,7 +82,21 @@ type CoreIterator[T any] interface {
 type IteratorExtensions[T any] interface {
 	// Chan returns the iterator as a channel.
 	Chan() <-chan T
+	Collect() []T
 	Enumerate() Iterator2[int, T]
+}
+
+type KeyValue[K any, V any] struct {
+	Key   K
+	Value V
+}
+
+func KVOf[K any, V any](key K, value V) KeyValue[K, V] {
+	return KeyValue[K, V]{key, value}
+}
+
+type Iterator2Extensions[K any, V any] interface {
+	Collect2() []KeyValue[K, V]
 }
 
 // Generic iterator
@@ -96,9 +110,11 @@ type CoreIterator2[K any, V any] interface {
 	Seq2() iter.Seq2[K, V]
 	Key() K
 }
+
 type Iterator2[K any, V any] interface {
 	CoreIterator2[K, V]
 	IteratorExtensions[V]
+	Iterator2Extensions[K, V]
 }
 
 type SimpleCoreIterator[T any] struct {
@@ -147,6 +163,10 @@ func NewDefaultIterator[T any](citr CoreIterator[T]) DefaultIterator[T] {
 
 func (di DefaultIterator[T]) Chan() <-chan T {
 	return Chan(di)
+}
+
+func (di DefaultIterator[T]) Collect() []T {
+	return Collect(di)
 }
 
 func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
@@ -291,6 +311,10 @@ func (si *SeqCoreIterator2[K, V]) Key() K {
 type DefaultIterator2[K any, V any] struct {
 	CoreIterator2[K, V]
 	DefaultIterator[V]
+}
+
+func (di2 DefaultIterator2[K, V]) Collect2() []KeyValue[K, V] {
+	return Collect2(di2)
 }
 
 func NewDefaultIterator2[K any, V any](core CoreIterator2[K, V]) DefaultIterator2[K, V] {
@@ -767,10 +791,28 @@ func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
 	return *slice
 }
 
+func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
+	if iter.PreferSeq() {
+		for k, v := range iter.Seq2() {
+			*slice = append(*slice, KVOf(k, v))
+		}
+	} else {
+		for iter.Next() {
+			*slice = append(*slice, KVOf(iter.Key(), iter.Value()))
+		}
+	}
+	return *slice
+}
+
 // Collect collects all elements from an iterator into a slice.
 func Collect[T any](iter CoreIterator[T]) []T {
 	result := make([]T, 0, iter.Size().Allocate())
 	return CollectInto(iter, &result)
+}
+
+func Collect2[K any, V any](itr CoreIterator2[K, V]) []KeyValue[K, V] {
+	result := make([]KeyValue[K, V], 0, itr.Size().Allocate())
+	return Collect2Into(itr, &result)
 }
 
 // CollectResults collects all elements from an iterator of results into a result of slice of the iterator's underlying type

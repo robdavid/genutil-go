@@ -237,8 +237,8 @@ func TestIterItems(t *testing.T) {
 		"three": 3,
 		"two":   2,
 	}
-	items := iterator.Collect(IterItems(mymap))
-	assert.ElementsMatch(t, []tuple.Tuple2[string, int]{tuple.Of2("one", 1), tuple.Of2("two", 2), tuple.Of2("three", 3)}, items)
+	items := IterItems(mymap).Collect2()
+	assert.ElementsMatch(t, []iterator.KeyValue[string, int]{iterator.KVOf("one", 1), iterator.KVOf("two", 2), iterator.KVOf("three", 3)}, items)
 }
 
 func generateMap(size int) map[string]int {

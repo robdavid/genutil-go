@@ -307,7 +307,7 @@ func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
 }
 
 // Returns an iterator over the keys and values of a map, returning each pair
-// as 2-tuple
+// as via an iterator.Iterator2
 func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
 	return iterator.New2(func(yield func(K, T) bool) {
 		for k, v := range m {
