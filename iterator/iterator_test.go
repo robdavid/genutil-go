@@ -3,6 +3,7 @@ package iterator
 import (
 	"fmt"
 	"iter"
+	"strings"
 	"testing"
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
@@ -160,6 +161,28 @@ func TestSliceIterString(t *testing.T) {
 	iter := Slice(input)
 	output := Collect(iter)
 	assert.Equal(t, input, output)
+}
+
+func TestSliceMutIterRef(t *testing.T) {
+	input := []string{"one", "two", "three", "four"}
+	iter := MutSlice(&input)
+	for iter.Next() {
+		*iter.Ref() = strings.ToUpper(*iter.Ref())
+	}
+	expected := []string{"ONE", "TWO", "THREE", "FOUR"}
+	assert.Equal(t, expected, input)
+}
+
+func TestSliceMutIterDelete(t *testing.T) {
+	input := []string{"one", "two", "three", "four"}
+	iter := MutSlice(&input)
+	for iter.Next() {
+		if iter.Value() == "two" {
+			iter.Delete()
+		}
+	}
+	expected := []string{"one", "three", "four"}
+	assert.Equal(t, expected, input)
 }
 
 func TestSliceIterChan(t *testing.T) {
@@ -824,7 +847,7 @@ func BenchmarkSimpleRange(b *testing.B) {
 
 func BenchmarkSeqFromSimpleRange(b *testing.B) {
 	var sum uint64
-	for v := range Seq(Range(0, b.N)) {
+	for v := range SimpleToSeq(Range(0, b.N)) {
 		sum += uint64(v)
 	}
 	assert.Equal(b, rangeSum(0, b.N), sum)

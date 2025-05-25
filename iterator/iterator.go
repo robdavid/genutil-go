@@ -22,6 +22,7 @@ const maxUncertainAllocation = 100000
 var ErrAllocationSizeInfinite = errors.New("cannot allocate storage for an infinite iterator")
 var ErrInvalidIteratorSizeType = errors.New("invalid iterator size type")
 var ErrInvalidIteratorRange = errors.New("invalid iterator range")
+var ErrDeleteNotImplemented = errors.New("delete not implemented")
 
 // SimpleIterator supports a simple sequence of elements
 type SimpleIterator[T any] interface {
@@ -34,11 +35,36 @@ type SimpleIterator[T any] interface {
 	Abort()
 }
 
-// Seq is a generic iter.Seq implementation for any simple iterator
-func Seq[T any](i SimpleIterator[T]) iter.Seq[T] {
+type SimpleMutableIterator[T any] interface {
+	// Next sets the iterator's current value to be the first, and subsequent, iterator elements.
+	// False is returned only when there are no more elements (the current value remains unchanged)
+	Next() bool
+	// Ref returns a reference to the current value, allowing it to be modified in place.
+	Ref() *T
+	// Delete deletes the current value, which must be the last value returned by Next(). This
+	// function may not be implemented for all iterator types, in which case it will return an
+	// ErrDeleteNotImplemented error.
+	Delete() error
+	// Abort stops the iterator; subsequent calls to Next() will return false.
+	Abort()
+}
+
+// SimpleToSeq is a generic iter.SimpleToSeq implementation for any simple iterator
+func SimpleToSeq[T any](i SimpleIterator[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for i.Next() {
 			if !yield(i.Value()) {
+				i.Abort()
+				break
+			}
+		}
+	}
+}
+
+func SimpleMutableToSeq[T any](i SimpleMutableIterator[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for i.Next() {
+			if !yield(*i.Ref()) {
 				i.Abort()
 				break
 			}
@@ -64,8 +90,8 @@ func OptSeqFrom[T any](seq iter.Seq[T]) OptSeq[T] {
 	return option.From(seq)
 }
 
-// CoreIterator is an extension of SimpleIterator that also holds some additional information
-// about what is being iterated over.
+// CoreIterator is an extension of SimpleIterator that in aggregate provides the minimum set of methods
+// that are intrinsic to an iterator implementation.
 type CoreIterator[T any] interface {
 	SimpleIterator[T]
 	// Seq returns the iterator as a Go iter.Seq function.
@@ -79,10 +105,22 @@ type CoreIterator[T any] interface {
 	PreferSeq() bool
 }
 
+type CoreMutableIterator[T any] interface {
+	CoreIterator[T]
+	// Ref returns a reference to the current value, allowing it to be modified in place.
+	Ref() *T
+	// Delete deletes the current value, which must be the last value returned by Next(). This
+	// function may not be implemented for all iterator types, in which case it will return an
+	Delete() error
+}
+
+// IteratorExtensions defines methods available to all iterators beyond the core functionality provided by CoreIterator.
 type IteratorExtensions[T any] interface {
 	// Chan returns the iterator as a channel.
 	Chan() <-chan T
+	// Collect collects all elements from the iterator into a slice.
 	Collect() []T
+	// Enumerate returns an iterator that enumerates the elements of this iterator, returning a tuple of the index and the value.
 	Enumerate() Iterator2[int, T]
 }
 
@@ -102,6 +140,12 @@ type Iterator2Extensions[K any, V any] interface {
 // Generic iterator
 type Iterator[T any] interface {
 	CoreIterator[T]
+	IteratorExtensions[T]
+}
+
+// Generic mutable iterator
+type MutableIterator[T any] interface {
+	CoreMutableIterator[T]
 	IteratorExtensions[T]
 }
 
@@ -139,17 +183,43 @@ func (itr *SimpleCoreIterator[T]) Size() IteratorSize {
 }
 
 func (itr *SimpleCoreIterator[T]) Seq() iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for itr.Next() {
-			if !yield(itr.Value()) {
-				itr.Abort()
-				break
-			}
-		}
-	}
+	return SimpleToSeq(itr.SimpleIterator)
 }
 
 func (itr *SimpleCoreIterator[T]) PreferSeq() bool {
+	return false
+}
+
+type SimpleCoreMutableIterator[T any] struct {
+	SimpleMutableIterator[T]
+	size func() IteratorSize
+}
+
+func NewSimpleCoreMutableIterator[T any](itr SimpleMutableIterator[T]) *SimpleCoreMutableIterator[T] {
+	return &SimpleCoreMutableIterator[T]{SimpleMutableIterator: itr}
+}
+
+func NewSimpleCoreMutableIteratorWithSize[T any](itr SimpleMutableIterator[T], size func() IteratorSize) *SimpleCoreMutableIterator[T] {
+	return &SimpleCoreMutableIterator[T]{SimpleMutableIterator: itr, size: size}
+}
+
+func (itr *SimpleCoreMutableIterator[T]) Size() IteratorSize {
+	if itr.size == nil {
+		return NewSizeUnknown()
+	} else {
+		return itr.size()
+	}
+}
+
+func (itr *SimpleCoreMutableIterator[T]) Value() T {
+	return *itr.SimpleMutableIterator.Ref()
+}
+
+func (itr *SimpleCoreMutableIterator[T]) Seq() iter.Seq[T] {
+	return SimpleMutableToSeq(itr.SimpleMutableIterator)
+}
+
+func (itr *SimpleCoreMutableIterator[T]) PreferSeq() bool {
 	return false
 }
 
@@ -171,6 +241,15 @@ func (di DefaultIterator[T]) Collect() []T {
 
 func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
 	return Enumerate(di)
+}
+
+type DefaultMutableIterator[T any] struct {
+	CoreMutableIterator[T]
+	DefaultIterator[T]
+}
+
+func NewDefaultMutableIterator[T any](citr CoreMutableIterator[T]) DefaultMutableIterator[T] {
+	return DefaultMutableIterator[T]{CoreMutableIterator: citr, DefaultIterator: DefaultIterator[T]{CoreIterator: citr}}
 }
 
 type Indexed[T any] = tuple.Tuple2[int, T]
@@ -437,7 +516,7 @@ func Chan[T any](itr CoreIterator[T]) (out chan T) {
 	out = make(chan T)
 	go func() {
 		defer safeClose(out)
-		if _, ok := itr.(*SimpleCoreIterator[T]); ok {
+		if !itr.PreferSeq() {
 			for itr.Next() {
 				if !safeSend(out, itr.Value()) {
 					break
@@ -515,14 +594,14 @@ func wrapFunc[T any, U any](iterator Iterator[T], f funcNext[T, U], sizeFunc fun
 
 // Iterator over a slice
 type sliceIter[T any] struct {
-	slice []T
+	slice *[]T
 	index int
-	value T
+	ref   *T
 }
 
 func (si *sliceIter[T]) Next() bool {
-	if si.index < len(si.slice) {
-		si.value = si.slice[si.index]
+	if si.index < len(*si.slice) {
+		si.ref = &(*si.slice)[si.index]
 		si.index++
 		return true
 	} else {
@@ -531,23 +610,38 @@ func (si *sliceIter[T]) Next() bool {
 }
 
 func (si *sliceIter[T]) Value() T {
-	return si.value
+	return *si.ref
+}
+
+func (si *sliceIter[T]) Ref() *T {
+	return si.ref
+}
+
+func (si *sliceIter[T]) Delete() error {
+	if si.index > len(*si.slice) {
+		return nil
+	} else if si.index == 0 {
+		*si.slice = (*si.slice)[1:] // Delete the first element
+		return nil
+	}
+	*si.slice = append((*si.slice)[:si.index-1], (*si.slice)[si.index:]...)
+	return nil
 }
 
 func (si *sliceIter[T]) Abort() {
-	si.index = len(si.slice)
+	si.index = len(*si.slice)
 }
 
 func (si *sliceIter[T]) Size() IteratorSize {
-	return NewSize(len(si.slice) - si.index)
+	return NewSize(len(*si.slice) - si.index)
 }
 
 func (si *sliceIter[T]) Seq() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		defer si.Abort()
-		for si.index = 0; si.index < len(si.slice); si.index++ {
-			si.value = si.slice[si.index]
-			if !yield(si.value) {
+		for si.index = 0; si.index < len(*si.slice); si.index++ {
+			si.ref = &(*si.slice)[si.index]
+			if !yield(*si.ref) {
 				break
 			}
 		}
@@ -559,8 +653,15 @@ func (si *sliceIter[T]) PreferSeq() bool { return false }
 // Slice makes an Iterator[T] from slice []T, containing all the elements
 // from the slice in order.
 func Slice[T any](slice []T) Iterator[T] {
-	iter := &sliceIter[T]{slice: slice, index: 0}
+	iter := &sliceIter[T]{slice: &slice, index: 0}
 	return NewDefaultIterator(iter)
+}
+
+// MutSlice makes a MutableIterator[T] from slice []T, containing all the elements
+// from the slice in order.
+func MutSlice[T any](slice *[]T) MutableIterator[T] {
+	iter := &sliceIter[T]{slice: slice, index: 0}
+	return NewDefaultMutableIterator(iter)
 }
 
 // Of makes an Iterator[T] containing the variadic arguments of type T
@@ -904,7 +1005,7 @@ func (pi *genIter[T]) Size() IteratorSize {
 }
 
 func (pi *genIter[T]) Seq() iter.Seq[T] {
-	return Seq(pi)
+	return SimpleToSeq(pi)
 }
 
 func (pi *genIter[T]) PreferSeq() bool {
