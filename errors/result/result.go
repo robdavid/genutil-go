@@ -83,8 +83,8 @@ func (r *Result[T]) Must() T {
 }
 
 // Returns the underlying value, or panics with a try value
-// if the error is. This can be handled by the Catch or Handle
-// functions in the handler package
+// if the error is not nil. This can be handled by the Catch
+// or Handle functions in the handler package
 func (r *Result[T]) Try() T {
 	return handler.Try(r.value, r.err)
 }

@@ -105,6 +105,8 @@ type CoreIterator[T any] interface {
 	PreferSeq() bool
 }
 
+// CoreMutableIterator is an extension of CoreIterator which adds methods to facilitate
+// iterator mutation.
 type CoreMutableIterator[T any] interface {
 	CoreIterator[T]
 	// Ref returns a reference to the current value, allowing it to be modified in place.
