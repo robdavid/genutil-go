@@ -3,6 +3,7 @@ package iterator
 import (
 	"fmt"
 	"iter"
+	"sort"
 	"strings"
 	"testing"
 
@@ -13,6 +14,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMapMutations(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i * 2
+	}
+	for k := range m {
+		if k%3 == 0 {
+			m[k] = k * 3
+		} else if k%2 == 0 {
+			delete(m, k)
+		}
+	}
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	actual := make([]int, 0, len(keys))
+	for _, k := range keys {
+		actual = append(actual, m[k])
+	}
+	expected := []int{0, 2, 9, 10, 18, 14, 27}
+	assert.Equal(t, expected, actual)
+}
 func TestCollectInto(t *testing.T) {
 	iter := Range(0, 5)
 	var output []int = nil
