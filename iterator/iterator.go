@@ -36,17 +36,13 @@ type SimpleIterator[T any] interface {
 }
 
 type SimpleMutableIterator[T any] interface {
-	// Next sets the iterator's current value to be the first, and subsequent, iterator elements.
-	// False is returned only when there are no more elements (the current value remains unchanged)
-	Next() bool
-	// Ref returns a reference to the current value, allowing it to be modified in place.
-	Ref() *T
+	SimpleIterator[T]
+	// Set allows a value to be modified in place
+	Set(T)
 	// Delete deletes the current value, which must be the last value returned by Next(). This
 	// function may not be implemented for all iterator types, in which case it will return an
 	// ErrDeleteNotImplemented error.
 	Delete() error
-	// Abort stops the iterator; subsequent calls to Next() will return false.
-	Abort()
 }
 
 // SimpleToSeq is a generic iter.SimpleToSeq implementation for any simple iterator
@@ -54,17 +50,6 @@ func SimpleToSeq[T any](i SimpleIterator[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for i.Next() {
 			if !yield(i.Value()) {
-				i.Abort()
-				break
-			}
-		}
-	}
-}
-
-func SimpleMutableToSeq[T any](i SimpleMutableIterator[T]) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for i.Next() {
-			if !yield(*i.Ref()) {
 				i.Abort()
 				break
 			}
@@ -109,8 +94,8 @@ type CoreIterator[T any] interface {
 // iterator mutation.
 type CoreMutableIterator[T any] interface {
 	CoreIterator[T]
-	// Ref returns a reference to the current value, allowing it to be modified in place.
-	Ref() *T
+	// Set modifies the current value in place.
+	Set(T)
 	// Delete deletes the current value, which must be the last value returned by Next(). This
 	// function may not be implemented for all iterator types, in which case it will return an
 	Delete() error
@@ -124,17 +109,23 @@ type IteratorExtensions[T any] interface {
 	Collect() []T
 	// Enumerate returns an iterator that enumerates the elements of this iterator, returning a tuple of the index and the value.
 	Enumerate() Iterator2[int, T]
+	Filter(func(T) bool) Iterator[T]
+	Morph(func(T) T) Iterator[T]
 }
 
+// KeyValue holds a key value pair
 type KeyValue[K any, V any] struct {
 	Key   K
 	Value V
 }
 
+// KVOf constructs a key value pair
 func KVOf[K any, V any](key K, value V) KeyValue[K, V] {
 	return KeyValue[K, V]{key, value}
 }
 
+// Iterator2Extensions defines additional iterator methods that are specific
+// to Iterator2.
 type Iterator2Extensions[K any, V any] interface {
 	Collect2() []KeyValue[K, V]
 }
@@ -213,14 +204,6 @@ func (itr *SimpleCoreMutableIterator[T]) Size() IteratorSize {
 	}
 }
 
-func (itr *SimpleCoreMutableIterator[T]) Value() T {
-	return *itr.SimpleMutableIterator.Ref()
-}
-
-func (itr *SimpleCoreMutableIterator[T]) Seq() iter.Seq[T] {
-	return SimpleMutableToSeq(itr.SimpleMutableIterator)
-}
-
 func (itr *SimpleCoreMutableIterator[T]) PreferSeq() bool {
 	return false
 }
@@ -243,6 +226,14 @@ func (di DefaultIterator[T]) Collect() []T {
 
 func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
 	return Enumerate(di)
+}
+
+func (di DefaultIterator[T]) Filter(predicate func(T) bool) Iterator[T] {
+	return Filter(di, predicate)
+}
+
+func (di DefaultIterator[T]) Morph(mapping func(T) T) Iterator[T] {
+	return Map(di, mapping)
 }
 
 type DefaultMutableIterator[T any] struct {
@@ -615,8 +606,8 @@ func (si *sliceIter[T]) Value() T {
 	return *si.ref
 }
 
-func (si *sliceIter[T]) Ref() *T {
-	return si.ref
+func (si *sliceIter[T]) Set(e T) {
+	*si.ref = e
 }
 
 func (si *sliceIter[T]) Delete() error {

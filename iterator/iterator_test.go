@@ -192,7 +192,7 @@ func TestSliceMutIterRef(t *testing.T) {
 	input := []string{"one", "two", "three", "four"}
 	iter := MutSlice(&input)
 	for iter.Next() {
-		*iter.Ref() = strings.ToUpper(*iter.Ref())
+		iter.Set(strings.ToUpper(iter.Value()))
 	}
 	expected := []string{"ONE", "TWO", "THREE", "FOUR"}
 	assert.Equal(t, expected, input)
