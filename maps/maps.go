@@ -317,3 +317,9 @@ func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
 		}
 	})
 }
+
+// type mapIterator[K comparable, V any] struct {
+// 	imap map[K]V
+// 	key  K
+// 	size int
+// }

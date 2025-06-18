@@ -154,15 +154,30 @@ type Iterator2[K any, V any] interface {
 	Iterator2Extensions[K, V]
 }
 
+type CoreMutableIterator2[K any, V any] interface {
+	CoreIterator2[K, V]
+	Set(V)
+	Delete()
+}
+
+type MutableIterator2[K any, V any] interface {
+	CoreMutableIterator2[K, V]
+	IteratorExtensions[V]
+	Iterator2Extensions[K, V]
+}
+
 type SimpleCoreIterator[T any] struct {
 	SimpleIterator[T]
 	size func() IteratorSize
 }
 
+// NewSimpleCoreIterator builds a CoreIterator from a SimpleIterator
 func NewSimpleCoreIterator[T any](itr SimpleIterator[T]) *SimpleCoreIterator[T] {
 	return &SimpleCoreIterator[T]{SimpleIterator: itr}
 }
 
+// NewSimpleCoreIteratorWithSize builds a CoreIterator from a SimpleIterator plus a function
+// that returns the remaining number of items in the iterator.
 func NewSimpleCoreIteratorWithSize[T any](itr SimpleIterator[T], size func() IteratorSize) *SimpleCoreIterator[T] {
 	return &SimpleCoreIterator[T]{SimpleIterator: itr, size: size}
 }
@@ -188,10 +203,13 @@ type SimpleCoreMutableIterator[T any] struct {
 	size func() IteratorSize
 }
 
+// NewSimpleCoreMutableIterator builds a CoreMutableIterator from a SimpleMutableIterator.
 func NewSimpleCoreMutableIterator[T any](itr SimpleMutableIterator[T]) *SimpleCoreMutableIterator[T] {
 	return &SimpleCoreMutableIterator[T]{SimpleMutableIterator: itr}
 }
 
+// NewSimpleCoreMutableIterator builds a CoreMutableIterator from a SimpleMutableIterator plus a function
+// that returns the number item remaining in the iterator.
 func NewSimpleCoreMutableIteratorWithSize[T any](itr SimpleMutableIterator[T], size func() IteratorSize) *SimpleCoreMutableIterator[T] {
 	return &SimpleCoreMutableIterator[T]{SimpleMutableIterator: itr, size: size}
 }
@@ -208,10 +226,14 @@ func (itr *SimpleCoreMutableIterator[T]) PreferSeq() bool {
 	return false
 }
 
+// DefaultIterator wraps a CoreIterator and provides the additional functions defined in IteratorExtensions
+// to provide a complete Iterator implementation.
 type DefaultIterator[T any] struct {
 	CoreIterator[T]
 }
 
+// NewDefaultIterator builds an Iterator from a CoreIterator by adding the methods defined in
+// IteratorExtensions.
 func NewDefaultIterator[T any](citr CoreIterator[T]) DefaultIterator[T] {
 	return DefaultIterator[T]{CoreIterator: citr}
 }
@@ -236,11 +258,15 @@ func (di DefaultIterator[T]) Morph(mapping func(T) T) Iterator[T] {
 	return Map(di, mapping)
 }
 
+// DefaultMutableIterator wraps a CoreMutableIterator together with a DefaultIterator to provide
+// and implementation of MutableIterator.
 type DefaultMutableIterator[T any] struct {
 	CoreMutableIterator[T]
 	DefaultIterator[T]
 }
 
+// NewDefaultMutableIterator builds a MutableIterator from a CoreMutableIterator by adding the methods
+// of IteratorExtensions.
 func NewDefaultMutableIterator[T any](citr CoreMutableIterator[T]) DefaultMutableIterator[T] {
 	return DefaultMutableIterator[T]{CoreMutableIterator: citr, DefaultIterator: DefaultIterator[T]{CoreIterator: citr}}
 }
@@ -328,20 +354,26 @@ func (si *SeqCoreIterator[T]) Abort() {
 	si.stop()
 }
 
+// NewSeqCoreIterator builds a CoreIterator from a standard library iter.Seq
 func NewSeqCoreIterator[T any](seq iter.Seq[T]) *SeqCoreIterator[T] {
 	return &SeqCoreIterator[T]{seq: seq}
 }
 
+// NewSeqCoreIterator builds a CoreIterator from a standard library iter.Seq and a function that
+// returns the number of items in the iterator.
 func NewSeqCoreIteratorWithSize[T any](seq iter.Seq[T], size func() IteratorSize) *SeqCoreIterator[T] {
 	return &SeqCoreIterator[T]{seq: seq, size: size}
 }
 
+// New builds an Iterator from a standard library iter.Seq
 func New[T any](seq iter.Seq[T]) Iterator[T] {
-	return &DefaultIterator[T]{CoreIterator: NewSeqCoreIterator(seq)}
+	return NewDefaultIterator(NewSeqCoreIterator(seq))
 }
 
+// New builds an Iterator from a standard library iter.Seq plus a function that
+// returns the number of items left in the iterator.
 func NewWithSize[T any](seq iter.Seq[T], size func() IteratorSize) Iterator[T] {
-	return &DefaultIterator[T]{CoreIterator: NewSeqCoreIteratorWithSize(seq, size)}
+	return NewDefaultIterator(NewSeqCoreIteratorWithSize(seq, size))
 }
 
 type SeqCoreIterator2[K any, V any] struct {
