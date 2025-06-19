@@ -271,6 +271,17 @@ func NewDefaultMutableIterator[T any](citr CoreMutableIterator[T]) DefaultMutabl
 	return DefaultMutableIterator[T]{CoreMutableIterator: citr, DefaultIterator: DefaultIterator[T]{CoreIterator: citr}}
 }
 
+// DefaultMutableIterator2 wraps a CoreMutableIterator together with a DefaultIterator to provide
+// and implementation of MutableIterator.
+type DefaultMutableIterator2[K any, V any] struct {
+	CoreMutableIterator2[K, V]
+	DefaultIterator2[K, V]
+}
+
+func NewDefaultMutableIterator2[K any, V any](citr CoreMutableIterator2[K, V]) DefaultMutableIterator2[K, V] {
+	return DefaultMutableIterator2[K, V]{CoreMutableIterator2: citr, DefaultIterator2: DefaultIterator2[K, V]{CoreIterator2: citr}}
+}
+
 type Indexed[T any] = tuple.Tuple2[int, T]
 
 func IndexValue[T any](index int, value T) Indexed[T] {
@@ -376,13 +387,18 @@ func NewWithSize[T any](seq iter.Seq[T], size func() IteratorSize) Iterator[T] {
 	return NewDefaultIterator(NewSeqCoreIteratorWithSize(seq, size))
 }
 
+type CoreIteratorMutations[T any] struct {
+	delete func()
+	set    func(T)
+}
+
 type SeqCoreIterator2[K any, V any] struct {
 	CoreIterator[V]
 	seq2 iter.Seq2[K, V]
 	key  K
 }
 
-func NewSeqCoreIterator2[K any, V any](seq2 iter.Seq2[K, V]) CoreIterator2[K, V] {
+func NewSeqCoreIterator2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func() IteratorSize) *SeqCoreIterator2[K, V] {
 	itr2 := SeqCoreIterator2[K, V]{
 		seq2: seq2,
 	}
@@ -393,23 +409,47 @@ func NewSeqCoreIterator2[K any, V any](seq2 iter.Seq2[K, V]) CoreIterator2[K, V]
 			}
 		}
 	}
-	itr2.CoreIterator = NewSeqCoreIterator(seq)
+	if size == nil {
+		itr2.CoreIterator = NewSeqCoreIterator(seq)
+	} else {
+		itr2.CoreIterator = NewSeqCoreIteratorWithSize(seq, size)
+	}
 	return &itr2
 }
 
-func (si *SeqCoreIterator2[K, V]) Seq2() iter.Seq2[K, V] {
-	return func(yield func(K, V) bool) {
-		var value V
-		for si.key, value = range si.seq2 {
-			if !yield(si.key, value) {
-				break
-			}
-		}
-	}
+func NewSeqCoreIterator2[K any, V any](seq2 iter.Seq2[K, V]) *SeqCoreIterator2[K, V] {
+	return NewSeqCoreIterator2WithSize(seq2, nil)
 }
 
 func (si *SeqCoreIterator2[K, V]) Key() K {
 	return si.key
+}
+
+func (si *SeqCoreIterator2[K, V]) Seq2() iter.Seq2[K, V] {
+	return si.seq2
+}
+
+type SeqCoreMutableIterator2[K any, V any] struct {
+	SeqCoreIterator2[K, V]
+	CoreIteratorMutations[V]
+}
+
+func (smi *SeqCoreMutableIterator2[K, V]) Delete() {
+	smi.delete()
+}
+
+func (smi *SeqCoreMutableIterator2[K, V]) Set(v V) {
+	smi.set(v)
+}
+
+func NewSeqCoreMutableIterator2[K any, V any](seq2 iter.Seq2[K, V], delete func(), set func(V)) *SeqCoreMutableIterator2[K, V] {
+	return &SeqCoreMutableIterator2[K, V]{SeqCoreIterator2: *NewSeqCoreIterator2(seq2),
+		CoreIteratorMutations: CoreIteratorMutations[V]{delete: delete, set: set}}
+}
+
+func NewSeqCoreMutableIterator2WithSize[K any, V any](seq2 iter.Seq2[K, V], delete func(), set func(V), size func() IteratorSize) *SeqCoreMutableIterator2[K, V] {
+	return &SeqCoreMutableIterator2[K, V]{SeqCoreIterator2: *NewSeqCoreIterator2WithSize(seq2, size),
+		CoreIteratorMutations: CoreIteratorMutations[V]{delete: delete, set: set}}
 }
 
 type DefaultIterator2[K any, V any] struct {

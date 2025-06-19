@@ -318,8 +318,33 @@ func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
 	})
 }
 
-// type mapIterator[K comparable, V any] struct {
-// 	imap map[K]V
-// 	key  K
-// 	size int
-// }
+type mapIterator[K comparable, V any] struct {
+	imap map[K]V
+	key  K
+	size int
+}
+
+func IterMutItems[K comparable, T any](m map[K]T) iterator.MutableIterator2[K, T] {
+	mi := mapIterator[K, T]{imap: m, size: len(m)}
+	core := iterator.NewSeqCoreMutableIterator2WithSize(
+		func(yield func(K, T) bool) {
+			var v T
+			for mi.key, v = range mi.imap {
+				mi.size--
+				if !yield(mi.key, v) {
+					break
+				}
+			}
+		},
+		func() {
+			delete(mi.imap, mi.key)
+		},
+		func(v T) {
+			mi.imap[mi.key] = v
+		},
+		func() iterator.IteratorSize {
+			return iterator.NewSize(mi.size)
+		},
+	)
+	return iterator.NewDefaultMutableIterator2(core)
+}
