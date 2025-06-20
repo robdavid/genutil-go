@@ -3,6 +3,7 @@ package maps
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -321,4 +322,31 @@ func TestSortedItems(t *testing.T) {
 		tuple.Of2("key-4", 4),
 	}
 	assert.Equal(t, expected, items)
+}
+
+func TestIteratorMutations(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i * 2
+	}
+	iter := IterMutItems(m)
+	assert.Equal(t, len(m), iter.Size().Size)
+	for k, v := range iter.Seq2() {
+		if k%3 == 0 {
+			iter.Set(v / 2 * 3)
+		} else if k%2 == 0 {
+			iter.Delete()
+		}
+	}
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	actual := make([]int, 0, len(keys))
+	for _, k := range keys {
+		actual = append(actual, m[k])
+	}
+	expected := []int{0, 2, 9, 10, 18, 14, 27}
+	assert.Equal(t, expected, actual)
 }
