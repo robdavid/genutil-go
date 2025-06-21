@@ -638,6 +638,19 @@ func BenchmarkGenerateTakeFibSeq(b *testing.B) {
 	}
 }
 
+func BenchmarkGenerateMorphFibSeq(b *testing.B) {
+	iter := fibSeq().Morph(func(n int) int { return n * 2 })
+	var sum uint64 = 0
+	i := 0
+	for v := range iter.Seq() {
+		if i >= b.N {
+			break
+		}
+		sum += uint64(v)
+		i++
+	}
+}
+
 func BenchmarkGenerateFibSeq(b *testing.B) {
 	iter := fibSeq()
 	var sum uint64 = 0

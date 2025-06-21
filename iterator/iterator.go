@@ -79,15 +79,19 @@ func OptSeqFrom[T any](seq iter.Seq[T]) OptSeq[T] {
 // that are intrinsic to an iterator implementation.
 type CoreIterator[T any] interface {
 	SimpleIterator[T]
-	// Seq returns the iterator as a Go iter.Seq function.
+	// Seq returns the iterator as a Go iter.Seq iterator.
 	Seq() iter.Seq[T]
 	// Size is an estimate, where possible, of the number of elements remaining.
 	Size() IteratorSize
-	// PreferSeq returns true if the underlying iterator does not have the most efficient implementation
-	// of the simple iterator. For example, an iterator based purely on iter.Seq must use iter.Pull
-	// to create an implementation of Next(), Value() etc., which carries a performance hit. An iterator
-	// of this type would return true for this method.
-	PreferSeq() bool
+	// SeqOK returns true if the Seq() method should be used to perform iterations.
+	// Generally, using Seq() is the preferred method for efficiency reasons. However
+	// there are situations where this is not the case and this method will return false.
+	// For example, if the underlying iterator is based on a simple iterator, it is
+	// slightly more efficient to stick to the simple iterator methods. Also, if simple
+	// iterator methods have already been called against a Seq based iterator, calling
+	// Seq() will cause inconsistent results, as it will restart the iterator from the
+	// beginning, and so in these cases, SeqOK() will return false.
+	SeqOK() bool
 }
 
 // CoreMutableIterator is an extension of CoreIterator which adds methods to facilitate
@@ -194,7 +198,7 @@ func (itr *SimpleCoreIterator[T]) Seq() iter.Seq[T] {
 	return SimpleToSeq(itr.SimpleIterator)
 }
 
-func (itr *SimpleCoreIterator[T]) PreferSeq() bool {
+func (itr *SimpleCoreIterator[T]) SeqOK() bool {
 	return false
 }
 
@@ -222,7 +226,7 @@ func (itr *SimpleCoreMutableIterator[T]) Size() IteratorSize {
 	}
 }
 
-func (itr *SimpleCoreMutableIterator[T]) PreferSeq() bool {
+func (itr *SimpleCoreMutableIterator[T]) SeqOK() bool {
 	return false
 }
 
@@ -342,13 +346,13 @@ func (si *SeqCoreIterator[T]) Size() IteratorSize {
 	}
 }
 
-func (si *SeqCoreIterator[T]) PreferSeq() bool {
-	return true
+func (si *SeqCoreIterator[T]) SeqOK() bool {
+	return si.next == nil
 }
 
 func (si *SeqCoreIterator[T]) Next() (ok bool) {
 	if si.next == nil {
-		si.next, si.stop = iter.Pull(si.Seq())
+		si.next, si.stop = iter.Pull(si.seq)
 	}
 	si.value, ok = si.next()
 	return
@@ -359,10 +363,17 @@ func (si *SeqCoreIterator[T]) Value() T {
 }
 
 func (si *SeqCoreIterator[T]) Abort() {
-	if si.next == nil {
-		si.next, si.stop = iter.Pull(si.Seq())
+	if si.stop == nil {
+		si.next, si.stop = iter.Pull(si.seq)
 	}
 	si.stop()
+}
+
+// Future: Reset restarts the iterator
+func (si *SeqCoreIterator[T]) Reset() {
+	si.Abort()
+	si.stop = nil
+	si.next = nil
 }
 
 // NewSeqCoreIterator builds a CoreIterator from a standard library iter.Seq
@@ -403,7 +414,8 @@ func NewSeqCoreIterator2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func()
 		seq2: seq2,
 	}
 	seq := func(yield func(V) bool) {
-		for _, v := range itr2.Seq2() {
+		var v V
+		for itr2.key, v = range itr2.Seq2() {
 			if !yield(v) {
 				break
 			}
@@ -560,7 +572,7 @@ func IsSizeInfinite(size IteratorSize) bool {
 
 // funcNext is a function supporting a transforming operation by consuming
 // all or part of an iterator, returning the next value
-type funcNext[T any, U any] func(Iterator[T]) (bool, U)
+type funcNext[T any, U any] func(T) (U, bool)
 
 func safeClose[T any](ch chan T) (ok bool) {
 	defer func() {
@@ -588,7 +600,7 @@ func Chan[T any](itr CoreIterator[T]) (out chan T) {
 	out = make(chan T)
 	go func() {
 		defer safeClose(out)
-		if !itr.PreferSeq() {
+		if !itr.SeqOK() {
 			for itr.Next() {
 				if !safeSend(out, itr.Value()) {
 					break
@@ -625,12 +637,14 @@ type mapIter[T, U any] struct {
 }
 
 func (i *mapIter[T, U]) Next() bool {
-	ok, value := i.mapping(i.base)
-	if !ok {
-		return false
-	} else {
-		i.value = value
-		return true
+	for {
+		if ok := i.base.Next(); !ok {
+			return false
+		}
+		if value, ok := i.mapping(i.base.Value()); ok {
+			i.value = value
+			return true
+		}
 	}
 }
 
@@ -646,13 +660,15 @@ func (i *mapIter[T, U]) Size() IteratorSize {
 	return i.sizeFunc(i.base.Size())
 }
 
-func (i *mapIter[T, U]) PreferSeq() bool { return false }
+func (i *mapIter[T, U]) SeqOK() bool { return i.base.SeqOK() }
 
 func (i *mapIter[T, U]) Seq() iter.Seq[U] {
 	return func(yield func(U) bool) {
-		for i.Next() {
-			if !yield(i.Value()) {
-				break
+		for v := range i.base.Seq() {
+			if mv, ok := i.mapping(v); ok {
+				if !yield(mv) {
+					break
+				}
 			}
 		}
 	}
@@ -711,8 +727,9 @@ func (si *sliceIter[T]) Size() IteratorSize {
 func (si *sliceIter[T]) Seq() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		defer si.Abort()
-		for si.index = 0; si.index < len(*si.slice); si.index++ {
+		for si.index = 0; si.index < len(*si.slice); {
 			si.ref = &(*si.slice)[si.index]
+			si.index++
 			if !yield(*si.ref) {
 				break
 			}
@@ -720,7 +737,7 @@ func (si *sliceIter[T]) Seq() iter.Seq[T] {
 	}
 }
 
-func (si *sliceIter[T]) PreferSeq() bool { return false }
+func (si *sliceIter[T]) SeqOK() bool { return false }
 
 // Slice makes an Iterator[T] from slice []T, containing all the elements
 // from the slice in order.
@@ -836,7 +853,7 @@ func (ri *rangeIter[T, S]) Size() IteratorSize {
 	return NewSize(size)
 }
 
-func (ri *rangeIter[T, S]) PreferSeq() bool { return false }
+func (ri *rangeIter[T, S]) SeqOK() bool { return false }
 
 func newRangeIter[T ordered.Real, S ordered.Real](from, upto T, by S, inclusive bool) Iterator[T] {
 	itr := rangeIter[T, S]{index: from, to: upto, by: by, inclusive: inclusive}
@@ -880,7 +897,7 @@ func (emptyIter[T]) Next() bool         { return false }
 func (emptyIter[T]) Value() T           { var zero T; return zero }
 func (emptyIter[T]) Size() IteratorSize { return NewSize(0) }
 func (emptyIter[T]) Abort()             {}
-func (emptyIter[T]) PreferSeq() bool    { return false }
+func (emptyIter[T]) SeqOK() bool        { return false }
 func (emptyIter[T]) Seq() iter.Seq[T]   { return func(yield func(T) bool) {} }
 
 // Empty creates an iterator that returns no items.
@@ -891,11 +908,8 @@ func Empty[T any]() Iterator[T] {
 // Map applies function `mapping` of type `func(T) U` to each value, producing
 // a new iterator over `U`.
 func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
-	mapNext := func(iterator Iterator[T]) (ok bool, value U) {
-		if ok = iterator.Next(); ok {
-			value = mapping(iterator.Value())
-		}
-		return
+	mapNext := func(value T) (U, bool) {
+		return mapping(value), true
 	}
 	return wrapFunc(iter, mapNext, functions.Id)
 }
@@ -903,17 +917,8 @@ func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
 // Filter applies a filter function `predicate` of type `func(T) bool`, producing
 // a new iterator containing only the elements than satisfy the function.
 func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
-	filterNext := func(i Iterator[T]) (ok bool, value T) {
-		for {
-			if ok = i.Next(); ok {
-				if !predicate(i.Value()) {
-					continue
-				} else {
-					value = i.Value()
-				}
-			}
-			return
-		}
+	filterNext := func(value T) (T, bool) {
+		return value, predicate(value)
 	}
 	return wrapFunc(iter, filterNext, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
@@ -923,15 +928,8 @@ func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
 // option. The result is an iterator over `U` drawn from only the non-empty options
 // returned.
 func FilterMap[T any, U any](iter Iterator[T], mapping func(T) option.Option[U]) Iterator[U] {
-	filterMapNext := func(i Iterator[T]) (ok bool, value U) {
-		for {
-			if ok = i.Next(); ok {
-				if value, ok = mapping(i.Value()).ToRef().GetOK(); !ok {
-					continue
-				}
-			}
-			return
-		}
+	filterMapNext := func(value T) (U, bool) {
+		return mapping(value).GetOK()
 	}
 	return wrapFunc(iter, filterMapNext, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
@@ -952,7 +950,7 @@ func FilterValues[T any](iter Iterator[result.Result[T]]) Iterator[T] {
 // The slice referenced may be reallocated as the append function is used to add
 // elements to the slice. The slice may be a nil slice.
 func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
-	if iter.PreferSeq() {
+	if iter.SeqOK() {
 		for v := range iter.Seq() {
 			*slice = append(*slice, v)
 		}
@@ -965,7 +963,7 @@ func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
 }
 
 func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
-	if iter.PreferSeq() {
+	if iter.SeqOK() {
 		for k, v := range iter.Seq2() {
 			*slice = append(*slice, KVOf(k, v))
 		}
@@ -1080,7 +1078,7 @@ func (pi *genIter[T]) Seq() iter.Seq[T] {
 	return SimpleToSeq(pi)
 }
 
-func (pi *genIter[T]) PreferSeq() bool {
+func (pi *genIter[T]) SeqOK() bool {
 	return false
 }
 
@@ -1226,7 +1224,7 @@ func (ti *takeIterator[T]) Next() bool {
 }
 
 // Non-seq is more efficient  here
-func (ti *takeIterator[T]) PreferSeq() bool { return false }
+func (ti *takeIterator[T]) SeqOK() bool { return false }
 
 func (ti *takeIterator[T]) Seq() iter.Seq[T] {
 	return func(yield func(T) bool) {

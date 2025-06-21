@@ -286,32 +286,44 @@ func FindUsingRef[K comparable, T any](m map[K]T, p func(*K, *T) bool) option.Op
 
 // Returns an iterator over the keys of a map.
 func IterKeys[K comparable, T any](m map[K]T) iterator.Iterator[K] {
-	return iterator.New(func(yield func(K) bool) {
-		for k := range m {
-			if !yield(k) {
-				break
+	size := len(m)
+	return iterator.NewWithSize(
+		func(yield func(K) bool) {
+			for k := range m {
+				size--
+				if !yield(k) {
+					break
+				}
 			}
-		}
-	})
+		},
+		func() iterator.IteratorSize {
+			return iterator.NewSize(size)
+		},
+	)
 }
 
 // Returns an iterator over the values of a map.
+//
+// Deprecated: Use Iter since iterator.Iterator2[K,T] is also an iterator.Iterator[K,T]
 func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
-	return iterator.New(func(yield func(T) bool) {
-		for _, v := range m {
-			if !yield(v) {
-				break
-			}
-		}
-	})
+	return Iter(m)
 }
 
 // Returns an iterator over the keys and values of a map, returning each pair
-// via an iterator.Iterator2
+// via an iterator.Iterator2.
+//
+// Deprecated: Use Iter since this function is an alias for that.
 func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
+	return Iter(m)
+}
+
+// Returns an iterator over the keys and values of a map, returning each pair
+// via an iterator.Iterator2.
+func Iter[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
 	size := len(m)
 	return iterator.New2WithSize(
 		func(yield func(K, T) bool) {
+			size = len(m)
 			for k, v := range m {
 				size--
 				if !yield(k, v) {
@@ -325,12 +337,13 @@ func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
 	)
 }
 
-func IterMutItems[K comparable, T any](m map[K]T) iterator.MutableIterator2[K, T] {
+func IterMut[K comparable, T any](m map[K]T) iterator.MutableIterator2[K, T] {
 	size := len(m)
 	var key K
 	core := iterator.NewSeqCoreMutableIterator2WithSize(
 		func(yield func(K, T) bool) {
 			var v T
+			size = len(m)
 			for key, v = range m {
 				size--
 				if !yield(key, v) {

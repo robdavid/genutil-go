@@ -232,14 +232,54 @@ func TestIterKeys(t *testing.T) {
 	assert.ElementsMatch(t, []string{"one", "two", "three"}, keys)
 }
 
-func TestIterItems(t *testing.T) {
+func TestIter(t *testing.T) {
 	mymap := map[string]int{
 		"one":   1,
 		"three": 3,
 		"two":   2,
 	}
-	items := IterItems(mymap).Collect2()
+	items := Iter(mymap).Collect2()
 	assert.ElementsMatch(t, []iterator.KeyValue[string, int]{iterator.KVOf("one", 1), iterator.KVOf("two", 2), iterator.KVOf("three", 3)}, items)
+}
+
+func TestIterSize(t *testing.T) {
+	mymap := make(map[int]string)
+	const mapsize = 20
+	for n := range mapsize {
+		mymap[n] = strconv.Itoa(n)
+	}
+	itr := Iter(mymap)
+	count := mapsize
+	for range itr.Seq2() {
+		count--
+		assert.Equal(t, count, itr.Size().Size)
+	}
+	assert.Zero(t, itr.Size().Size)
+}
+
+func TestIterSimple(t *testing.T) {
+	mymap := make(map[int]int)
+	seen := make(map[int]bool)
+	const mapsize = 20
+	for n := range mapsize {
+		mymap[n] = n
+	}
+	itr := Iter(mymap)
+	count := mapsize
+	for itr.Next() {
+		count--
+		assert.Equal(t, count, itr.Size().Size)
+		seen[itr.Key()] = true
+		if count <= 5 {
+			break
+		}
+	}
+	assert.Equal(t, 5, itr.Size().Size)
+	remain := itr.Collect()
+	assert.Equal(t, 5, len(remain))
+	for _, r := range remain {
+		assert.False(t, seen[r])
+	}
 }
 
 func generateMap(size int) map[string]int {
@@ -329,7 +369,7 @@ func TestIteratorMutations(t *testing.T) {
 	for i := range 10 {
 		m[i] = i * 2
 	}
-	iter := IterMutItems(m)
+	iter := IterMut(m)
 	assert.Equal(t, len(m), iter.Size().Size)
 	for k, v := range iter.Seq2() {
 		if k%3 == 0 {
