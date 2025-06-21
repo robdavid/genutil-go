@@ -307,15 +307,22 @@ func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
 }
 
 // Returns an iterator over the keys and values of a map, returning each pair
-// as via an iterator.Iterator2
+// via an iterator.Iterator2
 func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
-	return iterator.New2(func(yield func(K, T) bool) {
-		for k, v := range m {
-			if !yield(k, v) {
-				break
+	size := len(m)
+	return iterator.New2WithSize(
+		func(yield func(K, T) bool) {
+			for k, v := range m {
+				size--
+				if !yield(k, v) {
+					break
+				}
 			}
-		}
-	})
+		},
+		func() iterator.IteratorSize {
+			return iterator.NewSize(size)
+		},
+	)
 }
 
 func IterMutItems[K comparable, T any](m map[K]T) iterator.MutableIterator2[K, T] {

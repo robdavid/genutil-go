@@ -465,8 +465,15 @@ func NewDefaultIterator2[K any, V any](core CoreIterator2[K, V]) DefaultIterator
 	return DefaultIterator2[K, V]{DefaultIterator: DefaultIterator[V]{CoreIterator: core}, CoreIterator2: core}
 }
 
+// New2 creates an Iterator2 from a standard library iter.Seq2. Iterator Size is unknown.
 func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
 	return NewDefaultIterator2(NewSeqCoreIterator2(seq2))
+}
+
+// New2WithSize creates an Iterator2 from a standard library iter.Seq2 and a size function that
+// returns the remaining items in the iterator.
+func New2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func() IteratorSize) Iterator2[K, V] {
+	return NewDefaultIterator2(NewSeqCoreIterator2WithSize(seq2, size))
 }
 
 type IteratorSizeType int
