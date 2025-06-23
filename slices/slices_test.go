@@ -636,3 +636,12 @@ func TestFilled(t *testing.T) {
 	f := Filled(5, byte('-'))
 	assert.Equal(t, []byte{'-', '-', '-', '-', '-'}, f)
 }
+
+func TestIterRef(t *testing.T) {
+	input := Range(0, 10)
+	for vp := range IterRef(input).Seq() {
+		*vp *= 2
+	}
+	expected := RangeBy(0, 20, 2)
+	assert.Equal(t, expected, input)
+}

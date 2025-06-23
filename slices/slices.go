@@ -9,6 +9,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/internal/rangehelper"
+	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/ordered"
 )
@@ -816,4 +817,28 @@ func Filled[T any](size int, value T) []T {
 	slice := make([]T, size)
 	Fill(slice, value)
 	return slice
+}
+
+// Iter makes an Iterator[T] from slice []T, containing all the elements
+// from the slice in order.
+func Iter[T any](slice []T) iterator.Iterator[T] {
+	return iterator.NewDefaultIterator(iterator.NewSliceCoreIterator(&slice))
+}
+
+// IterRef makes an Iterator[*T] from slice []T, containing references to all the elements
+// in the slice in order.
+func IterRef[T any](slice []T) iterator.Iterator[*T] {
+	return iterator.NewDefaultIterator(iterator.NewSliceCoreIteratorRef(&slice))
+}
+
+// IterMut makes a MutableIterator[T] from slice reference *[]T, containing all the elements
+// from the slice in order.
+func IterMut[T any](slice *[]T) iterator.MutableIterator[T] {
+	return iterator.NewDefaultMutableIterator(iterator.NewSliceCoreIterator(slice))
+}
+
+// IterRefMut makes a MutableIterator[*T] from slice reference *[]T, containing references to all the elements
+// in the slice in order.
+func IterRefMut[T any](slice []T) iterator.MutableIterator[*T] {
+	return iterator.NewDefaultMutableIterator(iterator.NewSliceCoreIteratorRef(&slice))
 }

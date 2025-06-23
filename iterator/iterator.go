@@ -739,6 +739,39 @@ func (si *sliceIter[T]) Seq() iter.Seq[T] {
 
 func (si *sliceIter[T]) SeqOK() bool { return false }
 
+func NewSliceCoreIterator[T any](slice *[]T) CoreMutableIterator[T] {
+	return &sliceIter[T]{slice: slice, index: 0}
+}
+
+type sliceIterRef[T any] struct {
+	sliceIter[T]
+}
+
+func (sir *sliceIterRef[T]) Value() *T {
+	return sir.ref
+}
+
+func (sir *sliceIterRef[T]) Set(e *T) {
+	*sir.ref = *e
+}
+
+func (sir *sliceIterRef[T]) Seq() iter.Seq[*T] {
+	return func(yield func(*T) bool) {
+		defer sir.Abort()
+		for sir.index = 0; sir.index < len(*sir.slice); {
+			sir.ref = &(*sir.slice)[sir.index]
+			sir.index++
+			if !yield(sir.ref) {
+				break
+			}
+		}
+	}
+}
+
+func NewSliceCoreIteratorRef[T any](slice *[]T) CoreMutableIterator[*T] {
+	return &sliceIterRef[T]{sliceIter: sliceIter[T]{slice: slice, index: 0}}
+}
+
 // Slice makes an Iterator[T] from slice []T, containing all the elements
 // from the slice in order.
 func Slice[T any](slice []T) Iterator[T] {

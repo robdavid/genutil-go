@@ -1137,7 +1137,6 @@ func TestIterator2PullAndCollect2(t *testing.T) {
 	itr := testSeqIter2(0, size, func(n int) int { return n + size })
 	count := 0
 	for count < size/2 && itr.Next() {
-		fmt.Println(count)
 		count++
 	}
 	coll := itr.Collect2()
@@ -1153,7 +1152,6 @@ func TestIterator2PullAndCollect(t *testing.T) {
 	itr := testSeqIter2(0, size, func(n int) int { return n + size })
 	count := 0
 	for count < size/2 && itr.Next() {
-		fmt.Println(count)
 		count++
 	}
 	coll := itr.Collect()
