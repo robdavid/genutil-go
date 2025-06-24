@@ -101,8 +101,8 @@ type CoreMutableIterator[T any] interface {
 	// Set modifies the current value in place.
 	Set(T)
 	// Delete deletes the current value, which must be the last value returned by Next(). This
-	// function may not be implemented for all iterator types, in which case it will return an
-	Delete() error
+	// function may not be implemented for all iterator types, in which case it will panic.
+	Delete()
 }
 
 // IteratorExtensions defines methods available to all iterators beyond the core functionality provided by CoreIterator.
@@ -283,7 +283,7 @@ type DefaultMutableIterator2[K any, V any] struct {
 }
 
 func NewDefaultMutableIterator2[K any, V any](citr CoreMutableIterator2[K, V]) DefaultMutableIterator2[K, V] {
-	return DefaultMutableIterator2[K, V]{CoreMutableIterator2: citr, DefaultIterator2: DefaultIterator2[K, V]{CoreIterator2: citr}}
+	return DefaultMutableIterator2[K, V]{CoreMutableIterator2: citr, DefaultIterator2: NewDefaultIterator2(citr)}
 }
 
 type Indexed[T any] = tuple.Tuple2[int, T]
@@ -327,14 +327,19 @@ func (eci *enumeratedCoreIterator[T]) Seq2() iter.Seq2[int, T] {
 }
 
 type SeqCoreIterator[T any] struct {
-	seq   iter.Seq[T]
-	size  func() IteratorSize
-	stop  func()
-	next  func() (T, bool)
-	value T
+	seq       iter.Seq[T]
+	size      func() IteratorSize
+	stop      func()
+	next      func() (T, bool)
+	value     T
+	seqCalled bool
 }
 
 func (si *SeqCoreIterator[T]) Seq() iter.Seq[T] {
+	if si.next != nil {
+		panic("cannot call Seq() on iterator after calling Next()")
+	}
+	si.seqCalled = true
 	return si.seq
 }
 
@@ -351,6 +356,9 @@ func (si *SeqCoreIterator[T]) SeqOK() bool {
 }
 
 func (si *SeqCoreIterator[T]) Next() (ok bool) {
+	if si.seqCalled {
+		panic("cannot call Next() on iterator after calling Seq() or Seq2()")
+	}
 	if si.next == nil {
 		si.next, si.stop = iter.Pull(si.seq)
 	}
@@ -404,7 +412,7 @@ type CoreIteratorMutations[T any] struct {
 }
 
 type SeqCoreIterator2[K any, V any] struct {
-	CoreIterator[V]
+	*SeqCoreIterator[V]
 	seq2 iter.Seq2[K, V]
 	key  K
 }
@@ -415,16 +423,16 @@ func NewSeqCoreIterator2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func()
 	}
 	seq := func(yield func(V) bool) {
 		var v V
-		for itr2.key, v = range itr2.Seq2() {
+		for itr2.key, v = range itr2.seq2 {
 			if !yield(v) {
 				break
 			}
 		}
 	}
 	if size == nil {
-		itr2.CoreIterator = NewSeqCoreIterator(seq)
+		itr2.SeqCoreIterator = NewSeqCoreIterator(seq)
 	} else {
-		itr2.CoreIterator = NewSeqCoreIteratorWithSize(seq, size)
+		itr2.SeqCoreIterator = NewSeqCoreIteratorWithSize(seq, size)
 	}
 	return &itr2
 }
@@ -438,6 +446,10 @@ func (si *SeqCoreIterator2[K, V]) Key() K {
 }
 
 func (si *SeqCoreIterator2[K, V]) Seq2() iter.Seq2[K, V] {
+	if si.next != nil {
+		panic("cannot call Seq2() on iterator after calling Next()")
+	}
+	si.seqCalled = true
 	return si.seq2
 }
 
@@ -698,22 +710,26 @@ func (si *sliceIter[T]) Next() bool {
 }
 
 func (si *sliceIter[T]) Value() T {
+	if si.ref == nil {
+		var zero T
+		return zero
+	}
 	return *si.ref
 }
 
 func (si *sliceIter[T]) Set(e T) {
-	*si.ref = e
+	if si.ref != nil {
+		*si.ref = e
+	}
 }
 
-func (si *sliceIter[T]) Delete() error {
-	if si.index > len(*si.slice) {
-		return nil
-	} else if si.index == 0 {
-		*si.slice = (*si.slice)[1:] // Delete the first element
-		return nil
+func (si *sliceIter[T]) Delete() {
+	if si.index > len(*si.slice) || si.index < 1 || si.ref == nil {
+		return
 	}
 	*si.slice = append((*si.slice)[:si.index-1], (*si.slice)[si.index:]...)
-	return nil
+	si.index--
+	si.ref = nil
 }
 
 func (si *sliceIter[T]) Abort() {
@@ -737,7 +753,7 @@ func (si *sliceIter[T]) Seq() iter.Seq[T] {
 	}
 }
 
-func (si *sliceIter[T]) SeqOK() bool { return false }
+func (si *sliceIter[T]) SeqOK() bool { return si.index == 0 }
 
 func NewSliceCoreIterator[T any](slice *[]T) CoreMutableIterator[T] {
 	return &sliceIter[T]{slice: slice, index: 0}

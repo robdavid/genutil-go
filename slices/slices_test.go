@@ -645,3 +645,38 @@ func TestIterRef(t *testing.T) {
 	expected := RangeBy(0, 20, 2)
 	assert.Equal(t, expected, input)
 }
+
+func TestIterMut(t *testing.T) {
+	slice := Range(0, 10)
+	itr := IterMut(&slice)
+	size := len(slice)
+	for v := range itr.Seq() {
+		size--
+		assert.Equal(t, size, itr.Size().Allocate())
+		assert.Equal(t, v, itr.Value())
+		if v&1 == 0 {
+			itr.Delete()
+			assert.Equal(t, 0, itr.Value())
+		} else {
+			itr.Set(v * 3)
+		}
+	}
+	expected := []int{3, 9, 15, 21, 27}
+	assert.Equal(t, expected, slice)
+}
+
+func TestIterMutSeqCollect(t *testing.T) {
+	slice := Range(0, 10)
+	itr := IterMut(&slice)
+	var collected []int
+	count := 0
+	for v := range itr.Seq() {
+		count++
+		if v == 5 {
+			collected = itr.Collect()
+		}
+	}
+	expected := []int{6, 7, 8, 9}
+	assert.Equal(t, expected, collected)
+	assert.Equal(t, 6, count)
+}

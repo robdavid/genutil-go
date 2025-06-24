@@ -390,3 +390,22 @@ func TestIteratorMutations(t *testing.T) {
 	expected := []int{0, 2, 9, 10, 18, 14, 27}
 	assert.Equal(t, expected, actual)
 }
+
+func TestIterMutNextCollect(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i
+	}
+	itr := IterMut(m)
+	var collected []int
+	count := 0
+	assert.True(t, itr.SeqOK())
+	for itr.Next() {
+		assert.False(t, itr.SeqOK())
+		count++
+		if count == 5 {
+			collected = itr.Collect()
+		}
+	}
+	assert.Equal(t, 5, len(collected))
+}
