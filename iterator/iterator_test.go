@@ -147,12 +147,40 @@ func TestSliceIter(t *testing.T) {
 	assert.Equal(t, input, output)
 }
 
+func TestMutSliceIter(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	input := []int{1, 2, 3, 4}
+	iter := iterator.MutSlice(&input)
+	iter.Delete() // Delete before Next should be no-op
+	assert.True(iterator.IsSizeKnown(iter.Size()))
+	assert.Equal(4, iter.Size().Size)
+	require.True(iter.Next())
+	require.True(iter.Next())
+	iter.Delete()
+	iter.Reset()
+	assert.Equal(3, iter.Size().Size)
+	output := iterator.Collect(iter)
+	assert.Equal([]int{1, 3, 4}, output)
+}
+
 func TestTake(t *testing.T) {
 	input := slices.Range(0, 10)
 	iter := iterator.Take(4, iterator.Slice(input))
 	assert.True(t, iterator.IsSizeKnown(iter.Size()))
 	assert.Equal(t, 4, iter.Size().Allocate())
 	output := iterator.Collect(iter)
+	assert.Equal(t, slices.Range(0, 4), output)
+}
+
+func TestTakeReset(t *testing.T) {
+	input := slices.Range(0, 10)
+	iter := iterator.Take(4, iterator.Slice(input))
+	output := iter.Collect()
+	assert.Equal(t, slices.Range(0, 4), output)
+	assert.Empty(t, iter.Collect())
+	iter.Reset()
+	output = iter.Collect()
 	assert.Equal(t, slices.Range(0, 4), output)
 }
 
@@ -247,19 +275,36 @@ func TestSeqIterMix(t *testing.T) {
 func TestRange(t *testing.T) {
 	r := iterator.Range(0, 10)
 	seq := iterator.Collect(r)
-	assert.Equal(t, 10, len(seq))
-	for i, v := range seq {
-		assert.Equal(t, i, v)
-	}
+	assert.Equal(t, slices.Range(0, 10), seq)
+}
+
+func TestRangeReset(t *testing.T) {
+	r := iterator.Range(0, 10)
+	assert.Equal(t, slices.Range(0, 10), r.Collect())
+	assert.Empty(t, r.Collect())
+	r.Reset()
+	assert.Equal(t, slices.Range(0, 10), r.Collect())
 }
 
 func TestInclusiveRange(t *testing.T) {
 	r := iterator.IncRange(0, 10)
-	seq := iterator.Collect(r)
-	assert.Equal(t, 11, len(seq))
-	for i, v := range seq {
-		assert.Equal(t, i, v)
-	}
+	assert.Equal(t, slices.Range(0, 11), r.Collect())
+}
+
+func TestInclusiveRangeReset(t *testing.T) {
+	r := iterator.IncRange(0, 10)
+	assert.Equal(t, slices.Range(0, 11), r.Collect())
+	assert.Empty(t, r.Collect())
+	r.Reset()
+	assert.Equal(t, slices.Range(0, 11), r.Collect())
+}
+
+func TestReverseRangeReset(t *testing.T) {
+	r := iterator.Range(10, 0)
+	assert.Equal(t, slices.Range(10, 0), r.Collect())
+	assert.Empty(t, r.Collect())
+	r.Reset()
+	assert.Equal(t, slices.Range(10, 0), r.Collect())
 }
 
 func TestRangeChan(t *testing.T) {
@@ -548,6 +593,21 @@ func TestFromSeqToChan(t *testing.T) {
 	assert.Equal(t, slices.Range(0, 5), slice)
 }
 
+func TestFromSeqReset(t *testing.T) {
+	seq := func(yield func(int) bool) {
+		for i := range 5 {
+			if !yield(i) {
+				break
+			}
+		}
+	}
+	itr := iterator.New(seq)
+	assert.Equal(t, slices.Range(0, 5), itr.Collect())
+	assert.Empty(t, itr.Collect())
+	itr.Reset()
+	assert.Equal(t, slices.Range(0, 5), itr.Collect())
+}
+
 func fib() iterator.Iterator[int] {
 	return iterator.Generate(func(c iterator.Consumer[int]) {
 		tail := [2]int{0, 1}
@@ -746,6 +806,11 @@ func (sf *SimpleFib) Next() bool {
 
 func (sf *SimpleFib) Abort() {
 	sf[1] = 0
+}
+
+func (sf *SimpleFib) Reset() {
+	sf[0] = 0
+	sf[1] = 1
 }
 
 func newFib() iterator.Iterator[int] {

@@ -33,6 +33,10 @@ type SimpleIterator[T any] interface {
 	Value() T
 	// Abort stops the iterator; subsequent calls to Next() will return false.
 	Abort()
+	// Reset stops the iterator; subsequent calls to Next() will begin the iterator from the start.
+	// Note not all iterators are guaranteed to return the same sequence again, for example iterators
+	// that perform IO may not read the same data again.
+	Reset()
 }
 
 type SimpleMutableIterator[T any] interface {
@@ -337,10 +341,28 @@ type SeqCoreIterator[T any] struct {
 
 func (si *SeqCoreIterator[T]) Seq() iter.Seq[T] {
 	if si.next != nil {
-		panic("cannot call Seq() on iterator after calling Next()")
+		return si.pullSeq
 	}
-	si.seqCalled = true
-	return si.seq
+	return si.oneSeq
+}
+
+func (si *SeqCoreIterator[T]) oneSeq(yield func(T) bool) {
+	if !si.seqCalled {
+		si.seqCalled = true
+		si.seq(yield)
+	}
+}
+
+func (si *SeqCoreIterator[T]) pullSeq(yield func(T) bool) {
+	for {
+		v, ok := si.next()
+		if !ok {
+			break
+		}
+		if !yield(v) {
+			break
+		}
+	}
 }
 
 func (si *SeqCoreIterator[T]) Size() IteratorSize {
@@ -377,11 +399,12 @@ func (si *SeqCoreIterator[T]) Abort() {
 	si.stop()
 }
 
-// Future: Reset restarts the iterator
+// Reset restarts the iterator
 func (si *SeqCoreIterator[T]) Reset() {
 	si.Abort()
 	si.stop = nil
 	si.next = nil
+	si.seqCalled = false
 }
 
 // NewSeqCoreIterator builds a CoreIterator from a standard library iter.Seq
@@ -668,6 +691,10 @@ func (i *mapIter[T, U]) Abort() {
 	i.base.Abort()
 }
 
+func (i *mapIter[T, U]) Reset() {
+	i.base.Reset()
+}
+
 func (i *mapIter[T, U]) Size() IteratorSize {
 	return i.sizeFunc(i.base.Size())
 }
@@ -736,6 +763,10 @@ func (si *sliceIter[T]) Abort() {
 	si.index = len(*si.slice)
 }
 
+func (si *sliceIter[T]) Reset() {
+	si.index = 0
+}
+
 func (si *sliceIter[T]) Size() IteratorSize {
 	return NewSize(len(*si.slice) - si.index)
 }
@@ -790,6 +821,8 @@ func NewSliceCoreIteratorRef[T any](slice *[]T) CoreMutableIterator[*T] {
 
 // Slice makes an Iterator[T] from slice []T, containing all the elements
 // from the slice in order.
+//
+// Deprecated: use slices.Iter()
 func Slice[T any](slice []T) Iterator[T] {
 	iter := &sliceIter[T]{slice: &slice, index: 0}
 	return NewDefaultIterator(iter)
@@ -807,11 +840,16 @@ func Of[T any](elements ...T) Iterator[T] {
 	return Slice(elements)
 }
 
+type rangeIterInitial[T ordered.Real] struct {
+	index     T
+	inclusive bool
+}
 type rangeIter[T ordered.Real, S ordered.Real] struct {
 	index, to T
 	by        S
 	value     T
 	inclusive bool
+	initial   rangeIterInitial[T]
 }
 
 func (ri *rangeIter[T, S]) incdec() {
@@ -857,6 +895,11 @@ func (ri *rangeIter[T, S]) Value() T {
 func (ri *rangeIter[T, S]) Abort() {
 	ri.index = ri.to
 	ri.inclusive = false
+}
+
+func (ri *rangeIter[T, S]) Reset() {
+	ri.index = ri.initial.index
+	ri.inclusive = ri.initial.inclusive
 }
 
 func (ri *rangeIter[T, S]) Seq() iter.Seq[T] {
@@ -905,7 +948,8 @@ func (ri *rangeIter[T, S]) Size() IteratorSize {
 func (ri *rangeIter[T, S]) SeqOK() bool { return false }
 
 func newRangeIter[T ordered.Real, S ordered.Real](from, upto T, by S, inclusive bool) Iterator[T] {
-	itr := rangeIter[T, S]{index: from, to: upto, by: by, inclusive: inclusive}
+	itr := rangeIter[T, S]{index: from, to: upto, by: by, inclusive: inclusive,
+		initial: rangeIterInitial[T]{index: from, inclusive: inclusive}}
 	itr.validateRange()
 	return NewDefaultIterator(&itr)
 }
@@ -946,6 +990,7 @@ func (emptyIter[T]) Next() bool         { return false }
 func (emptyIter[T]) Value() T           { var zero T; return zero }
 func (emptyIter[T]) Size() IteratorSize { return NewSize(0) }
 func (emptyIter[T]) Abort()             {}
+func (emptyIter[T]) Reset()             {}
 func (emptyIter[T]) SeqOK() bool        { return false }
 func (emptyIter[T]) Seq() iter.Seq[T]   { return func(yield func(T) bool) {} }
 
@@ -1119,6 +1164,11 @@ func (pi *genIter[T]) Abort() {
 	safeClose(pi.source)
 }
 
+// Reset is the same as abort for this iterator
+func (pi *genIter[T]) Reset() {
+	safeClose(pi.source)
+}
+
 func (pi *genIter[T]) Size() IteratorSize {
 	return NewSizeUnknown()
 }
@@ -1261,6 +1311,11 @@ func (ti *takeIterator[T]) Abort() {
 		ti.iterator.Abort()
 	}
 	ti.aborted = true
+}
+
+func (ti *takeIterator[T]) Reset() {
+	ti.count = 0
+	ti.iterator.Reset()
 }
 
 func (ti *takeIterator[T]) Next() bool {
