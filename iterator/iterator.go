@@ -830,6 +830,8 @@ func Slice[T any](slice []T) Iterator[T] {
 
 // MutSlice makes a MutableIterator[T] from slice []T, containing all the elements
 // from the slice in order.
+//
+// Deprecated: use slices.IterMut()
 func MutSlice[T any](slice *[]T) MutableIterator[T] {
 	iter := &sliceIter[T]{slice: slice, index: 0}
 	return NewDefaultMutableIterator(iter)

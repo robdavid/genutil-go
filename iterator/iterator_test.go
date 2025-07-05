@@ -10,6 +10,7 @@ import (
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/robdavid/genutil-go/iterator"
+	"github.com/robdavid/genutil-go/maps"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -164,6 +165,38 @@ func TestMutSliceIter(t *testing.T) {
 	assert.Equal([]int{1, 3, 4}, output)
 }
 
+func TestSliceIterRef(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	// Using slices method to test iterator code.
+	// Remove when slices code moves to slices package.
+	iter := slices.IterRef(input)
+	output := make([]int, 0, len(input))
+	for p := range iter.Seq() {
+		output = append(output, *p)
+		*p *= 2
+		assert.Equal(t, *p, *iter.Value())
+	}
+	assert.Equal(t, []int{1, 2, 3, 4}, output)
+	assert.Equal(t, []int{2, 4, 6, 8}, input)
+}
+
+func TestSliceIterRefMut(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	// Using slices method to test iterator code.
+	// Remove when slices code moves to slices package.
+	iter := slices.IterRefMut(input)
+	output := make([]int, 0, len(input))
+	for p := range iter.Seq() {
+		output = append(output, *p)
+		*p *= 2
+		assert.Equal(t, *p, *iter.Value())
+		pone := *p + 1
+		iter.Set(&pone)
+	}
+	assert.Equal(t, []int{1, 2, 3, 4}, output)
+	assert.Equal(t, []int{3, 5, 7, 9}, input)
+}
+
 func TestTake(t *testing.T) {
 	input := slices.Range(0, 10)
 	iter := iterator.Take(4, iterator.Slice(input))
@@ -276,6 +309,15 @@ func TestRange(t *testing.T) {
 	r := iterator.Range(0, 10)
 	seq := iterator.Collect(r)
 	assert.Equal(t, slices.Range(0, 10), seq)
+}
+
+func TestRangeSingularInclusiveSeq(t *testing.T) {
+	r := iterator.IncRange(0, 0)
+	output := make([]int, 0)
+	for v := range r.Seq() {
+		output = append(output, v)
+	}
+	assert.Equal(t, []int{0}, output)
 }
 
 func TestRangeReset(t *testing.T) {
@@ -1224,4 +1266,23 @@ func TestIterator2PullAndCollect(t *testing.T) {
 	for i, value := range coll {
 		assert.Equal(t, i+size*3/2, value)
 	}
+}
+
+func TestMapMutNextCollect(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i
+	}
+	itr := maps.IterMut(m)
+	var collected []int
+	count := 0
+	assert.True(t, itr.SeqOK())
+	for itr.Next() {
+		assert.False(t, itr.SeqOK())
+		count++
+		if count == 5 {
+			collected = itr.Collect()
+		}
+	}
+	assert.Equal(t, 5, len(collected))
 }
