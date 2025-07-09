@@ -119,6 +119,7 @@ type IteratorExtensions[T any] interface {
 	Enumerate() Iterator2[int, T]
 	Filter(func(T) bool) Iterator[T]
 	Morph(func(T) T) Iterator[T]
+	Take(int) Iterator[T]
 }
 
 // KeyValue holds a key value pair
@@ -136,6 +137,8 @@ func KVOf[K any, V any](key K, value V) KeyValue[K, V] {
 // to Iterator2.
 type Iterator2Extensions[K any, V any] interface {
 	Collect2() []KeyValue[K, V]
+	Chan2() <-chan KeyValue[K, V]
+	Take2(int) Iterator2[K, V]
 }
 
 // Generic iterator
@@ -264,6 +267,10 @@ func (di DefaultIterator[T]) Filter(predicate func(T) bool) Iterator[T] {
 
 func (di DefaultIterator[T]) Morph(mapping func(T) T) Iterator[T] {
 	return Map(di, mapping)
+}
+
+func (di DefaultIterator[T]) Take(n int) Iterator[T] {
+	return Take(n, di)
 }
 
 // DefaultMutableIterator wraps a CoreMutableIterator together with a DefaultIterator to provide
@@ -501,20 +508,28 @@ func NewSeqCoreMutableIterator2WithSize[K any, V any](seq2 iter.Seq2[K, V], dele
 
 type DefaultIterator2[K any, V any] struct {
 	CoreIterator2[K, V]
-	DefaultIterator[V]
+	IteratorExtensions[V]
 }
 
 func (di2 DefaultIterator2[K, V]) Collect2() []KeyValue[K, V] {
-	return Collect2(di2)
+	return Collect2(di2.CoreIterator2)
+}
+
+func (di2 DefaultIterator2[K, V]) Chan2() <-chan KeyValue[K, V] {
+	return Chan2(di2.CoreIterator2)
+}
+
+func (di2 DefaultIterator2[K, V]) Take2(n int) Iterator2[K, V] {
+	return Take2(n, di2.CoreIterator2)
 }
 
 func NewDefaultIterator2[K any, V any](core CoreIterator2[K, V]) DefaultIterator2[K, V] {
-	return DefaultIterator2[K, V]{DefaultIterator: DefaultIterator[V]{CoreIterator: core}, CoreIterator2: core}
+	return DefaultIterator2[K, V]{IteratorExtensions: NewDefaultIterator(core), CoreIterator2: core}
 }
 
 // New2 creates an Iterator2 from a standard library iter.Seq2. Iterator Size is unknown.
 func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
-	return NewDefaultIterator2(NewSeqCoreIterator2(seq2))
+	return NewDefaultIterator2(CoreIterator2[K, V](NewSeqCoreIterator2(seq2)))
 }
 
 // New2WithSize creates an Iterator2 from a standard library iter.Seq2 and a size function that
@@ -638,12 +653,36 @@ func Chan[T any](itr CoreIterator[T]) (out chan T) {
 		if !itr.SeqOK() {
 			for itr.Next() {
 				if !safeSend(out, itr.Value()) {
+					itr.Abort()
 					break
 				}
 			}
 		} else {
 			for v := range itr.Seq() {
 				if !safeSend(out, v) {
+					itr.Abort()
+					break
+				}
+			}
+		}
+	}()
+	return
+}
+
+func Chan2[K any, V any](itr CoreIterator2[K, V]) (out chan KeyValue[K, V]) {
+	out = make(chan KeyValue[K, V])
+	go func() {
+		defer safeClose(out)
+		if !itr.SeqOK() {
+			for itr.Next() {
+				if !safeSend(out, KVOf(itr.Key(), itr.Value())) {
+					itr.Abort()
+					break
+				}
+			}
+		} else {
+			for k, v := range itr.Seq2() {
+				if !safeSend(out, KVOf(k, v)) {
 					itr.Abort()
 					break
 				}
@@ -986,6 +1025,52 @@ func IncRangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] 
 	return newRangeIter(from, upto, by, true)
 }
 
+type kvIter[K any, V any] struct {
+	base CoreIterator2[K, V]
+}
+
+func (pi *kvIter[K, V]) Next() bool {
+	return pi.base.Next()
+}
+
+func (pi *kvIter[K, V]) Value() KeyValue[K, V] {
+	return KVOf(pi.base.Key(), pi.base.Value())
+}
+
+func (pi *kvIter[K, V]) Size() IteratorSize {
+	return pi.base.Size()
+}
+
+func (pi *kvIter[K, V]) Abort() {
+	pi.base.Abort()
+}
+
+func (pi *kvIter[K, V]) Reset() {
+	pi.base.Reset()
+}
+
+func (pi *kvIter[K, V]) Seq() iter.Seq[KeyValue[K, V]] {
+	return func(yield func(KeyValue[K, V]) bool) {
+		for k, v := range pi.base.Seq2() {
+			if !yield(KVOf(k, v)) {
+				break
+			}
+		}
+	}
+}
+
+func (pi *kvIter[K, V]) Chan() <-chan KeyValue[K, V] {
+	return Chan2(pi.base)
+}
+
+func (pi *kvIter[K, V]) SeqOK() bool {
+	return pi.base.SeqOK()
+}
+
+func AsKV[K any, V any](iter2 CoreIterator2[K, V]) Iterator[KeyValue[K, V]] {
+	return NewDefaultIterator(&kvIter[K, V]{iter2})
+}
+
 type emptyIter[T any] struct{}
 
 func (emptyIter[T]) Next() bool         { return false }
@@ -1071,6 +1156,22 @@ func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V
 	return *slice
 }
 
+func CollectIntoMap[K comparable, V any](iter CoreIterator2[K, V], m map[K]V) map[K]V {
+	if m == nil {
+		m = make(map[K]V)
+	}
+	if iter.SeqOK() {
+		for k, v := range iter.Seq2() {
+			m[k] = v
+		}
+	} else {
+		for iter.Next() {
+			m[iter.Key()] = iter.Value()
+		}
+	}
+	return m
+}
+
 // Collect collects all elements from an iterator into a slice.
 func Collect[T any](iter CoreIterator[T]) []T {
 	result := make([]T, 0, iter.Size().Allocate())
@@ -1080,6 +1181,10 @@ func Collect[T any](iter CoreIterator[T]) []T {
 func Collect2[K any, V any](itr CoreIterator2[K, V]) []KeyValue[K, V] {
 	result := make([]KeyValue[K, V], 0, itr.Size().Allocate())
 	return Collect2Into(itr, &result)
+}
+
+func CollectMap[K comparable, V any](itr CoreIterator2[K, V]) map[K]V {
+	return CollectIntoMap(itr, make(map[K]V))
 }
 
 // CollectResults collects all elements from an iterator of results into a result of slice of the iterator's underlying type
@@ -1299,13 +1404,11 @@ func GenerateResults[T any](generator ResultGenerator[T]) Iterator[result.Result
 type takeIterator[T any] struct {
 	count, max int
 	aborted    bool
-	iterator   Iterator[T]
-	value      T
+	iterator   CoreIterator[T]
 }
 
 func (ti *takeIterator[T]) Value() T {
-	ti.value = ti.iterator.Value()
-	return ti.value
+	return ti.iterator.Value()
 }
 
 func (ti *takeIterator[T]) Abort() {
@@ -1336,10 +1439,9 @@ func (ti *takeIterator[T]) Seq() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		if ti.count < ti.max && !ti.aborted {
 			next, _ := iter.Pull(ti.iterator.Seq())
-			for ti.count < ti.max {
-				var ok bool
-				if ti.value, ok = next(); ok {
-					if !yield(ti.value) {
+			for ti.count < ti.max && !ti.aborted {
+				if value, ok := next(); ok {
+					if !yield(value) {
 						ti.aborted = true
 						break
 					}
@@ -1369,9 +1471,41 @@ func (ti *takeIterator[T]) Size() IteratorSize {
 	}
 }
 
+type takeIterator2[K any, V any] struct {
+	takeIterator[V]
+	iterator2 CoreIterator2[K, V]
+}
+
+func (ti2 *takeIterator2[K, V]) Key() K {
+	return ti2.iterator2.Key()
+}
+
+func (ti *takeIterator2[K, V]) Seq2() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		if ti.count < ti.max && !ti.aborted {
+			next, _ := iter.Pull2(ti.iterator2.Seq2())
+			for ti.count < ti.max && !ti.aborted {
+				if key, value, ok := next(); ok {
+					if !yield(key, value) {
+						ti.aborted = true
+						break
+					}
+					ti.count++
+				} else {
+					break
+				}
+			}
+		}
+	}
+}
+
 // Take transforms an iterator into an iterator the returns the
 // first n elements of the original iterator. If there are less
 // than n elements available, they are all returned.
-func Take[T any](n int, iter Iterator[T]) Iterator[T] {
+func Take[T any](n int, iter CoreIterator[T]) Iterator[T] {
 	return NewDefaultIterator(&takeIterator[T]{iterator: iter, max: n})
+}
+
+func Take2[K any, V any](n int, iter CoreIterator2[K, V]) Iterator2[K, V] {
+	return NewDefaultIterator2(&takeIterator2[K, V]{takeIterator: takeIterator[V]{iterator: iter, max: n}, iterator2: iter})
 }

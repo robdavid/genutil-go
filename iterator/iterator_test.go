@@ -60,6 +60,11 @@ func TestInclusiveCollectInto(t *testing.T) {
 	assert.Equal(t, expected, output)
 }
 
+func TestSeqCollect2(t *testing.T) {
+	collected := iterator.Of(3, 4, 5, 6).Enumerate().Collect2()
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 3}, {1, 4}, {2, 5}, {3, 6}}, collected)
+}
+
 func TestFloatingRange(t *testing.T) {
 	iter := iterator.Range(0.0, 5.0)
 	assert.True(t, iterator.IsSizeKnown(iter.Size()))
@@ -217,6 +222,23 @@ func TestTakeReset(t *testing.T) {
 	assert.Equal(t, slices.Range(0, 4), output)
 }
 
+func TestTakeAbort(t *testing.T) {
+	base := iterator.Range(0, 10)
+	iter := base.Take(6)
+	collect := make([]int, 0, 10)
+	for v := range iter.Seq() {
+		collect = append(collect, v)
+		if v == 4 {
+			iter.Abort() // Abort aborts the underlying iterator
+		}
+	}
+	assert.Equal(t, slices.Range(0, 5), collect)
+	rest := iter.Collect()
+	assert.Empty(t, rest)
+	baseRest := base.Collect()
+	assert.Empty(t, baseRest)
+}
+
 func TestTakeNext(t *testing.T) {
 	assert := assert.New(t)
 	input := slices.Range(0, 10)
@@ -241,6 +263,27 @@ func TestTakeMore(t *testing.T) {
 	assert.Equal(t, 4, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	assert.Equal(t, input, output)
+}
+
+func TestTake2(t *testing.T) {
+	iter := iterator.Range(9, -1).Enumerate().Take2(4)
+	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.Equal(t, 4, iter.Size().Allocate())
+	output := iterator.Collect2(iter)
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 9}, {1, 8}, {2, 7}, {3, 6}}, output)
+}
+
+func TestTake2Seq2(t *testing.T) {
+	iter := iterator.Range(9, -1).Enumerate().Take2(4)
+	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	collectMap := make(map[int]int)
+	for k, v := range iter.Seq2() {
+		collectMap[k] = v
+	}
+	assert.Equal(t, 4, len(collectMap))
+	for k, v := range collectMap {
+		assert.Equal(t, v, 9-k)
+	}
 }
 
 func TestSliceIterString(t *testing.T) {
