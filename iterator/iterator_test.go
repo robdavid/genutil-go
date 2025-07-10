@@ -1036,7 +1036,7 @@ func BenchmarkSimpleRange(b *testing.B) {
 
 func BenchmarkSeqFromSimpleRange(b *testing.B) {
 	var sum uint64
-	for v := range iterator.SimpleToSeq(iterator.Range(0, b.N)) {
+	for v := range iterator.Seq(iterator.Range(0, b.N)) {
 		sum += uint64(v)
 	}
 	assert.Equal(b, rangeSum(0, b.N), sum)
