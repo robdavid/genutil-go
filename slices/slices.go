@@ -661,11 +661,25 @@ func FilterRef[T any](s []T, f func(*T) bool) (result []T) {
 	return
 }
 
-// Combines Filter and Map functionality. The mapping function f is applied to each
-// element in the slice of type T, and returns an Option value of type U. If the option
-// is non-empty, the value of type U is appended to the result slice. Otherwise,
+// FilterMap Combines Filter and Map functionality. The mapping function f is applied
+// to each element in the slice of type T, and returns a value of type U and a boolean. If the
+// boolean is true, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMap[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
+func FilterMap[T any, U any](s []T, f func(T) (U, bool)) (result []U) {
+	result = make([]U, 0, len(s))
+	for _, v := range s {
+		if o, ok := f(v); ok {
+			result = append(result, o)
+		}
+	}
+	return
+}
+
+// FilterMapOpt Combines Filter and Map functionality. The mapping function f is applied
+// to each element in the slice of type T, and returns an Option value of type U. If the
+// option is non-empty, the value of type U is appended to the result slice. Otherwise,
+// the element is skipped.
+func FilterMapOpt[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for _, v := range s {
 		if o := f(v); o.HasValue() {
@@ -675,11 +689,25 @@ func FilterMap[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
 	return
 }
 
-// Combines Filter and Map functionality. The mapping function f is applied to a reference
+// FilterMapRef combines Filter and Map functionality. The mapping function f is applied to a reference
 // to each element in the slice of type T, and returns an Option value of type U. If the option
 // is non-empty, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMapRef[T any, U any](s []T, f func(*T) option.Option[U]) (result []U) {
+func FilterMapRef[T any, U any](s []T, f func(*T) (U, bool)) (result []U) {
+	result = make([]U, 0, len(s))
+	for i := range s {
+		if o, ok := f(&s[i]); ok {
+			result = append(result, o)
+		}
+	}
+	return
+}
+
+// FilterMapRefOpt combines Filter and Map functionality. The mapping function f is applied to a reference
+// to each element in the slice of type T, and returns an Option value of type U. If the option
+// is non-empty, the value of type U is appended to the result slice. Otherwise,
+// the element is skipped.
+func FilterMapRefOpt[T any, U any](s []T, f func(*T) option.Option[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for i := range s {
 		if o := f(&s[i]); o.HasValue() {

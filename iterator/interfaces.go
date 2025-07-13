@@ -78,6 +78,7 @@ type IteratorExtensions[T any] interface {
 	// Enumerate returns an iterator that enumerates the elements of this iterator, returning a tuple of the index and the value.
 	Enumerate() Iterator2[int, T]
 	Filter(func(T) bool) Iterator[T]
+	FilterMorph(func(T) (T, bool)) Iterator[T]
 	Morph(func(T) T) Iterator[T]
 	Take(int) Iterator[T]
 }
@@ -88,6 +89,8 @@ type Iterator2Extensions[K any, V any] interface {
 	Collect2() []KeyValue[K, V]
 	Chan2() <-chan KeyValue[K, V]
 	Take2(int) Iterator2[K, V]
+	Morph2(func(K, V) (K, V)) Iterator2[K, V]
+	FilterMorph2(func(K, V) (K, V, bool)) Iterator2[K, V]
 }
 
 // Generic iterator

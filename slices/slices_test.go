@@ -199,15 +199,15 @@ func TestFilter(t *testing.T) {
 
 func TestFilterMap(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	sliceOut := FilterMap(sliceIn, func(i int) option.Option[int] {
+	sliceOut := FilterMapOpt(sliceIn, func(i int) option.Option[int] {
 		return functions.IfElse(i%2 == 0, option.Value(i*3), option.Empty[int]())
 	})
 	assert.Equal(t, []int{6, 12, 18, 24}, sliceOut)
 }
 
-func TestFilterMapRef(t *testing.T) {
+func TestFilterMapRefOpt(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	sliceOut := FilterMapRef(sliceIn, func(i *int) option.Option[int] {
+	sliceOut := FilterMapRefOpt(sliceIn, func(i *int) option.Option[int] {
 		return functions.IfElse(*i%2 == 0, option.Value(*i*3), option.Empty[int]())
 	})
 	assert.Equal(t, []int{6, 12, 18, 24}, sliceOut)

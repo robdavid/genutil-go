@@ -80,6 +80,10 @@ func (di DefaultIterator[T]) Filter(predicate func(T) bool) Iterator[T] {
 	return Filter(di, predicate)
 }
 
+func (di DefaultIterator[T]) FilterMorph(mapping func(T) (T, bool)) Iterator[T] {
+	return FilterMap(di, mapping)
+}
+
 func (di DefaultIterator[T]) Morph(mapping func(T) T) Iterator[T] {
 	return Map(di, mapping)
 }
@@ -138,6 +142,14 @@ func (di2 DefaultIterator2[K, V]) Chan2() <-chan KeyValue[K, V] {
 
 func (di2 DefaultIterator2[K, V]) Take2(n int) Iterator2[K, V] {
 	return Take2(n, di2.CoreIterator2)
+}
+
+func (di2 DefaultIterator2[K, V]) Morph2(f func(k K, v V) (K, V)) Iterator2[K, V] {
+	return Map2(di2, f)
+}
+
+func (di2 DefaultIterator2[K, V]) FilterMorph2(f func(K, V) (K, V, bool)) Iterator2[K, V] {
+	return FilterMap2(di2, f)
 }
 
 func NewDefaultIterator2[K any, V any](core CoreIterator2[K, V]) DefaultIterator2[K, V] {

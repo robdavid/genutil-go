@@ -325,6 +325,17 @@ func TestSliceIterChan(t *testing.T) {
 	}
 }
 
+func TestSliceIterChan2(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := iterator.Slice(input).Enumerate()
+	i := 1
+	for kv := range iter.Chan2() {
+		assert.Equal(t, kv.Key, i-1)
+		assert.Equal(t, kv.Value, i)
+		i++
+	}
+}
+
 func TestSliceIterSeq(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	iter := iterator.Slice(input)
@@ -596,6 +607,63 @@ func TestMapIterSeq(t *testing.T) {
 		assert.Equal(t, size, mi.Size().Size)
 	}
 	assert.Equal(t, expected, actual)
+}
+
+func TestMap2Iter(t *testing.T) {
+	input := map[string]int{"one": 1, "two": 2, "three": 3, "four": 4}
+	expected := map[int]string{1: "one", 2: "two", 3: "three", 4: "four"}
+	swapKVIter := iterator.Map2(maps.Iter(input), func(key string, value int) (int, string) { return value, key })
+	actual := iterator.CollectMap(swapKVIter)
+	assert.Equal(t, expected, actual)
+	values := swapKVIter.Collect()
+	expectedValues := maps.Keys(input)
+	slices.Sort(values)
+	slices.Sort(expectedValues)
+	assert.Equal(t, expectedValues, values)
+}
+
+func TestMap2IterNext(t *testing.T) {
+	input := map[string]int{"one": 1, "two": 2, "three": 3, "four": 4}
+	expected := map[int]string{1: "one", 2: "two", 3: "three", 4: "four"}
+	swapKVIter := iterator.Map2(maps.Iter(input), func(key string, value int) (int, string) { return value, key })
+	actual := make(map[int]string)
+	for swapKVIter.Next() {
+		actual[swapKVIter.Key()] = swapKVIter.Value()
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestFilerMorph2(t *testing.T) {
+	const keys = 10
+	testMap := iterator.CollectMap(iterator.New2(func(yield func(int, int) bool) {
+		for key := range keys {
+			if !yield(key, key*3) {
+				break
+			}
+		}
+	}))
+	filterIter := maps.Iter(testMap).FilterMorph2(func(k, v int) (int, int, bool) {
+		if (k+v)&1 == 0 {
+			return k, k * 2, true
+		} else {
+			return 0, 0, false
+		}
+	})
+	expectedMap := make(map[int]int)
+	for k := range keys {
+		if (k+k*3)&1 == 0 {
+			expectedMap[k] = k * 2
+		}
+	}
+	actualMap := iterator.CollectMap(filterIter)
+	expectedKeys := maps.Keys(expectedMap)
+	actualKeys := maps.Keys(actualMap)
+	slices.Sort(expectedKeys)
+	slices.Sort(actualKeys)
+	assert.Equal(t, expectedKeys, actualKeys)
+	for _, key := range actualKeys {
+		assert.Equal(t, expectedMap[key], actualMap[key])
+	}
 }
 
 func TestMapIterChanAbort(t *testing.T) {
@@ -884,7 +952,6 @@ func (sf *SimpleFib) Next() bool {
 		return false
 	} else {
 		sf[0], sf[1] = sf[1], sf[0]+sf[1]
-		// *sf = SimpleFib{sf[1], sf[0] + sf[1]}
 		return true
 	}
 }
@@ -1042,6 +1109,30 @@ func BenchmarkSeqFromSimpleRange(b *testing.B) {
 	assert.Equal(b, rangeSum(0, b.N), sum)
 }
 
+func TestSimpleFibSeq2(t *testing.T) {
+	assert := assert.New(t)
+	seq2 := iterator.Seq2(iterator.AsKV(iterator.Enumerate(iterator.NewSimpleCoreIterator(NewSimpleFib()))))
+loop:
+	for k, v := range seq2 {
+		switch k {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
+
+	}
+}
 func TestGeneratorChan(t *testing.T) {
 	gen := iterator.Generate(func(c iterator.Consumer[int]) {
 		for i := range 10 {
