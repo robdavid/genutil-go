@@ -44,6 +44,8 @@ func (pi *kvIter[K, V]) SeqOK() bool {
 	return pi.base.SeqOK()
 }
 
+// AsKV takes a CoreIterator2 and returns an Iterator where each value is
+// a KeyValue pair.
 func AsKV[K any, V any](iter2 CoreIterator2[K, V]) Iterator[KeyValue[K, V]] {
 	return NewDefaultIterator(&kvIter[K, V]{iter2})
 }

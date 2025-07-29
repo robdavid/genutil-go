@@ -40,7 +40,7 @@ func KVOf[K any, V any](key K, value V) KeyValue[K, V] {
 	return KeyValue[K, V]{key, value}
 }
 
-// Seq2 is a generic iter.Seq2 implementation for any simple iterator returning a 2-tuple
+// Seq2 is a generic iter.Seq2 implementation for any simple iterator returning key value pairs
 func Seq2[K any, V any](i SimpleIterator[KeyValue[K, V]]) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for i.Next() {
@@ -127,6 +127,17 @@ func NewWithSize[T any](seq iter.Seq[T], size func() IteratorSize) Iterator[T] {
 	return NewDefaultIterator(NewSeqCoreIteratorWithSize(seq, size))
 }
 
+// NewFromSimple builds an Iterator from a SimpleIterator
+func NewFromSimple[T any](simple SimpleIterator[T]) Iterator[T] {
+	return NewDefaultIterator(NewSimpleCoreIterator(simple))
+}
+
+// NewFromSimpleWithSize builds an Iterator from a SimpleIterator plus a function that
+// returns the number of items left in the iterator.
+func NewFromSimpleWithSize[T any](simple SimpleIterator[T], size func() IteratorSize) Iterator[T] {
+	return NewDefaultIterator(NewSimpleCoreIteratorWithSize(simple, size))
+}
+
 type DefaultIterator2[K any, V any] struct {
 	CoreIterator2[K, V]
 	IteratorExtensions[V]
@@ -169,6 +180,8 @@ func New2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func() IteratorSize) 
 
 // MakeIterator creates a generic iterator from a simple iterator. Provides an implementation
 // of additional Iterator methods.
+//
+// Deprecated: use NewFromSimple
 func MakeIterator[T any](base SimpleIterator[T]) Iterator[T] {
 	return DefaultIterator[T]{NewSimpleCoreIterator(base)}
 }

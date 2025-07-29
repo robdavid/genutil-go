@@ -47,6 +47,8 @@ func newEnumeratedCoreIterator[T any](citr CoreIterator[T]) *enumeratedCoreItera
 	return &enumeratedCoreIterator[T]{CoreIterator: citr, key: 0, index: 0}
 }
 
+// Enumerate takes a CoreIterator and builds an Iterator2 that returns the pair of
+// the index of each element (starting at zero) and the original element.
 func Enumerate[T any](itr CoreIterator[T]) Iterator2[int, T] {
 	return NewDefaultIterator2(newEnumeratedCoreIterator(itr))
 }

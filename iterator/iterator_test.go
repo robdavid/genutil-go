@@ -966,7 +966,7 @@ func (sf *SimpleFib) Reset() {
 }
 
 func newFib() iterator.Iterator[int] {
-	return iterator.MakeIterator[int](NewSimpleFib())
+	return iterator.NewFromSimple(NewSimpleFib())
 }
 
 func TestSimpleFib(t *testing.T) {
@@ -1111,7 +1111,7 @@ func BenchmarkSeqFromSimpleRange(b *testing.B) {
 
 func TestSimpleFibSeq2(t *testing.T) {
 	assert := assert.New(t)
-	seq2 := iterator.Seq2(iterator.AsKV(iterator.Enumerate(iterator.NewSimpleCoreIterator(NewSimpleFib()))))
+	seq2 := iterator.NewFromSimple(NewSimpleFib()).Enumerate().Seq2()
 loop:
 	for k, v := range seq2 {
 		switch k {
@@ -1133,6 +1133,33 @@ loop:
 
 	}
 }
+
+func TestAsKV(t *testing.T) {
+	assert := assert.New(t)
+	kvi := iterator.AsKV(iterator.NewFromSimple(NewSimpleFib()).Enumerate())
+loop:
+	for kv := range kvi.Seq() {
+		v := kv.Value
+		switch kv.Key {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
+
+	}
+}
+
 func TestGeneratorChan(t *testing.T) {
 	gen := iterator.Generate(func(c iterator.Consumer[int]) {
 		for i := range 10 {
