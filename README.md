@@ -351,13 +351,13 @@ Instances implementing this interface can be transformed to a full `Iterator[T]`
 To make an `Iterator[T]` of indeterminate size, use
 
 ```go
-func MakeIteratorFromSimple[T any](base SimpleIterator[T]) Iterator[T]
+func NewFromSimple[T any](base SimpleIterator[T]) Iterator[T]
 ```
 
 or to make one with a given size use
 
 ```go
-func MakeIteratorOfSizeFromSimple[T any](base SimpleIterator[T], size IteratorSize) Iterator[T]
+func NewFromSimpleWithSize[T any](base SimpleIterator[T], size func() IteratorSize) Iterator[T]
 ```
 
 The following example illustrates how an Iterator over a slice can be created by implementing only
@@ -369,17 +369,23 @@ the SimpleIterator interface.
 type iterSlice[T any] struct {
   slice []T
   index int
+  value T
 }
 
 // Advance to first/next element
 func (is *iterSlice[T]) Next() bool {
-  is.index++
-  return is.index < len(is.slice)
+  if is.index < len(is.slice) {
+    is.value = is.slice[is.index]
+    is.index++
+    return true
+  } else {
+    return false
+  }
 }
 
 // Return current element
 func (is *iterSlice[T]) Value() T {
-  return is.slice[is.index]
+  return is.slice.value
 }
 
 // Move index after last element; ensures next Next() call returns false
@@ -387,13 +393,23 @@ func (is *iterSlice[T]) Abort() {
   is.index = len(is.slice)
 }
 
+// Reset index to the beginning
+func (is *iterSlice[T]) Reset() {
+  is.index = 0
+}
+
+
 // newIterSlice creates an Iterator over a slice
 func newIterSlice[T any](slice []T) Iterator[T] {
   // First, create the SimpleIterator over the slice.
-  // Index starts at -1 because Next() is called for the first element.
-  simpleIter := &iterSlice[T]{slice, -1}
+  simpleIter := &iterSlice[T]{slice, 0}
   // Then create an Iterator from the SimpleIterator, with known size (the slice's length)
-  return iterator.MakeIteratorOfSizeFromSimple[T](simpleIter, iterator.NewSize(len(slice)))
+  return iterator.NewFromSimpleWithSize[T](
+    simpleIter, 
+    func() iterator.IteratorSize { 
+      return iterator.NewSize(len(simpleIter.slice)-simpleIter.index) 
+    },
+  )
 }
 ```
 
