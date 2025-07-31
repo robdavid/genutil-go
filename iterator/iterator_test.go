@@ -794,6 +794,36 @@ func fibSeq() iterator.Iterator[int] {
 	return iterator.New(fibPureSeq)
 }
 
+type simpleFib [2]int
+
+func newSimpleFib() *simpleFib {
+	return &simpleFib{0, 1}
+}
+
+func (sf *simpleFib) Next() bool {
+	if sf[0]+sf[1] == 0 {
+		return false
+	}
+	sf[0], sf[1] = sf[1], sf[0]+sf[1]
+	return true
+}
+
+func (sf *simpleFib) Value() int {
+	return sf[0]
+}
+
+func (sf *simpleFib) Abort() {
+	*sf = simpleFib{0, 0}
+}
+
+func (sf *simpleFib) Reset() {
+	*sf = simpleFib{0, 1}
+}
+
+func newFromSimpleFib() iterator.Iterator[int] {
+	return iterator.NewFromSimpleWithSize(newSimpleFib(), func() iterator.IteratorSize { return iterator.NewSizeInfinite() })
+}
+
 func TestGenerateFib(t *testing.T) {
 	result := iterator.Collect(iterator.Take(10, fib()))
 	var expected = []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
@@ -809,8 +839,26 @@ func TestGenerateFibChan(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestCollectSimpleFib(t *testing.T) {
+	var result []int
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	for e := range iterator.Take(10, newFromSimpleFib()).Chan() {
+		result = append(result, e)
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestGenerateSimpleFibChan(t *testing.T) {
+	var result []int
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	for e := range iterator.Take(10, newFromSimpleFib()).Chan() {
+		result = append(result, e)
+	}
+	assert.Equal(t, expected, result)
+}
+
 func BenchmarkGenerateSimpleFib(b *testing.B) {
-	iter := newFib()
+	iter := newFromSimpleFib()
 	var sum uint64 = 0
 	var count int
 	for range b.N {
@@ -935,45 +983,6 @@ func BenchmarkGenerateFibChan2(b *testing.B) {
 			iter.Abort()
 		}
 	}
-}
-
-type SimpleFib [2]int
-
-func NewSimpleFib() iterator.SimpleIterator[int] {
-	return &SimpleFib{0, 1}
-}
-
-func (sf *SimpleFib) Value() int {
-	return sf[0]
-}
-
-func (sf *SimpleFib) Next() bool {
-	if sf[1] == 0 {
-		return false
-	} else {
-		sf[0], sf[1] = sf[1], sf[0]+sf[1]
-		return true
-	}
-}
-
-func (sf *SimpleFib) Abort() {
-	sf[1] = 0
-}
-
-func (sf *SimpleFib) Reset() {
-	sf[0] = 0
-	sf[1] = 1
-}
-
-func newFib() iterator.Iterator[int] {
-	return iterator.NewFromSimple(NewSimpleFib())
-}
-
-func TestSimpleFib(t *testing.T) {
-	fib := newFib()
-	seq := iterator.Collect(iterator.Take(10, fib))
-	expected := []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
-	assert.Equal(t, expected, seq)
 }
 
 func repeatSeq[T any](r int, v T) func(func(T) bool) {
@@ -1111,7 +1120,7 @@ func BenchmarkSeqFromSimpleRange(b *testing.B) {
 
 func TestSimpleFibSeq2(t *testing.T) {
 	assert := assert.New(t)
-	seq2 := iterator.NewFromSimple(NewSimpleFib()).Enumerate().Seq2()
+	seq2 := newFromSimpleFib().Enumerate().Seq2()
 loop:
 	for k, v := range seq2 {
 		switch k {
@@ -1134,9 +1143,36 @@ loop:
 	}
 }
 
+func TestSimpleFibChan2(t *testing.T) {
+	assert := assert.New(t)
+	chan2 := newFromSimpleFib().Enumerate().Chan2()
+loop:
+	for kv := range chan2 {
+		k := kv.Key
+		v := kv.Value
+		switch k {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
+
+	}
+}
+
 func TestAsKV(t *testing.T) {
 	assert := assert.New(t)
-	kvi := iterator.AsKV(iterator.NewFromSimple(NewSimpleFib()).Enumerate())
+	kvi := iterator.AsKV(newFromSimpleFib().Enumerate())
 loop:
 	for kv := range kvi.Seq() {
 		v := kv.Value
