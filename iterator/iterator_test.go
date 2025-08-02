@@ -691,6 +691,15 @@ func TestFilter(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFilter2(t *testing.T) {
+	input := map[int]int{1: 3, 2: 6, 3: 9, 4: 12, 5: 15, 6: 18, 7: 21, 8: 24, 9: 27}
+	expected := map[int]int{1: 3, 3: 9, 5: 15, 7: 21, 9: 27}
+	itr := maps.Iter(input).Filter2(func(x, y int) bool { return (x*y)&1 == 1 })
+	assert.True(t, iterator.IsSizeAtMost(itr.Size()))
+	actual := iterator.CollectMap(itr)
+	assert.Equal(t, expected, actual)
+}
+
 func TestDoMapIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6}

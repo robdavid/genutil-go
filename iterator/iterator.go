@@ -155,6 +155,10 @@ func (di2 DefaultIterator2[K, V]) Take2(n int) Iterator2[K, V] {
 	return Take2(n, di2.CoreIterator2)
 }
 
+func (di2 DefaultIterator2[K, V]) Filter2(f func(k K, v V) bool) Iterator2[K, V] {
+	return Filter2(di2, f)
+}
+
 func (di2 DefaultIterator2[K, V]) Morph2(f func(k K, v V) (K, V)) Iterator2[K, V] {
 	return Map2(di2, f)
 }

@@ -158,7 +158,7 @@ func Map2[K, V, X, Y any](iter Iterator2[K, V], mapping func(K, V) (X, Y)) Itera
 }
 
 // Filter applies a filter function `predicate` of type `func(T) bool`, producing
-// a new iterator containing only the elements than satisfy the function.
+// a new iterator containing only the elements that satisfy the function.
 func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
 	filterNext := func(value T) (T, bool) {
 		return value, predicate(value)
@@ -166,6 +166,8 @@ func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
 	return wrapFunc(iter, filterNext, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
 
+// Filter2 applies a filter function of type `func(K, V) bool` over each key and value pair,
+// producing a new iterator containing only the elements that satisfy the function.
 func Filter2[K, V any](iter Iterator2[K, V], predicate func(K, V) bool) Iterator2[K, V] {
 	filterNext := func(key K, value V) (K, V, bool) {
 		return key, value, predicate(key, value)

@@ -89,6 +89,7 @@ type Iterator2Extensions[K any, V any] interface {
 	Collect2() []KeyValue[K, V]
 	Chan2() <-chan KeyValue[K, V]
 	Take2(int) Iterator2[K, V]
+	Filter2(func(K, V) bool) Iterator2[K, V]
 	Morph2(func(K, V) (K, V)) Iterator2[K, V]
 	FilterMorph2(func(K, V) (K, V, bool)) Iterator2[K, V]
 }

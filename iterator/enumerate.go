@@ -2,15 +2,7 @@ package iterator
 
 import (
 	"iter"
-
-	"github.com/robdavid/genutil-go/tuple"
 )
-
-type Indexed[T any] = tuple.Tuple2[int, T]
-
-func IndexValue[T any](index int, value T) Indexed[T] {
-	return tuple.Of2(index, value)
-}
 
 type enumeratedCoreIterator[T any] struct {
 	CoreIterator[T]
