@@ -761,32 +761,23 @@ func TestFromSeqReset(t *testing.T) {
 	assert.Equal(t, slices.Range(0, 5), itr.Collect())
 }
 
-func fib() iterator.Iterator[int] {
+func fibGen() iterator.Iterator[int] {
 	return iterator.Generate(func(c iterator.Consumer[int]) {
 		tail := [2]int{0, 1}
-		c.Yield(tail[0])
-		c.Yield(tail[1])
 		for {
-			next := tail[0] + tail[1]
-			c.Yield(next)
-			tail[0] = tail[1]
-			tail[1] = next
+			c.Yield(tail[1])
+			tail[0], tail[1] = tail[1], tail[0]+tail[1]
 		}
 	})
 }
 
 func fibPureSeq(yield func(int) bool) {
 	tail := [2]int{0, 1}
-	if !(yield(tail[0]) && yield(tail[1])) {
-		return
-	}
 	for {
-		next := tail[0] + tail[1]
-		if !yield(next) {
+		if !yield(tail[1]) {
 			return
 		}
-		tail[0] = tail[1]
-		tail[1] = next
+		tail[0], tail[1] = tail[1], tail[0]+tail[1]
 	}
 }
 
@@ -825,15 +816,15 @@ func newFromSimpleFib() iterator.Iterator[int] {
 }
 
 func TestGenerateFib(t *testing.T) {
-	result := iterator.Collect(iterator.Take(10, fib()))
-	var expected = []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
+	result := iterator.Collect(iterator.Take(10, fibGen()))
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
 	assert.Equal(t, expected, result)
 }
 
 func TestGenerateFibChan(t *testing.T) {
 	var result []int
-	var expected = []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
-	for e := range iterator.Take(10, fib()).Chan() {
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	for e := range iterator.Take(10, fibGen()).Chan() {
 		result = append(result, e)
 	}
 	assert.Equal(t, expected, result)
@@ -857,6 +848,21 @@ func TestGenerateSimpleFibChan(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestFibSeqPull(t *testing.T) {
+	var result []int
+	var expected = []int{1, 2, 3, 5, 8, 13, 21, 34, 55}
+	fib := fibSeq()
+	assert.True(t, fib.Next())
+	assert.Equal(t, 1, fib.Value())
+	for n := range fib.Seq() {
+		result = append(result, n)
+		if n >= 55 {
+			break
+		}
+	}
+	assert.Equal(t, expected, result)
+}
+
 func BenchmarkGenerateSimpleFib(b *testing.B) {
 	iter := newFromSimpleFib()
 	var sum uint64 = 0
@@ -870,7 +876,7 @@ func BenchmarkGenerateSimpleFib(b *testing.B) {
 }
 
 func BenchmarkGenerateFib(b *testing.B) {
-	iter := fib()
+	iter := fibGen()
 	var sum uint64 = 0
 	var count int
 	for range b.N {
@@ -882,7 +888,7 @@ func BenchmarkGenerateFib(b *testing.B) {
 }
 
 func BenchmarkGenerateTakeFib(b *testing.B) {
-	iter := iterator.Take(b.N, fib())
+	iter := iterator.Take(b.N, fibGen())
 	var sum uint64 = 0
 	var count int
 	for iter.Next() {
@@ -957,7 +963,7 @@ func BenchmarkGenerateFibSeqPull(b *testing.B) {
 }
 
 func BenchmarkGenerateFib2(b *testing.B) {
-	iter := fib()
+	iter := fibGen()
 	defer iter.Abort()
 	var sum uint64 = 0
 	for i := 0; i < b.N && iter.Next(); i++ {
@@ -967,7 +973,7 @@ func BenchmarkGenerateFib2(b *testing.B) {
 
 func BenchmarkGenerateFibChan(b *testing.B) {
 	var sum uint64 = 0
-	for v := range iterator.Take(b.N, fib()).Chan() {
+	for v := range iterator.Take(b.N, fibGen()).Chan() {
 		sum += uint64(v)
 	}
 }
@@ -975,7 +981,7 @@ func BenchmarkGenerateFibChan(b *testing.B) {
 func BenchmarkGenerateFibChan2(b *testing.B) {
 	var sum uint64 = 0
 	i := 0
-	iter := fib()
+	iter := fibGen()
 	for v := range iter.Chan() {
 		sum += uint64(v)
 		i++
@@ -1002,7 +1008,6 @@ func repeatSeqIter[T any](r int, v T) iterator.Iterator[T] {
 }
 
 type repeatSimpleIter[T any] struct {
-	iterator.DefaultIterator[T]
 	index, repetitions int
 	value              T
 }
@@ -1024,10 +1029,13 @@ func (rsi *repeatSimpleIter[T]) Abort() {
 	rsi.index = rsi.repetitions
 }
 
+func (rsi *repeatSimpleIter[T]) Reset() {
+	rsi.index = 0
+}
+
 func repeatIter[T any](r int, v T) iterator.Iterator[T] {
 	rsi := &repeatSimpleIter[T]{repetitions: r, value: v}
-	rsi.CoreIterator = rsi
-	return rsi
+	return iterator.NewFromSimpleWithSize(rsi, func() iterator.IteratorSize { return iterator.NewSize(rsi.repetitions - rsi.index) })
 }
 
 func BenchmarkBaseSeq(b *testing.B) {
@@ -1168,6 +1176,34 @@ loop:
 		}
 
 	}
+}
+
+func TestSimpleRepeatSize(t *testing.T) {
+	const size = 10
+	const value = 101
+	itr := repeatIter(size, value)
+	assert.Equal(t, size, itr.Size().Size)
+	c := itr.Collect()
+	assert.Equal(t, size, len(c))
+	assert.Equal(t, size, cap(c))
+	for _, v := range c {
+		assert.Equal(t, value, v)
+	}
+}
+
+func newSimpleMutableSliceIter[T any](slice []T) iterator.MutableIterator[T] {
+	core := iterator.NewSliceCoreIterator(&slice)
+	return iterator.NewFromSimpleMutableWithSize(core, core.Size)
+}
+
+func TestSimpleMutableSize(t *testing.T) {
+	const size = 10
+	slice := slices.Range(0, size)
+	itr := newSimpleMutableSliceIter(slice)
+	assert.Equal(t, size, itr.Size().Size)
+	c := itr.Collect()
+	assert.Equal(t, size, cap(c))
+	assert.Equal(t, slice, c)
 }
 
 func TestAsKV(t *testing.T) {

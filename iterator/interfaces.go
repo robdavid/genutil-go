@@ -24,7 +24,7 @@ type SimpleMutableIterator[T any] interface {
 	// Delete deletes the current value, which must be the last value returned by Next(). This
 	// function may not be implemented for all iterator types, in which case it will return an
 	// ErrDeleteNotImplemented error.
-	Delete() error
+	Delete()
 }
 
 // CoreIterator is an extension of SimpleIterator that in aggregate provides the minimum set of methods
