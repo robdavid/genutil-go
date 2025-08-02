@@ -1249,19 +1249,21 @@ func TestGeneratorChan(t *testing.T) {
 }
 
 func TestGeneratorChanAbort(t *testing.T) {
+	const size = 10
 	gen := iterator.Generate(func(c iterator.Consumer[int]) {
-		for i := range 10 {
+		for i := range size + 1 {
 			c.Yield(i)
 		}
 	})
-	actual := make([]int, 5)
-	expected := iterator.Collect(iterator.Range(0, 5))
+	actual := make([]int, size)
+	expected := iterator.Collect(iterator.Range(0, size))
 	p := 0
 	for i := range gen.Chan() {
 		actual[p] = i
 		p++
 		if p >= len(actual) {
 			gen.Abort()
+			break
 		}
 	}
 	assert.Equal(t, expected, actual)
