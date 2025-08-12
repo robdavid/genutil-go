@@ -251,7 +251,7 @@ func Collect2[K any, V any](itr CoreIterator2[K, V]) []KeyValue[K, V] {
 }
 
 func CollectMap[K comparable, V any](itr CoreIterator2[K, V]) map[K]V {
-	return CollectIntoMap(itr, make(map[K]V))
+	return CollectIntoMap(itr, nil)
 }
 
 // CollectResults collects all elements from an iterator of results into a result of slice of the iterator's underlying type

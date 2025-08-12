@@ -685,7 +685,7 @@ func TestMapIterChanAbort(t *testing.T) {
 func TestFilter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4}
-	iter := iterator.Filter(iterator.Slice(input), func(n int) bool { return n&1 == 0 })
+	iter := iterator.Slice(input).Filter(func(n int) bool { return n&1 == 0 })
 	assert.True(t, iterator.IsSizeAtMost(iter.Size()))
 	actual := iterator.Collect(iter)
 	assert.Equal(t, expected, actual)
@@ -1156,7 +1156,30 @@ loop:
 		default:
 			break loop
 		}
+	}
+}
 
+func TestSimpleFibKVSeq2(t *testing.T) {
+	assert := assert.New(t)
+	seq2 := iterator.Seq2(iterator.AsKV(newFromSimpleFib().Enumerate()))
+loop:
+	for k, v := range seq2 {
+		switch k {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
 	}
 }
 
@@ -1198,6 +1221,19 @@ func TestSimpleRepeatSize(t *testing.T) {
 	for _, v := range c {
 		assert.Equal(t, value, v)
 	}
+}
+
+func TestSimpleCollectToMap(t *testing.T) {
+	const size = 10
+	const value = 101
+	itr := repeatIter(size, value).Enumerate()
+	c := iterator.CollectMap(itr)
+	assert.Equal(t, size, len(c))
+	keys := slices.Sorted(maps.Keys(c))
+	for _, v := range c {
+		assert.Equal(t, value, v)
+	}
+	assert.Equal(t, slices.Range(0, size), keys)
 }
 
 func newSimpleMutableSliceIter[T any](slice []T) iterator.MutableIterator[T] {
