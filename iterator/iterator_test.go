@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -633,6 +634,15 @@ func TestMap2IterNext(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFilterMap(t *testing.T) {
+	input := iterator.Range(0, 10)
+	filtered := iterator.FilterMap(input, func(n int) (string, bool) {
+		return strconv.Itoa(n), n&1 == 0
+	})
+	actual := filtered.Collect()
+	assert.Equal(t, []string{"0", "2", "4", "6", "8"}, actual)
+}
+
 func TestFilerMorph2(t *testing.T) {
 	const keys = 10
 	testMap := iterator.CollectMap(iterator.New2(func(yield func(int, int) bool) {
@@ -790,8 +800,10 @@ func fibPureSeq(yield func(int) bool) {
 	}
 }
 
+func infSize() iterator.IteratorSize { return iterator.NewSizeInfinite() }
+
 func fibSeq() iterator.Iterator[int] {
-	return iterator.New(fibPureSeq)
+	return iterator.NewWithSize(fibPureSeq, infSize)
 }
 
 type simpleFib [2]int
@@ -821,7 +833,7 @@ func (sf *simpleFib) Reset() {
 }
 
 func newFromSimpleFib() iterator.Iterator[int] {
-	return iterator.NewFromSimpleWithSize(newSimpleFib(), func() iterator.IteratorSize { return iterator.NewSizeInfinite() })
+	return iterator.NewFromSimpleWithSize(newSimpleFib(), infSize)
 }
 
 func TestGenerateFib(t *testing.T) {
@@ -870,6 +882,14 @@ func TestFibSeqPull(t *testing.T) {
 		}
 	}
 	assert.Equal(t, expected, result)
+}
+
+func TestFibInf(t *testing.T) {
+	const size = 10
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	fib := fibSeq().Take(size)
+	assert.Equal(t, size, fib.Size().Size)
+	assert.Equal(t, expected, fib.Collect())
 }
 
 func BenchmarkGenerateSimpleFib(b *testing.B) {
