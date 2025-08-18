@@ -1293,8 +1293,20 @@ loop:
 		default:
 			break loop
 		}
-
 	}
+}
+
+func TestCollectKV(t *testing.T) {
+	const size = 10
+	itr := iterator.AsKV(iterator.Range(size, size*2).Enumerate())
+	assert.Equal(t, size, itr.Size().Size)
+	c := itr.Collect()
+	expected := make([]iterator.KeyValue[int, int], size)
+	for i := range size {
+		expected[i] = iterator.KVOf(i, i+size)
+	}
+	assert.Equal(t, expected, c)
+	assert.Equal(t, size, cap(c))
 }
 
 func TestGeneratorChan(t *testing.T) {

@@ -75,7 +75,7 @@ type IteratorExtensions[T any] interface {
 	Chan() <-chan T
 	// Collect collects all elements from the iterator into a slice.
 	Collect() []T
-	// Enumerate returns an iterator that enumerates the elements of this iterator, returning a tuple of the index and the value.
+	// Enumerate returns an iterator that enumerates the elements of this iterator, returning an Iterator2 of the index and the value.
 	Enumerate() Iterator2[int, T]
 	Filter(func(T) bool) Iterator[T]
 	FilterMorph(func(T) (T, bool)) Iterator[T]
