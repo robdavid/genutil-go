@@ -1598,3 +1598,23 @@ func TestMapMutNextCollect(t *testing.T) {
 	}
 	assert.Equal(t, 5, len(collected))
 }
+
+func TestMapMutSetDelete(t *testing.T) {
+	const size = 10
+	m := make(map[int]int)
+	for i := range size {
+		m[i] = i
+	}
+	itr := maps.IterMut(m)
+	for k := range itr.Seq2() {
+		if k < 3 {
+			itr.Delete()
+		} else {
+			itr.Set(k * 2)
+		}
+	}
+	assert.Equal(t, size-3, len(m))
+	for k := 3; k < size; k++ {
+		assert.Equal(t, k*2, m[k])
+	}
+}
