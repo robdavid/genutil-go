@@ -62,9 +62,9 @@ func (ti *takeIterator[T]) Size() IteratorSize {
 	case SizeKnown:
 		return NewSize(min(remain, itrSize.Size))
 	case SizeUnknown:
-		return NewSizeAtMost(remain)
+		return NewSizeMax(remain)
 	case SizeAtMost:
-		return NewSizeAtMost(min(remain, itrSize.Size))
+		return NewSizeMax(min(remain, itrSize.Size))
 	case SizeInfinite:
 		return NewSize(remain)
 	default:

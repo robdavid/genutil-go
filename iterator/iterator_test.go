@@ -68,7 +68,7 @@ func TestSeqCollect2(t *testing.T) {
 
 func TestFloatingRange(t *testing.T) {
 	iter := iterator.Range(0.0, 5.0)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(5))
 	assert.Equal(t, 5, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	expected := []float64{0.0, 1.0, 2.0, 3.0, 4.0}
@@ -77,7 +77,7 @@ func TestFloatingRange(t *testing.T) {
 
 func TestReverseFloatingRange(t *testing.T) {
 	iter := iterator.Range(5.0, 0.0)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnown())
 	assert.Equal(t, 5, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	expected := []float64{5.0, 4.0, 3.0, 2.0, 1.0}
@@ -86,7 +86,7 @@ func TestReverseFloatingRange(t *testing.T) {
 
 func TestFloatingRangeBy(t *testing.T) {
 	iter := iterator.RangeBy(0.0, 5.0, 0.5)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(10))
 	assert.Equal(t, 10, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}
@@ -96,7 +96,7 @@ func TestFloatingRangeBy(t *testing.T) {
 
 func TestInclusiveFloatingRangeBy(t *testing.T) {
 	iter := iterator.IncRangeBy(0.0, 5.0, 0.5)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(11))
 	assert.Equal(t, 11, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0}
@@ -105,7 +105,7 @@ func TestInclusiveFloatingRangeBy(t *testing.T) {
 
 func TestFloatingRangeDesc(t *testing.T) {
 	iter := iterator.RangeBy(5.0, 0.0, -0.5)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(10))
 	assert.Equal(t, 10, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5}
@@ -114,7 +114,7 @@ func TestFloatingRangeDesc(t *testing.T) {
 
 func TestInclusiveFloatingRangeDesc(t *testing.T) {
 	iter := iterator.IncRangeBy(5.0, 0.0, -0.5)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(11))
 	assert.Equal(t, 11, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.0}
@@ -132,7 +132,7 @@ func TestInvalidRange(t *testing.T) {
 
 func TestZeroRange(t *testing.T) {
 	iter := iterator.RangeBy(1, 1, 0)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(0))
 	assert.Equal(t, 0, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	assert.Empty(t, output)
@@ -140,7 +140,7 @@ func TestZeroRange(t *testing.T) {
 
 func TestInclusiveZeroRange(t *testing.T) {
 	iter := iterator.IncRangeBy(1, 1, 0)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(1))
 	assert.Equal(t, 1, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	assert.Equal(t, []int{1}, output)
@@ -149,7 +149,7 @@ func TestInclusiveZeroRange(t *testing.T) {
 func TestSliceIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	iter := iterator.Slice(input)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(4))
 	output := iterator.Collect(iter)
 	assert.Equal(t, input, output)
 }
@@ -160,7 +160,7 @@ func TestMutSliceIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	iter := iterator.MutSlice(&input)
 	iter.Delete() // Delete before Next should be no-op
-	assert.True(iterator.IsSizeKnown(iter.Size()))
+	assert.True(iter.Size().IsKnownToBe(4))
 	assert.Equal(4, iter.Size().Size)
 	require.True(iter.Next())
 	require.True(iter.Next())
@@ -206,7 +206,7 @@ func TestSliceIterRefMut(t *testing.T) {
 func TestTake(t *testing.T) {
 	input := slices.Range(0, 10)
 	iter := iterator.Take(4, iterator.Slice(input))
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(4))
 	assert.Equal(t, 4, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	assert.Equal(t, slices.Range(0, 4), output)
@@ -246,11 +246,11 @@ func TestTakeNext(t *testing.T) {
 	sliceIter := iterator.Slice(input)
 	iter := iterator.Take(4, sliceIter)
 	assert.True(iter.Next())
-	assert.True(iterator.IsSizeKnown(iter.Size()))
+	assert.True(iter.Size().IsKnownToBe(3))
 	assert.Equal(3, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	assert.Equal(slices.Range(1, 4), output)
-	assert.True(iterator.IsSizeKnown(sliceIter.Size()))
+	assert.True(sliceIter.Size().IsKnownToBe(6))
 	assert.Equal(6, sliceIter.Size().Allocate())
 	remain := iterator.Collect(sliceIter)
 	assert.Equal(slices.Range(4, 10), remain)
@@ -260,7 +260,7 @@ func TestTakeNext(t *testing.T) {
 func TestTakeMore(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	iter := iterator.Take(10, iterator.Slice(input))
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(4))
 	assert.Equal(t, 4, iter.Size().Allocate())
 	output := iterator.Collect(iter)
 	assert.Equal(t, input, output)
@@ -268,7 +268,7 @@ func TestTakeMore(t *testing.T) {
 
 func TestTake2(t *testing.T) {
 	iter := iterator.Range(9, -1).Enumerate().Take2(4)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnownToBe(4))
 	assert.Equal(t, 4, iter.Size().Allocate())
 	output := iterator.Collect2(iter)
 	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 9}, {1, 8}, {2, 7}, {3, 6}}, output)
@@ -276,7 +276,7 @@ func TestTake2(t *testing.T) {
 
 func TestTake2Seq2(t *testing.T) {
 	iter := iterator.Range(9, -1).Enumerate().Take2(4)
-	assert.True(t, iterator.IsSizeKnown(iter.Size()))
+	assert.True(t, iter.Size().IsKnown())
 	collectMap := make(map[int]int)
 	for k, v := range iter.Seq2() {
 		collectMap[k] = v
@@ -482,7 +482,7 @@ func TestEmptySeq(t *testing.T) {
 
 func TestNegativeRange(t *testing.T) {
 	r := iterator.RangeBy(9, -1, -1)
-	assert.True(t, iterator.IsSizeKnown(r.Size()))
+	assert.True(t, r.Size().IsKnownToBe(10))
 	assert.Equal(t, 10, r.Size().Allocate())
 	seq := iterator.Collect(r)
 	expected := []int{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
@@ -696,7 +696,7 @@ func TestFilter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4}
 	iter := iterator.Slice(input).Filter(func(n int) bool { return n&1 == 0 })
-	assert.True(t, iterator.IsSizeAtMost(iter.Size()))
+	assert.True(t, iter.Size().IsMaxKnown())
 	actual := iterator.Collect(iter)
 	assert.Equal(t, expected, actual)
 }
@@ -705,7 +705,7 @@ func TestFilter2(t *testing.T) {
 	input := map[int]int{1: 3, 2: 6, 3: 9, 4: 12, 5: 15, 6: 18, 7: 21, 8: 24, 9: 27}
 	expected := map[int]int{1: 3, 3: 9, 5: 15, 7: 21, 9: 27}
 	itr := maps.Iter(input).Filter2(func(x, y int) bool { return (x*y)&1 == 1 })
-	assert.True(t, iterator.IsSizeAtMost(itr.Size()))
+	assert.True(t, itr.Size().IsMaxKnown())
 	actual := iterator.CollectMap(itr)
 	assert.Equal(t, expected, actual)
 }
@@ -890,6 +890,20 @@ func TestFibInf(t *testing.T) {
 	fib := fibSeq().Take(size)
 	assert.Equal(t, size, fib.Size().Size)
 	assert.Equal(t, expected, fib.Collect())
+}
+
+func TestFibSize(t *testing.T) {
+	fib := fibSeq()
+	assert.True(t, fib.Size().IsInfinite())
+	filt := fib.Filter(func(n int) bool { return n&1 == 0 })
+	assert.True(t, filt.Size().IsInfinite())
+	take := fib.Take(20)
+	assert.True(t, take.Size().IsKnownToBe(20))
+	take2 := fib.Take(20)
+	assert.True(t, take2.Size().IsKnownToBe(20))
+	filt2 := take2.Filter(func(n int) bool { return n&1 == 0 })
+	assert.True(t, filt2.Size().IsMaxKnownToBe(20))
+	assert.Equal(t, []int{2, 8, 34, 144, 610, 2584}, filt2.Collect())
 }
 
 func BenchmarkGenerateSimpleFib(b *testing.B) {
