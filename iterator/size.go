@@ -50,7 +50,7 @@ func NewSizeUnknown() IteratorSize {
 	return IteratorSize{Type: SizeUnknown}
 }
 
-// IsSizeUnknown returns true if the given IteratorSize instance represents
+// IsUnknown returns true if the given IteratorSize instance represents
 // an unknown size
 func (size IteratorSize) IsUnknown() bool {
 	return size.Type == SizeUnknown
