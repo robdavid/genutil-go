@@ -3,7 +3,8 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                "golang.go"
+                "golang.go",
+                "ms-vscode-remote.remote-containers"
             ]
         }
     }
