@@ -211,11 +211,33 @@ func (l List[T]) Seq() iter.Seq[T] {
 	}
 }
 
+// SeqRef returns a native iter.Seq iterator over pointers to element values moving forwards in the list.
+func (l List[T]) SeqRef() iter.Seq[*T] {
+	return func(yield func(*T) bool) {
+		for n := l.head; n != nil; n = n.next {
+			if !yield(&n.value) {
+				break
+			}
+		}
+	}
+}
+
 // RevSeq returns a native iter.Seq iterator over element values moving backwards in the list.
 func (l List[T]) RevSeq() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for n := l.head; n != nil; n = n.prev {
 			if !yield(n.value) {
+				break
+			}
+		}
+	}
+}
+
+// RevSeq returns a native iter.Seq iterator over pointers to element values moving backwards in the list.
+func (l List[T]) RevSeqRef() iter.Seq[*T] {
+	return func(yield func(*T) bool) {
+		for n := l.head; n != nil; n = n.prev {
+			if !yield(&n.value) {
 				break
 			}
 		}
