@@ -38,6 +38,22 @@ func TestAppend(t *testing.T) {
 	}
 }
 
+func TestAppendSlice(t *testing.T) {
+	const size = 10
+	list := list.New[int]()
+	slice := slices.Range(0, size)
+	list.Append(slice...)
+	assert.Equal(t, size, list.Size())
+	l := list
+	for i := range size {
+		assert.Equal(t, option.Value(i), l.Get())
+		l = l.Next()
+		require.Equal(t, i == size-1, l.IsEmpty())
+	}
+	collected := list.Iter().Collect()
+	assert.Equal(t, slice, collected)
+}
+
 func TestInsert(t *testing.T) {
 	const size = 10
 	list := list.New[int]()
@@ -55,6 +71,24 @@ func TestInsert(t *testing.T) {
 	}
 }
 
+func TestInsertSlice(t *testing.T) {
+	const size = 10
+	list := list.New[int]()
+	slice := slices.Range(0, size)
+	list.Insert(slice...)
+	assert.Equal(t, size, list.Size())
+	l := list
+	for i := range size {
+		n, ok := l.Get().GetOK()
+		require.True(t, ok)
+		assert.Equal(t, i, n)
+		l = l.Next()
+		require.Equal(t, i == size-1, l.IsEmpty())
+	}
+	collected := list.Iter().Collect()
+	assert.Equal(t, slice, collected)
+}
+
 func TestLastAndFirst(t *testing.T) {
 	const size = 10
 	list := list.Of(slices.Range(1, size+1)...)
@@ -62,6 +96,31 @@ func TestLastAndFirst(t *testing.T) {
 	assert.Equal(t, option.Value(size), last.Get())
 	assert.Equal(t, size, last.RevSize())
 	assert.Equal(t, option.Value(1), last.First().Get())
+}
+
+func TestAt(t *testing.T) {
+	const size = 10
+	const mid = size / 2
+	defer test.ReportErr(t)
+	l := list.Of(slices.Range(0, size)...)
+	m := l.At(mid)
+	assert.Equal(t, 0, l.At(0).Get().Try())
+	assert.Equal(t, mid, m.Get().Try())
+	assert.Equal(t, 0, m.At(-mid).Get().Try())
+	assert.Equal(t, mid*2-1, m.At(mid-1).Get().Try())
+}
+
+func TestGetAt(t *testing.T) {
+	const size = 10
+	const mid = size / 2
+	defer test.ReportErr(t)
+	l := list.Of(slices.Range(0, size)...)
+	m := l.At(mid)
+	assert.Equal(t, 0, l.GetAt(0).Try())
+	assert.Equal(t, mid, l.GetAt(mid).Try())
+	assert.Equal(t, mid, m.GetAt(0).Try())
+	assert.Equal(t, 0, m.GetAt(-mid).Try())
+	assert.Equal(t, mid*2-1, m.GetAt(mid-1).Try())
 }
 
 func TestIter(t *testing.T) {

@@ -13,7 +13,7 @@ type Node[T any] struct {
 	next  *Node[T]
 }
 
-// List is a doubly linked list. More precisely it references an item within such a list, which
+// List is a doubly linked list. More precisely it may reference any given element within such a list, which
 // may be at the beginning, the end, or any point in between. The list can be traversed in either
 // direction. The list may be empty, in which case it references nothing.
 type List[T any] struct {
@@ -28,10 +28,7 @@ func New[T any]() List[T] {
 // Of creates a new list whose elements are taken from the variadic args of the function
 func Of[T any](slice ...T) List[T] {
 	lst := New[T]()
-	l := len(slice)
-	for i := l - 1; i >= 0; i-- {
-		lst.Insert(slice[i])
-	}
+	lst.Append(slice...)
 	return lst
 }
 
@@ -68,6 +65,27 @@ func (l List[T]) Get() option.Option[T] {
 	} else {
 		return option.Value(l.head.value)
 	}
+}
+
+// At returns the list n elements away from its current position; n may be negative as
+// well as positive
+func (l List[T]) At(n int) List[T] {
+	for n != 0 {
+		if n < 0 {
+			l = l.Prev()
+			n++
+		} else {
+			l = l.Next()
+			n--
+		}
+	}
+	return l
+}
+
+// GetAt returns the element n elements away from the current position; n may be negative as well as
+// positive, or zero (the current element). An empty option is returned if no such element exists.
+func (l List[T]) GetAt(n int) option.Option[T] {
+	return l.At(n).Get()
 }
 
 // Ref returns a reference to the element at the head of the given list. It returns nil if
@@ -153,30 +171,35 @@ func (l List[T]) RevSize() int {
 
 // Insert inserts a new element in the current position, moving the original element to following
 // position.
-func (l *List[T]) Insert(value T) {
-	if l.head == nil {
-		l.head = &Node[T]{value: value}
-	} else {
-		node := &Node[T]{value: value, next: l.head, prev: l.head.prev}
-		l.head.prev = node
-		l.head = node
+func (l *List[T]) Insert(values ...T) {
+	ln := len(values)
+	for i := ln - 1; i >= 0; i-- {
+		value := values[i]
+		if l.head == nil {
+			l.head = &Node[T]{value: value}
+		} else {
+			node := &Node[T]{value: value, next: l.head, prev: l.head.prev}
+			l.head.prev = node
+			l.head = node
+		}
 	}
 }
 
-// Append adds an element to the end of the list
-func (l *List[T]) Append(value T) {
-	var node *Node[T]
-	for node = l.head; node != nil && node.next != nil; node = node.next {
-	}
-	newNode := Node[T]{value: value, prev: node}
-	if node == nil {
-		l.head = &newNode
-	} else {
-		node.next = &newNode
+// Append adds elements to the end of the list
+func (l *List[T]) Append(values ...T) {
+	node := l.Last().head
+	for _, value := range values {
+		newNode := Node[T]{value: value, prev: node}
+		if node == nil {
+			l.head = &newNode
+		} else {
+			node.next = &newNode
+		}
+		node = &newNode
 	}
 }
 
-// SeqList returns a native iter.Seq iterator over items moving forward in the list, returning
+// SeqList returns a native iter.Seq iterator over elements moving forward in the list, returning
 // a new List starting at each element found.
 func (l List[T]) SeqList() iter.Seq[List[T]] {
 	return func(yield func(List[T]) bool) {
@@ -244,14 +267,14 @@ func (l List[T]) RevSeqRef() iter.Seq[*T] {
 	}
 }
 
-// IterList returns a iterator.Iterator over items moving forward in the list, returning
+// IterList returns a iterator.Iterator over elements moving forward in the list, returning
 // a new List starting at each element found.
 func (l List[T]) IterList() iterator.Iterator[List[T]] {
 	return iterator.NewWithSize(l.SeqList(),
 		func() iterator.IteratorSize { return iterator.NewSize(l.Size()) })
 }
 
-// RevIterList returns a iterator.Iterator over items moving forward in the list, returning
+// RevIterList returns a iterator.Iterator over elements moving forward in the list, returning
 // a new List starting at each element found.
 func (l List[T]) RevIterList() iterator.Iterator[List[T]] {
 	return iterator.NewWithSize(l.RevSeqList(),
