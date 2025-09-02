@@ -233,7 +233,7 @@ func (l List[T]) RevSeq() iter.Seq[T] {
 	}
 }
 
-// RevSeq returns a native iter.Seq iterator over pointers to element values moving backwards in the list.
+// RevSeqRef returns a native iter.Seq iterator over pointers to element values moving backwards in the list.
 func (l List[T]) RevSeqRef() iter.Seq[*T] {
 	return func(yield func(*T) bool) {
 		for n := l.head; n != nil; n = n.prev {
@@ -264,8 +264,20 @@ func (l List[T]) Iter() iterator.Iterator[T] {
 		func() iterator.IteratorSize { return iterator.NewSize(l.Size()) })
 }
 
-// Iter returns an iterator.Iterator over element values, moving backwards in the list.
+// IterRef returns an iterator.Iterator over pointers to element values, moving forwards in the list.
+func (l List[T]) IterRef() iterator.Iterator[*T] {
+	return iterator.NewWithSize(l.SeqRef(),
+		func() iterator.IteratorSize { return iterator.NewSize(l.Size()) })
+}
+
+// RevIter returns an iterator.Iterator over element values, moving backwards in the list.
 func (l List[T]) RevIter() iterator.Iterator[T] {
 	return iterator.NewWithSize(l.RevSeq(),
+		func() iterator.IteratorSize { return iterator.NewSize(l.RevSize()) })
+}
+
+// RevIterRef returns an iterator.Iterator over pointers to element values, moving backwards in the list.
+func (l List[T]) RevIterRef() iterator.Iterator[*T] {
+	return iterator.NewWithSize(l.RevSeqRef(),
 		func() iterator.IteratorSize { return iterator.NewSize(l.RevSize()) })
 }

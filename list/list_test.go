@@ -1,10 +1,11 @@
-package list
+package list_test
 
 import (
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/robdavid/genutil-go/iterator"
+	"github.com/robdavid/genutil-go/list"
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestEmpty(t *testing.T) {
-	empty := New[int]()
+	empty := list.New[int]()
 	assert.Equal(t, 0, empty.Size())
 	assert.True(t, empty.IsEmpty())
 	assert.True(t, empty.Prev().IsEmpty())
@@ -24,7 +25,7 @@ func TestEmpty(t *testing.T) {
 
 func TestAppend(t *testing.T) {
 	const size = 10
-	list := New[int]()
+	list := list.New[int]()
 	for n := range iterator.Range(0, 10).Seq() {
 		list.Append(n)
 	}
@@ -39,7 +40,7 @@ func TestAppend(t *testing.T) {
 
 func TestInsert(t *testing.T) {
 	const size = 10
-	list := New[int]()
+	list := list.New[int]()
 	for n := range iterator.Range(0, 10).Seq() {
 		list.Insert(n)
 	}
@@ -56,16 +57,16 @@ func TestInsert(t *testing.T) {
 
 func TestLastAndFirst(t *testing.T) {
 	const size = 10
-	list := Of(slices.Range(1, size+1)...)
+	list := list.Of(slices.Range(1, size+1)...)
 	last := list.Last()
 	assert.Equal(t, option.Value(size), last.Get())
 	assert.Equal(t, size, last.RevSize())
 	assert.Equal(t, option.Value(1), last.First().Get())
 }
 
-func TestIterator(t *testing.T) {
+func TestIter(t *testing.T) {
 	const size = 10
-	list := New[int]()
+	list := list.New[int]()
 	slice := slices.Range(0, size)
 	for _, n := range slice {
 		list.Append(n)
@@ -75,27 +76,39 @@ func TestIterator(t *testing.T) {
 	assert.Equal(t, size, cap(collected))
 }
 
+func TestIterRef(t *testing.T) {
+	const size = 10
+	defer test.ReportErr(t)
+	lst := list.From(iterator.Range(0, size))
+	for lp := range lst.IterRef().Seq() {
+		*lp += 5
+	}
+	c := lst.Iter().Collect()
+	assert.Equal(t, slices.Range(5, size+5), c)
+}
+
 func TestRevIter(t *testing.T) {
 	const size = 10
-	list := From(iterator.Range(0, size))
-	last := list.Last()
+	lst := list.From(iterator.Range(0, size))
+	last := lst.Last()
 	reved := last.RevIter().Collect()
 	assert.Equal(t, slices.IncRange(size-1, 0), reved)
 }
 
-func TestRevIterList(t *testing.T) {
+func TestRevIterRef(t *testing.T) {
 	const size = 10
-	defer test.ReportErr(t)
-	list := From(iterator.Range(0, size))
-	last := list.Last()
-	revedList := last.RevIterList().Collect()
-	reved := slices.Map(revedList, func(l List[int]) int { return l.Get().Try() })
-	assert.Equal(t, slices.IncRange(size-1, 0), reved)
+	lst := list.From(iterator.Range(0, size))
+	last := lst.Last()
+	for lp := range last.RevIterRef().Seq() {
+		*lp += 5
+	}
+	reved := last.RevIter().Collect()
+	assert.Equal(t, slices.IncRange(size+4, 5), reved)
 }
 
 func TestRef(t *testing.T) {
 	const size = 10
-	list := From(iterator.Range(0, size))
+	list := list.From(iterator.Range(0, size))
 	for itr := range list.SeqList() {
 		*itr.Ref()++
 	}
@@ -103,10 +116,10 @@ func TestRef(t *testing.T) {
 	assert.Equal(t, slices.Range(1, size+1), c)
 }
 
-func TestListIterator(t *testing.T) {
+func TestIterList(t *testing.T) {
 	defer test.ReportErr(t)
 	const size = 10
-	list := New[int]()
+	list := list.New[int]()
 	slice := slices.Range(0, size)
 	for _, n := range slice {
 		list.Append(n)
@@ -126,10 +139,34 @@ func TestListIterator(t *testing.T) {
 	assert.Equal(t, size, cap(collected))
 }
 
+func TestRevIterList(t *testing.T) {
+	defer test.ReportErr(t)
+	const size = 10
+	list := list.New[int]()
+	slice := slices.Range(0, size)
+	for _, n := range slice {
+		list.Append(n)
+	}
+	for i, l := range list.Last().RevIterList().Enumerate().Seq2() {
+		if i > 0 && i < size-1 {
+			v := l.Get().Try()
+			p := l.Prev().Get().Try()
+			n := l.Next().Get().Try()
+			assert.Equal(t, size-i-1, v)
+			assert.Equal(t, size-i-2, p)
+			assert.Equal(t, size-i, n)
+		}
+	}
+	revSlice := slices.IncRange(size-1, 0)
+	collected := list.Last().RevIter().Collect()
+	assert.Equal(t, revSlice, collected)
+	assert.Equal(t, size, cap(collected))
+}
+
 func TestListSet(t *testing.T) {
 	defer test.ReportErr(t)
 	const size = 10
-	list := New[int]()
+	list := list.New[int]()
 	slice := slices.Range(0, size)
 	for _, n := range slice {
 		list.Append(n)
@@ -148,6 +185,6 @@ func TestListSet(t *testing.T) {
 func TestFrom(t *testing.T) {
 	const size = 10
 	input := slices.Range(0, size)
-	lst := Of(input...)
+	lst := list.Of(input...)
 	assert.Equal(t, input, lst.Iter().Collect())
 }
