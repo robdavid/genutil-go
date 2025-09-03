@@ -52,6 +52,10 @@ func FromSeq[T any](itr iter.Seq[T]) List[T] {
 	return first
 }
 
+func As[U ~struct{ List[T] }, T any](l List[T]) U {
+	return U{l}
+}
+
 // IsEmpty returns true if the list is empty
 func (l List[T]) IsEmpty() bool {
 	return l.head == nil
