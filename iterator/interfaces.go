@@ -2,7 +2,8 @@ package iterator
 
 import "iter"
 
-// SimpleIterator supports a simple sequence of elements
+// SimpleIterator defines a core set of methods for iterating over a collection of elements, of type T.
+// More complete Iterator implementations can be built on this core set of methods.
 type SimpleIterator[T any] interface {
 	// Next sets the iterator's current value to be the first, and subsequent, iterator elements.
 	// False is returned only when there are no more elements (the current value remains unchanged)
@@ -13,25 +14,29 @@ type SimpleIterator[T any] interface {
 	Abort()
 	// Reset stops the iterator; subsequent calls to Next() will begin the iterator from the start.
 	// Note not all iterators are guaranteed to return the same sequence again, for example iterators
-	// that perform IO may not read the same data again.
+	// that perform IO may not read the same data again, or may return no data at all.
 	Reset()
 }
 
+// SimpleMutableIterator extends SimpleIterator by adding methods to support element mutation.
+// More complete MutableIterator implementations can be built on this core set of methods.
 type SimpleMutableIterator[T any] interface {
 	SimpleIterator[T]
-	// Set allows a value to be modified in place
+	// Set allows the value at the iterator's current position to be modified in place
 	Set(T)
-	// Delete deletes the current value, which must be the last value returned by Next(). This
-	// function may not be implemented for all iterator types, in which case it will return an
-	// ErrDeleteNotImplemented error.
+	// Delete deletes the current value, which must be the last value arrived at by Next().
 	Delete()
 }
 
 // CoreIterator is an extension of SimpleIterator that in aggregate provides the minimum set of methods
-// that are intrinsic to an iterator implementation.
+// that are intrinsic to an iterator implementation. These methods are those that are concerned with
+// handling the underlying data.
 type CoreIterator[T any] interface {
 	SimpleIterator[T]
-	// Seq returns the iterator as a Go iter.Seq iterator.
+	// Seq returns the iterator as a Go `iter.Seq` iterator. The iterator may be backed by
+	// an `iter.Seq[T]` object, in which case that iterator object will typically be returned
+	// directly. Otherwise, an `iter.Seq[T]` will be synthesised from the underlying iterator, typically
+	// a SimpleIterator.
 	Seq() iter.Seq[T]
 	// Size is an estimate, where possible, of the number of elements remaining.
 	Size() IteratorSize
@@ -42,7 +47,7 @@ type CoreIterator[T any] interface {
 	// slightly more efficient to stick to the simple iterator methods. Also, if simple
 	// iterator methods have already been called against a Seq based iterator, calling
 	// Seq() will cause inconsistent results, as it will restart the iterator from the
-	// beginning, and so in these cases, SeqOK() will return false.
+	// beginning, and so in these cases, SeqOK() should return false.
 	SeqOK() bool
 }
 
@@ -50,22 +55,34 @@ type CoreIterator[T any] interface {
 // iterator mutation.
 type CoreMutableIterator[T any] interface {
 	CoreIterator[T]
-	// Set modifies the current value in place.
+	// Set modifies the current value, the last value arrived at by a call to Next(), in place.
 	Set(T)
 	// Delete deletes the current value, which must be the last value returned by Next(). This
 	// function may not be implemented for all iterator types, in which case it will panic.
 	Delete()
 }
 
+// CoreIterator2 is an extension of CoreIterator that adds support for a second variable of type
+// K (the "key") in addition to the existing value, of type V.
 type CoreIterator2[K any, V any] interface {
 	CoreIterator[V]
+	// Seq returns the iterator as a Go `iter.Seq2` iterator. The iterator may be backed by
+	// an `iter.Seq2[T]` object, in which case that iterator object will typically be returned
+	// directly. Otherwise, an `iter.Seq2[T]` will be synthesised from the underlying iterator.
 	Seq2() iter.Seq2[K, V]
+	// Key returns the current iterator key.
 	Key() K
 }
 
+// CoreMutableIterator2 is an extension of CoreIterator2 that adds support for mutability. The
+// iterator value may be changed, and the current item may be deleted. There is no support
+// for modifing the key.
 type CoreMutableIterator2[K any, V any] interface {
 	CoreIterator2[K, V]
+	// Set will modify the current iterator value.
 	Set(V)
+	// Delete will remove the current iterator item. Calliing Next() is still required to advance
+	// to the next item.
 	Delete()
 }
 

@@ -164,9 +164,41 @@ func TestMutSliceIter(t *testing.T) {
 	assert.Equal(4, iter.Size().Size)
 	require.True(iter.Next())
 	require.True(iter.Next())
+	assert.Equal(2, iter.Value())
 	iter.Delete()
+	assert.Equal(0, iter.Value()) // Zero value after delete
+	require.True(iter.Next())
+	assert.Equal(3, iter.Value())
 	iter.Reset()
 	assert.Equal(3, iter.Size().Size)
+	output := iterator.Collect(iter)
+	assert.Equal([]int{1, 3, 4}, output)
+}
+
+func TestMutSliceSeq(t *testing.T) {
+	assert := assert.New(t)
+	input := []int{1, 2, 3, 4}
+	iter := iterator.MutSlice(&input)
+	for n := range iter.Seq() {
+		if n == 2 {
+			iter.Delete()
+		}
+	}
+	iter.Reset()
+	output := iterator.Collect(iter)
+	assert.Equal([]int{1, 3, 4}, output)
+}
+
+func TestMutSliceSeq2(t *testing.T) {
+	assert := assert.New(t)
+	input := []int{1, 2, 3, 4}
+	iter := iterator.MutSlice(&input)
+	for i, n := range iter.Enumerate().Seq2() {
+		if i == 1 && n == 2 {
+			iter.Delete()
+		}
+	}
+	iter.Reset()
 	output := iterator.Collect(iter)
 	assert.Equal([]int{1, 3, 4}, output)
 }

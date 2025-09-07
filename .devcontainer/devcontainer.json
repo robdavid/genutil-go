@@ -1,5 +1,5 @@
 {
-    "image":"mcr.microsoft.com/devcontainers/go",
+    "build": { "dockerfile": "Dockerfile" },
     "customizations": {
         "vscode": {
             "extensions": [
