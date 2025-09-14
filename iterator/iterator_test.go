@@ -675,6 +675,17 @@ func TestFilterMap(t *testing.T) {
 	assert.Equal(t, []string{"0", "2", "4", "6", "8"}, actual)
 }
 
+func TestFilerMorph(t *testing.T) {
+	const size = 10
+	testSlice := iterator.Range(0, size)
+	filterIter := testSlice.FilterMorph(func(v int) (int, bool) {
+		return v * 2, v%2 == 0
+	})
+	expectedSlice := slices.RangeBy(0, size*2, 4) // 0,4,8,12,16
+	actualSlice := iterator.Collect(filterIter)
+	assert.Equal(t, expectedSlice, actualSlice)
+}
+
 func TestFilerMorph2(t *testing.T) {
 	const keys = 10
 	testMap := iterator.CollectMap(iterator.New2(func(yield func(int, int) bool) {
