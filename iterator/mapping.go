@@ -199,8 +199,7 @@ func FilterMapOpt[T any, U any](iter Iterator[T], mapping func(T) option.Option[
 // function `mapping` is applied to each key and value pair, of type K and V respectively,
 // producing either a new key and value pairs (of type X and Y) and a true boolean, or
 // undefined key and value and a false boolean. Values are taken from the keys and values
-// when the boolean is true to produce a new Iterator2; returns when the boolean is false
-// are ignored.
+// when the boolean is true to produce a new Iterator2.
 func FilterMap2[K, V, X, Y any](iter Iterator2[K, V], mapping func(K, V) (X, Y, bool)) Iterator2[X, Y] {
 	return wrapFunc2(iter, mapping, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }

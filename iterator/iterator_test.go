@@ -686,6 +686,13 @@ func TestFilerMorph(t *testing.T) {
 	assert.Equal(t, expectedSlice, actualSlice)
 }
 
+func TestFilterMorph2Example(t *testing.T) {
+	inputMap := map[int]int{0: 2, 1: 4, 2: 6, 3: 8}
+	itr := maps.Iter(inputMap).FilterMorph2(func(k, v int) (int, int, bool) { return k + 1, v * 2, (k+v)%2 == 0 })
+	output := iterator.CollectMap(itr)
+	assert.Equal(t, map[int]int{1: 4, 3: 12}, output)
+}
+
 func TestFilerMorph2(t *testing.T) {
 	const keys = 10
 	testMap := iterator.CollectMap(iterator.New2(func(yield func(int, int) bool) {

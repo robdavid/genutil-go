@@ -111,13 +111,13 @@ type IteratorExtensions[T any] interface {
 	Enumerate() Iterator2[int, T]
 
 	// Filter is a filtering method that creates a new iterator which contains a subset of elements
-	// of the current one. This function takes a predicate function p and only elements for
-	// which this function returns true should be included in the filtered iterator
+	// contained in the current one. This function takes a predicate function p and only elements
+	// for which this function returns true should be included in the filtered iterator
 	Filter(p func(T) bool) Iterator[T]
 
-	// Morph is a mapping function that creates a new iterator which contains elements of the
-	// current iterator with the supplied function m applied to each value. The type the return
-	// value of m must be of the same type of the values of the current iterator. This is because of
+	// Morph is a mapping function that creates a new iterator which contains the elements of the
+	// current iterator with the supplied function m applied to each one. The type of the return
+	// value of m must be the same as that of the elements of the current iterator. This is because of
 	// limitations of Go generics. To apply a mapping that changes the type, see the iterator.Map
 	// function.
 	Morph(m func(T) T) Iterator[T]
@@ -125,7 +125,7 @@ type IteratorExtensions[T any] interface {
 	// FilterMorph is a filtering and mapping method that creates a new iterator from an existing
 	// one by simultaneously transforming and filtering each iterator element. The method takes a
 	// mapping function f that transforms and filters each element. It does this by taking an input
-	// element value and returns a new element value and a boolean flag. Only elements for which
+	// element value and returning a new element value and a boolean flag. Only elements for which
 	// this flag is true are included in the new iterator. E.g.
 	//  itr := iterator.Of(0,1,2,3,4)
 	//  itrMorph := itr.FilterMorph(func(v int) (int, bool) { return v*2, v%2 == 0})
@@ -144,13 +144,47 @@ type IteratorExtensions[T any] interface {
 // Iterator2Extensions defines additional iterator methods that are specific
 // to Iterator2.
 type Iterator2Extensions[K any, V any] interface {
+
+	// Collect2 collects all the element pairs from the iterator into a slice of
+	// KeyValue objects.
 	Collect2() []KeyValue[K, V]
+
+	// Chan2 returns the iterator as a channel of KeyValue objects. The iterator is consumed
+	// in a goroutine which yields results to the channel.
 	Chan2() <-chan KeyValue[K, V]
+
+	// Filter2 is a filtering method that creates a new iterator which contains a subset of element
+	// pairs contained by the current one. This function takes a predicate function p and only
+	// element pairs for which this function returns true should be included in the filtered
+	// iterator
+	Filter2(p func(K, V) bool) Iterator2[K, V]
+
+	// Morph2 is a mapping function that creates a new iterator which contains pairs of elements of the
+	// current iterator with the supplied function m applied to each key and value. The type of the return
+	// value and key of m must be of the same type as the kay and value of the current iterator. This is because of
+	// limitations of Go generics. To apply a mapping that changes the type, see the iterator.Map2
+	// function.
+	Morph2(m func(K, V) (K, V)) Iterator2[K, V]
+
+	// FilterMorph2 is a filtering and mapping method that creates a new iterator from an existing
+	// one by simultaneously transforming and filtering each iterator element pair. The method takes
+	// a mapping function f that transforms and filters each element pair. It does this by taking an
+	// input element key and value and returning a new element key and value and a boolean flag.
+	// Only elements for which this flag is true are included in the new iterator. E.g.
+	//  inputMap := map[int]int{0: 2, 1: 4, 2: 6, 3: 8}
+	//  itr := maps.Iter(inputMap).FilterMorph2(func(k, v int) (int, int, bool) {
+	//    return k + 1, v * 2, (k+v)%2 == 0
+	//  })
+	//  output := iterator.CollectMap(itr) // map[int]int{1: 4, 3: 12}
+	// Note that this function is not able to map element keys or values to different types due to
+	// limitations of Go generics. For a filter mapping function that can map to different types,
+	// see the iterator.FilterMap2 function.
+	FilterMorph2(f func(K, V) (K, V, bool)) Iterator2[K, V]
+
+	// Take2 returns a variant of the current iterator that which returns at most n pairs of
+	// elements. If the current iterator has less than or exactly n element pairs, the returned
+	// iterator is equivalent to the input iterator.
 	Take2(int) Iterator2[K, V]
-	Filter2(func(K, V) bool) Iterator2[K, V]
-	Morph2(func(K, V) (K, V)) Iterator2[K, V]
-	// FilterMorph2 is a filtering and mapping method
-	FilterMorph2(func(K, V) (K, V, bool)) Iterator2[K, V]
 }
 
 // Top level iterator types
