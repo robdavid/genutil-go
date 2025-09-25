@@ -17,6 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSimpleSequence(t *testing.T) {
+	itr := iterator.Of(2, 4, 6, 8)
+	c := itr.Collect()
+	assert.Equal(t, []int{2, 4, 6, 8}, c)
+}
+
 func TestMapMutations(t *testing.T) {
 	m := make(map[int]int)
 	for i := range 10 {
@@ -193,7 +199,10 @@ func TestMutSliceSeq2(t *testing.T) {
 	assert := assert.New(t)
 	input := []int{1, 2, 3, 4}
 	iter := iterator.MutSlice(&input)
+	seen := make(map[int]bool)
 	for i, n := range iter.Enumerate().Seq2() {
+		assert.False(seen[i])
+		seen[i] = true
 		if i == 1 && n == 2 {
 			iter.Delete()
 		}
@@ -850,10 +859,8 @@ func fibPureSeq(yield func(int) bool) {
 	}
 }
 
-func infSize() iterator.IteratorSize { return iterator.NewSizeInfinite() }
-
 func fibSeq() iterator.Iterator[int] {
-	return iterator.NewWithSize(fibPureSeq, infSize)
+	return iterator.NewWithSize(fibPureSeq, iterator.NewSizeInfinite)
 }
 
 type simpleFib [2]int
@@ -883,7 +890,7 @@ func (sf *simpleFib) Reset() {
 }
 
 func newFromSimpleFib() iterator.Iterator[int] {
-	return iterator.NewFromSimpleWithSize(newSimpleFib(), infSize)
+	return iterator.NewFromSimpleWithSize(newSimpleFib(), iterator.NewSizeInfinite)
 }
 
 func TestGenerateFib(t *testing.T) {

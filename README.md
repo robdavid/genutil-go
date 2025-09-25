@@ -227,6 +227,97 @@ Various other methods and types exist to handle return values with errors only o
 
 ## Iterator
 
+A number of generic iterator types are provided with some useful abilities such as filtering, mapping, enumeration, sizing information, and mutation of underlying values. They can be consumed via `for` loops, or via collected into slices or maps, converted to and from Go native `iter.Seq` and `iter.Seq2` types, or their elements sent from a goroutine over a channel.
+
+The principle abstract iterator types are:
+
+| Interface Type | Description |
+|------|-------------|
+| `iterator.Iterator[T]` | An immutable iterator over elements of type T |
+| `iterator.MutableIterator[T]` | A mutable iterator over elements of type T that supports methods for modifying or deleting the current value. This type supports methods to modify the element in place, or to remove it from an underlying collection. |
+| `iterator.Iterator2[K,V]` | An immutable iterator over pairs of element index or key of type K, and element value of type V.|
+| `iterator.ImmutableIterator2[K,V]` | A mutable iterator over pairs of element index or key of type K, and element value of type V. This type supports methods to modify the value of an element in place, or to remove it (and the key where applicable) from an underlying collection. Note there is no method to modify the key value. |
+
+The following sections give you an overview of the iterator types and their usage. For full documentation see the API reference.
+
+### Creation
+
+Iterators can be created in various ways.
+
+#### From values
+
+Most simply, an iterator can be created from an explicit list of values:
+
+```go
+intIter := iterator.Of(1,1,2,3,5,8)          // iterator.Iterator[int]
+strIter := iterator.Of("red","green","blue") // iterator.Iterator[string]
+```
+
+#### From numeric value ranges
+
+Iterators can be created as a range of numeric values:
+
+```go
+intIter := iterator.Range(0,5)      // iterator.Iterator[int]
+                                    // 0,1,2,3,4
+fltIter := iterator.Range(0.0, 5.0) // iterator.Iterator[float64]
+                                    // 0.0, 1.0, 2.0, 3.0, 4.0
+```
+
+#### From slices
+
+An iterator can be created over a slice. Such an iterator carries sizing information:
+
+```go
+myslice := []int { 1, 2, 3, 4 }
+intIter := slices.Iter(myslice) // iterator.Iterator[int]
+intIter.Size().IsKnownToBe(4)   // true
+```
+
+In addition, a mutable iterator can be created, which allows modification of the underlying slice (see further below).
+
+```go
+myslice := []int { 1, 2, 3, 4 }
+intIter := slices.IterMut(myslice) // iterator.MutableIterator[int]
+```
+
+#### From native Go iterators
+
+An iterator can be created from a native Go iterator. This underlying iterator can be accessed directly.
+
+```go
+	// fib returns a native Go iterator (fibonacci sequence).
+	fib := func(yield func(int) bool) {
+		tail := [2]int{0, 1}
+		for {
+			if !yield(tail[1]) {
+				return
+			}
+			tail[0], tail[1] = tail[1], tail[0]+tail[1]
+		}
+	}
+
+	fibItr := iterator.New(fib) // iterator.Iterator[int]
+	fibSeq := fibItr.Seq()      // iter.Seq[int]
+```
+
+#### From maps
+
+An iterator can be constructed over both keys and values of a map:
+
+```go
+m := map[int]string{ 1: "one", 2: "two", 3: "three" }
+itr := maps.Iter(m) // Iterator2[int,string]
+```
+
+It's also possible to create a mutable iterator, that supports modification of the underlying map (see further below)
+
+```go
+m := map[int]string{ 1: "one", 2: "two", 3: "three" }
+itr := maps.IterMut(m) // MutableIterator2[int,string]
+```
+
+
 An `Iterator` is a generic type equivalent to the following definition
 
 ```go

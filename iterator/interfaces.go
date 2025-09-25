@@ -37,10 +37,11 @@ type SimpleMutableIterator[T any] interface {
 }
 
 // CoreIterator is an extension of SimpleIterator that in aggregate provides the minimum set of methods
-// that are intrinsic to an iterator implementation. These methods are those that are concerned with
-// handling the underlying data.
+// that are intrinsic to an iterator implementation, i.e. those methods that are concerned with
+// interacting the underlying data.
 type CoreIterator[T any] interface {
 	SimpleIterator[T]
+
 	// Seq returns the iterator as a Go `iter.Seq` iterator. The iterator may be backed by
 	// an `iter.Seq[T]` object, in which case that iterator object will typically be returned
 	// directly. Otherwise, an `iter.Seq[T]` will be synthesised from the underlying iterator, typically
@@ -50,13 +51,12 @@ type CoreIterator[T any] interface {
 	// Size is an estimate, where possible, of the number of elements remaining.
 	Size() IteratorSize
 
-	// SeqOK returns true if the Seq() method should be used to perform iterations. Generally, using
-	// Seq() is the preferred method for efficiency reasons. However there are situations where this
-	// is not the case and this method will return false. For example, if the underlying iterator is
-	// based on a simple iterator, it is slightly more efficient to stick to the simple iterator
-	// methods. Also, if simple iterator methods have already been called against a Seq based
-	// iterator, calling Seq() will cause inconsistent results, as it will restart the iterator from
-	// the beginning, and so in these cases, SeqOK() will return false.
+	// SeqOK returns true if the Seq() method should be used to perform iterations. Generally, using Seq() is the
+	// preferred method for efficiency reasons. However there are situations where this is not the case and in those
+	// cases this method will return false. For example, if the underlying iterator is based on a simple iterator, it is
+	// slightly more efficient to stick to the simple iterator methods. Also, if simple iterator methods have already
+	// been called against a Seq based iterator, calling Seq() will cause inconsistent results, as it will restart the
+	// iterator from the beginning, and so in these cases, SeqOK() will return false.
 	SeqOK() bool
 }
 
