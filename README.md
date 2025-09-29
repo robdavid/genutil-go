@@ -317,8 +317,69 @@ m := map[int]string{ 1: "one", 2: "two", 3: "three" }
 itr := maps.IterMut(m) // MutableIterator2[int,string]
 ```
 
+### Consumption
 
-An `Iterator` is a generic type equivalent to the following definition
+Iterators can be consumed in a number of ways. 
+
+#### For loops
+
+The most straight forward way to consume an iterator is using a `for` loop. The recommended way is by converting to a native Go iterator with the `Seq` method.
+
+```go
+for n := range iterator.Range(0,10).Seq() {
+  fmt.Printf("%d\n",n) // 0..1..2..
+}
+```
+
+It's also possible to use `Next()` and `Value()` methods provided by iterators in a `for` loop as follows:
+
+```go
+for itr := iterator.Range(0, 10); itr.Next(); {
+  fmt.Fprintf(&buffer, "%d\n", itr.Value()) // 0..1..2.. .. ..9
+}
+```
+
+Generally speaking, the `Seq()` method is preferred since using `Next()` against an iterator that is backed by an `iter.Seq` native iterator incurs a performance penalty (due to use of `iter.Pull`). 
+
+#### Collection
+
+Iterators have a `Collect()` method that allows elements to be collected in to a slice.
+
+```go
+c := iterator.Range(0,5).Collect() // []int{0, 1, 2 ,3, 4}
+```
+
+Iterators of element pairs can be collected into a map, provided the key value is comparable.
+
+```go
+m := iterator.CollectMap(iterator.Of("zero", "one","two","three").Enumerate()) // map[int]string{0, "zero", 1: "one", 2: "two", 3: "three"}
+```
+
+The `Enumerate()` method turns an `iterator.Iterator[T]` into an `iterator.Iterator2[int,T]` by adding a counter key starting at zero. The `iterator.CollectMap` function is a function rather than a method because the comparable constraint needs to be enforced, which cannot be done in a method.
+
+### Mutability
+
+Some iterators support the mutation of the underlying collection from which their elements are drawn. Out of the box, an `iterator.MutableIterator` can be constructed over slices, and an `iterator.MutableIterator2` can be constructed over maps. Both iterators have a `Set(v T)` method which provides for the mutation of the current element (not the key), and a `Delete()` method which removes the current element (or element pair) from the collection.
+
+#### Mutability over slices
+
+In order to support mutability over slices, especially the removal of elements, the iterator needs to operate on a pointer to a slice; the removal of an element may necessitate reallocation the slice to a new location. The following example builds a slice of ints from 0...9 (inclusive), and iterates mutably over it, deleting elements that are odd, whilst dividing even numbers by 2.
+
+```go
+s := slices.Range(0,10)
+itr := slices.IterMut(&s)
+for n := range itr.Seq() {
+  if n%2 == 1 {
+    itr.Delete()
+  } else {
+    itr.Set(n/2)
+  }
+}s
+fmt.Println(s) // [0 1 2 3 4]
+```
+
+
+An `Iterator` is a generic type equivalent to the following definition 
 
 ```go
 type Iterator[T any] interface {

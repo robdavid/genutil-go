@@ -20,6 +20,9 @@ var (
 	INFINITE_SIZE              = IteratorSize{Type: SizeInfinite, Size: -1}
 )
 
+// Allocate returns an estimated allocation size needed to accommodate the remaining elements in the
+// iterator. If the iterator size is infinite, the function will panic with
+// iterator.ErrAllocationSizeInfinite.
 func (isz IteratorSize) Allocate() int {
 	switch isz.Type {
 	case SizeUnknown:
@@ -61,7 +64,7 @@ func (size IteratorSize) IsUnknown() bool {
 	return size.Type == SizeUnknown
 }
 
-// NewSize creates an `IteratorSize` implementation that has a fixed size of `n`.
+// NewSize creates an IteratorSize implementation that has a fixed size of n.
 func NewSize(n int) IteratorSize { return IteratorSize{SizeKnown, n} }
 
 // IsKnown returns true if the iterator size is one whose actual size is known.
@@ -75,7 +78,7 @@ func (size IteratorSize) IsKnownToBe(n int) bool {
 	return size.Type == SizeKnown && size.Size == n
 }
 
-// NewSizeMax creates an `IteratorSize` implementation that has a size no more than n.
+// NewSizeMax creates an IteratorSize implementation that has a size no more than n.
 func NewSizeMax(n int) IteratorSize {
 	return IteratorSize{SizeAtMost, n}
 }

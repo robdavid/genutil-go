@@ -106,6 +106,13 @@ type IteratorExtensions[T any] interface {
 	// Collect collects all elements from the iterator into a slice.
 	Collect() []T
 
+	// CollectInto adds all elements from the iterator into an existing slice.
+	CollectInto(*[]T) []T
+
+	// CollectIntoCap add elements from the iterator into an existing slice until either the
+	// capacity of the slice is filled, or the iterator is exhausted, which ever is first.
+	CollectIntoCap(*[]T) []T
+
 	// Enumerate returns an iterator that enumerates the elements of this iterator, returning an
 	// Iterator2 of the index and the value.
 	Enumerate() Iterator2[int, T]

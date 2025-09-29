@@ -72,6 +72,14 @@ func (di DefaultIterator[T]) Collect() []T {
 	return Collect(di)
 }
 
+func (di DefaultIterator[T]) CollectInto(slice *[]T) []T {
+	return CollectInto(di, slice)
+}
+
+func (di DefaultIterator[T]) CollectIntoCap(slice *[]T) []T {
+	return CollectIntoCap(di, slice)
+}
+
 func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
 	return Enumerate(di)
 }
@@ -194,10 +202,15 @@ func NewSliceCoreIteratorRef[T any](slice *[]T) CoreMutableIterator[*T] {
 	return &sliceIterRef[T]{sliceIter: sliceIter[T]{slice: slice, index: 0}}
 }
 
-// CollectInto collects all elements from an iterator into a pointer to a slice.
-// The slice referenced may be reallocated as the append function is used to add
-// elements to the slice. The slice may be a nil slice.
+// CollectInto collects all elements from an iterator into a slice a pointer to which is passed.
+// Elements are appended to any existing data in the slice. The slice referenced may be reallocated
+// as the append function is used to add elements to the slice. The slice may be a nil slice. For
+// convenience, the final slice is returned. If the iterator is known to have an infinite size, this
+// function will panic.
 func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
+	if iter.Size().IsInfinite() {
+		panic(ErrAllocationSizeInfinite)
+	}
 	if iter.SeqOK() {
 		for v := range iter.Seq() {
 			*slice = append(*slice, v)
@@ -210,7 +223,43 @@ func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
 	return *slice
 }
 
+// CollectIntoCap appends elements from an iterator into a slice a pointer to which is passed, up to
+// a maximum of the capacity for the slice. Elements are not added beyond the capacity. Elements are
+// appended to any existing data in the slice. The slice may be a nil slice, in which case no
+// elements will be added. For convenience, tbe final slice is returned.
+func CollectIntoCap[T any](iter CoreIterator[T], slice *[]T) []T {
+	max := cap(*slice) - len(*slice)
+	if max > 0 {
+		if iter.SeqOK() {
+			for v := range iter.Seq() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, v)
+				max--
+			}
+		} else {
+			for iter.Next() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, iter.Value())
+				max--
+			}
+		}
+	}
+	return *slice
+}
+
+// Collect2Into collects all element pairs from an Iterator2 into a slice of KeyValue pairs, a
+// pointer to which is passed. Pairs are appended to any existing data in the slice. The slice
+// referenced may be reallocated as the append function is used to add pairs to the slice. The slice
+// may be a nil slice. For convenience, the final slice is returned. If the iterator is known to
+// have an infinite size, this function will panic.
 func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
+	if iter.Size().IsInfinite() {
+		panic(ErrAllocationSizeInfinite)
+	}
 	if iter.SeqOK() {
 		for k, v := range iter.Seq2() {
 			*slice = append(*slice, KVOf(k, v))
@@ -223,7 +272,47 @@ func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V
 	return *slice
 }
 
+// Collect2IntoCap collects all element pairs from an Iterator2 into a slice of KeyValue pairs, a
+// pointer to which is passed. Pairs are appended to any existing data in the slice. The slice
+// referenced may be reallocated as the append function is used to add pairs to the slice. The slice
+// may be a nil slice. For convenience, the final slice is returned. If the iterator is known to
+// have an infinite size, this function will panic.
+func Collect2IntoCap[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
+	if iter.Size().IsInfinite() {
+		panic(ErrAllocationSizeInfinite)
+	}
+	max := cap(*slice) - len(*slice)
+	if max > 0 {
+		if iter.SeqOK() {
+			for k, v := range iter.Seq2() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, KVOf(k, v))
+				max--
+			}
+		} else {
+			for iter.Next() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, KVOf(iter.Key(), iter.Value()))
+				max--
+			}
+		}
+	}
+	return *slice
+}
+
+// CollectIntoMap collects all element pairs from an Iterator2 into the map passed, populating it
+// with key and value pairs. All keys should be unique; any duplicate keys will result in only the
+// latest key/value pair with that key being preserved. The map may be nil, in which case a new map
+// will be created. The final map is returned. If the iterator is known to have an infinite size,
+// this function will panic.
 func CollectIntoMap[K comparable, V any](iter CoreIterator2[K, V], m map[K]V) map[K]V {
+	if iter.Size().IsInfinite() {
+		panic(ErrAllocationSizeInfinite)
+	}
 	if m == nil {
 		m = make(map[K]V)
 	}
@@ -239,17 +328,23 @@ func CollectIntoMap[K comparable, V any](iter CoreIterator2[K, V], m map[K]V) ma
 	return m
 }
 
-// Collect collects all elements from an iterator into a slice.
+// Collect all elements from an iterator into a slice. If the iterator is known to be
+// of infinite size, this function will panic.
 func Collect[T any](iter CoreIterator[T]) []T {
 	result := make([]T, 0, iter.Size().Allocate())
 	return CollectInto(iter, &result)
 }
 
+// Collect2 collects all elements from an Iterator2 into a slice of KeyValue pairs. If the iterator
+// is known to be of infinite size, this function will panic.
 func Collect2[K any, V any](itr CoreIterator2[K, V]) []KeyValue[K, V] {
 	result := make([]KeyValue[K, V], 0, itr.Size().Allocate())
 	return Collect2Into(itr, &result)
 }
 
+// CollectMap collects all elements from an Iterator2 into a map of key and value pairs. All keys
+// should be unique; any duplicate keys will result in only the latest key/value pair with that key
+// being preserved. If the iterator is known to be of infinite size, this function will panic.
 func CollectMap[K comparable, V any](itr CoreIterator2[K, V]) map[K]V {
 	return CollectIntoMap(itr, nil)
 }

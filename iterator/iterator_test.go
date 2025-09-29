@@ -50,9 +50,9 @@ func TestMapMutations(t *testing.T) {
 func TestCollectInto(t *testing.T) {
 	iter := iterator.Range(0, 5)
 	var output []int = nil
-	iterator.CollectInto(iter, &output)
+	iter.CollectInto(&output)
 	iter2 := iterator.Range(10, 15)
-	iterator.CollectInto(iter2, &output)
+	iter2.CollectInto(&output)
 	expected := []int{0, 1, 2, 3, 4, 10, 11, 12, 13, 14}
 	assert.Equal(t, expected, output)
 }
@@ -60,9 +60,9 @@ func TestCollectInto(t *testing.T) {
 func TestInclusiveCollectInto(t *testing.T) {
 	iter := iterator.IncRange(0, 5)
 	var output []int = nil
-	iterator.CollectInto(iter, &output)
+	iter.CollectInto(&output)
 	iter2 := iterator.IncRange(10, 15)
-	iterator.CollectInto(iter2, &output)
+	iter2.CollectInto(&output)
 	expected := []int{0, 1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15}
 	assert.Equal(t, expected, output)
 }
@@ -947,6 +947,23 @@ func TestFibInf(t *testing.T) {
 	fib := fibSeq().Take(size)
 	assert.Equal(t, size, fib.Size().Size)
 	assert.Equal(t, expected, fib.Collect())
+}
+
+func TestCollectFibInf(t *testing.T) {
+	defer func() {
+		p := recover()
+		assert.NotNil(t, p)
+		assert.ErrorIs(t, p.(error), iterator.ErrAllocationSizeInfinite)
+	}()
+	fibSeq().Collect()
+	assert.Fail(t, "Expected panic did not occur")
+}
+
+func TestCollectFibInfMax(t *testing.T) {
+	s := make([]int, 0, 5)
+	i := fibSeq()
+	i.CollectIntoCap(&s)
+	assert.Equal(t, []int{1, 1, 2, 3, 5}, s)
 }
 
 func TestFibSize(t *testing.T) {
