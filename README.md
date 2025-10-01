@@ -363,7 +363,7 @@ Some iterators support the mutation of the underlying collection from which thei
 
 #### Mutability over slices
 
-In order to support mutability over slices, especially the removal of elements, the iterator needs to operate on a pointer to a slice; the removal of an element may necessitate reallocation the slice to a new location. The following example builds a slice of ints from 0...9 (inclusive), and iterates mutably over it, deleting elements that are odd, whilst dividing even numbers by 2.
+In order to support mutability over slices, especially the removal of elements, the iterator needs to operate on a pointer to a slice; the removal of an element may lead to reallocation of the slice to a new location. The following example builds a slice of ints from 0...9 (inclusive), and iterates mutably over it, deleting elements that are odd, whilst dividing even numbers by 2.
 
 ```go
 s := slices.Range(0,10)
@@ -374,8 +374,31 @@ for n := range itr.Seq() {
   } else {
     itr.Set(n/2)
   }
-}s
+}
 fmt.Println(s) // [0 1 2 3 4]
+```
+
+#### Mutability over maps
+
+
+
+```go
+// Make a map
+m := make(map[int]int)
+for i := range 10 {
+  m[i] = i + 10
+}
+
+// Iterate
+itr := maps.IterMut(m)
+for k, v := range itr.Seq2() {
+  if k%2 == 1 {
+    itr.Delete()
+  } else {
+    itr.Set(v / 2)
+  }
+}
+fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
 ```
 
 

@@ -155,6 +155,14 @@ func (di2 DefaultIterator2[K, V]) Collect2() []KeyValue[K, V] {
 	return Collect2(di2.CoreIterator2)
 }
 
+func (di2 DefaultIterator2[K, V]) Collect2Into(s *[]KeyValue[K, V]) []KeyValue[K, V] {
+	return Collect2Into(di2.CoreIterator2, s)
+}
+
+func (di2 DefaultIterator2[K, V]) Collect2IntoCap(s *[]KeyValue[K, V]) []KeyValue[K, V] {
+	return Collect2IntoCap(di2.CoreIterator2, s)
+}
+
 func (di2 DefaultIterator2[K, V]) Chan2() <-chan KeyValue[K, V] {
 	return Chan2(di2.CoreIterator2)
 }

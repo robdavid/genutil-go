@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/robdavid/genutil-go/iterator"
+	"github.com/robdavid/genutil-go/maps"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 )
@@ -89,4 +90,21 @@ func TestMutableSlice(t *testing.T) {
 	}
 	fmt.Println(s)
 	assert.Equal(t, []int{0, 1, 2, 3, 4}, s)
+}
+
+func TestMutableMap(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i + 10
+	}
+	itr := maps.IterMut(m)
+	for k, v := range itr.Seq2() {
+		if k%2 == 1 {
+			itr.Delete()
+		} else {
+			itr.Set(v / 2)
+		}
+	}
+	fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
+	assert.Equal(t, map[int]int{0: 5, 2: 6, 4: 7, 6: 8, 8: 9}, m)
 }

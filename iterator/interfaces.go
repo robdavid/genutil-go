@@ -2,8 +2,8 @@ package iterator
 
 import "iter"
 
-// SimpleIterator defines a core set of methods for iterating over a collection of elements, of type T.
-// More complete Iterator implementations can be built on this core set of methods.
+// SimpleIterator defines a core set of methods for iterating over a collection of elements, of type
+// T. More complete Iterator implementations can be built on this core set of methods.
 type SimpleIterator[T any] interface {
 
 	// Next sets the iterator's current value to be the first, and subsequent, iterator elements.
@@ -22,8 +22,8 @@ type SimpleIterator[T any] interface {
 	Reset()
 }
 
-// SimpleMutableIterator extends SimpleIterator by adding methods to support element mutation.
-// More complete MutableIterator implementations can be built on this core set of methods.
+// SimpleMutableIterator extends SimpleIterator by adding methods to support element mutation. More
+// complete MutableIterator implementations can be built on this core set of methods.
 type SimpleMutableIterator[T any] interface {
 	SimpleIterator[T]
 
@@ -36,27 +36,28 @@ type SimpleMutableIterator[T any] interface {
 	Delete()
 }
 
-// CoreIterator is an extension of SimpleIterator that in aggregate provides the minimum set of methods
-// that are intrinsic to an iterator implementation, i.e. those methods that are concerned with
-// interacting the underlying data.
+// CoreIterator is an extension of SimpleIterator that in aggregate provides the minimum set of
+// methods that are intrinsic to an iterator implementation, i.e. those methods that are concerned
+// with interacting the underlying data.
 type CoreIterator[T any] interface {
 	SimpleIterator[T]
 
-	// Seq returns the iterator as a Go `iter.Seq` iterator. The iterator may be backed by
-	// an `iter.Seq[T]` object, in which case that iterator object will typically be returned
-	// directly. Otherwise, an `iter.Seq[T]` will be synthesised from the underlying iterator, typically
-	// a SimpleIterator.
+	// Seq returns the iterator as a Go `iter.Seq` iterator. The iterator may be backed by an
+	// `iter.Seq[T]` object, in which case that iterator object will typically be returned directly.
+	// Otherwise, an `iter.Seq[T]` will be synthesised from the underlying iterator, typically a
+	// SimpleIterator.
 	Seq() iter.Seq[T]
 
 	// Size is an estimate, where possible, of the number of elements remaining.
 	Size() IteratorSize
 
-	// SeqOK returns true if the Seq() method should be used to perform iterations. Generally, using Seq() is the
-	// preferred method for efficiency reasons. However there are situations where this is not the case and in those
-	// cases this method will return false. For example, if the underlying iterator is based on a simple iterator, it is
-	// slightly more efficient to stick to the simple iterator methods. Also, if simple iterator methods have already
-	// been called against a Seq based iterator, calling Seq() will cause inconsistent results, as it will restart the
-	// iterator from the beginning, and so in these cases, SeqOK() will return false.
+	// SeqOK returns true if the Seq() method should be used to perform iterations. Generally, using
+	// Seq() is the preferred method for efficiency reasons. However there are situations where this
+	// is not the case and in those cases this method will return false. For example, if the
+	// underlying iterator is based on a simple iterator, it is slightly more efficient to stick to
+	// the simple iterator methods. Also, if simple iterator methods have already been called
+	// against a Seq based iterator, calling Seq() will cause inconsistent results, as it will
+	// restart the iterator from the beginning, and so in these cases, SeqOK() will return false.
 	SeqOK() bool
 }
 
@@ -156,6 +157,15 @@ type Iterator2Extensions[K any, V any] interface {
 	// KeyValue objects.
 	Collect2() []KeyValue[K, V]
 
+	// Collect2Into collects all the element pairs from the iterator into the slice of KeyValue
+	// objects pointed to by s. The final slice is returned.
+	Collect2Into(s *[]KeyValue[K, V]) []KeyValue[K, V]
+
+	// Collect2IntoCap collects all the element pairs from the iterator into the slice of KeyValue
+	// objects pointed to by s, up to but not exceeding the capacity of *s. The final slice is
+	// returned.
+	Collect2IntoCap(s *[]KeyValue[K, V]) []KeyValue[K, V]
+
 	// Chan2 returns the iterator as a channel of KeyValue objects. The iterator is consumed
 	// in a goroutine which yields results to the channel.
 	Chan2() <-chan KeyValue[K, V]
@@ -166,11 +176,11 @@ type Iterator2Extensions[K any, V any] interface {
 	// iterator
 	Filter2(p func(K, V) bool) Iterator2[K, V]
 
-	// Morph2 is a mapping function that creates a new iterator which contains pairs of elements of the
-	// current iterator with the supplied function m applied to each key and value. The type of the return
-	// value and key of m must be of the same type as the kay and value of the current iterator. This is because of
-	// limitations of Go generics. To apply a mapping that changes the type, see the iterator.Map2
-	// function.
+	// Morph2 is a mapping function that creates a new iterator which contains pairs of elements of
+	// the current iterator with the supplied function m applied to each key and value. The type of
+	// the return value and key of m must be of the same type as the kay and value of the current
+	// iterator. This is because of limitations of Go generics. To apply a mapping that changes the
+	// type, see the iterator.Map2 function.
 	Morph2(m func(K, V) (K, V)) Iterator2[K, V]
 
 	// FilterMorph2 is a filtering and mapping method that creates a new iterator from an existing
