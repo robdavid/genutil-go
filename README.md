@@ -357,13 +357,27 @@ m := iterator.CollectMap(iterator.Of("zero", "one","two","three").Enumerate()) /
 
 The `Enumerate()` method turns an `iterator.Iterator[T]` into an `iterator.Iterator2[int,T]` by adding a counter key starting at zero. The `iterator.CollectMap` function is a function rather than a method because the comparable constraint needs to be enforced, which cannot be done in a method.
 
+### Transformation
+
+Iterators may be converted into different iterators by means of specific methods and functions that apply various kinds of transformations.
+
+#### Morph and Map
+
+One of the classic transformations is a mapping function applied to each element of the iterator, producing a new iterator yielding the transformed values. Two forms are available; the `Morph` method and the `iterator.Map` function.
+
+The `Morph` method is the more limited form that will only support mappings to values with the same type as the original. So, for example, an iterator of integers can only be transformed to another iterator of integers. The following example converts from an iterator of integers to another where each value is doubled.
+
+```go
+iterator.Range(0,5).Morph(func(n int) int { return n*2 }).Collect() // []int{0,2,4,6,8}
+```
+
 ### Mutability
 
 Some iterators support the mutation of the underlying collection from which their elements are drawn. Out of the box, an `iterator.MutableIterator` can be constructed over slices, and an `iterator.MutableIterator2` can be constructed over maps. Both iterators have a `Set(v T)` method which provides for the mutation of the current element (not the key), and a `Delete()` method which removes the current element (or element pair) from the collection.
 
 #### Mutability over slices
 
-In order to support mutability over slices, especially the removal of elements, the iterator needs to operate on a pointer to a slice; the removal of an element may lead to reallocation of the slice to a new location. The following example builds a slice of ints from 0...9 (inclusive), and iterates mutably over it, deleting elements that are odd, whilst dividing even numbers by 2.
+In order to support mutability over slices, especially the removal of elements, the iterator needs to operate on a pointer to a slice; the removal of an element may lead to reallocation of the slice to a new location. The following example builds a slice of integers from 0...9 (inclusive), and runs a mutable iterator over it, deleting elements that are odd, whilst dividing even numbers by 2.
 
 ```go
 s := slices.Range(0,10)
@@ -380,7 +394,7 @@ fmt.Println(s) // [0 1 2 3 4]
 
 #### Mutability over maps
 
-
+Mutable iterators can be constructed over maps. The following example builds a map of integers to integers with keys ranging from 0 to 9, and each value equal to the key plus 10. It runs a mutable iterator over it which deletes entries where the key is odd, and modifies each value by dividing it by 2.
 
 ```go
 // Make a map
