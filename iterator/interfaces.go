@@ -2,12 +2,14 @@ package iterator
 
 import "iter"
 
-// SimpleIterator defines a core set of methods for iterating over a collection of elements, of type
-// T. More complete Iterator implementations can be built on this core set of methods.
+// SimpleIterator defines a core set of methods for iterating over a collection
+// of elements, of type T. More complete Iterator implementations can be built
+// on this core set of methods.
 type SimpleIterator[T any] interface {
 
-	// Next sets the iterator's current value to be the first, and subsequent, iterator elements.
-	// False is returned only when there are no more elements (the current value remains unchanged)
+	// Next sets the iterator's current value to be the first, and subsequent,
+	// iterator elements. False is returned only when there are no more elements
+	// (the current value remains unchanged).
 	Next() bool
 
 	// Value gets the current iterator value.
@@ -16,9 +18,10 @@ type SimpleIterator[T any] interface {
 	// Abort stops the iterator; subsequent calls to Next() will return false.
 	Abort()
 
-	// Reset stops the iterator; subsequent calls to Next() will begin the iterator from the start.
-	// Note not all iterators are guaranteed to return the same sequence again, for example iterators
-	// that perform IO may not read the same data again, or may return no data at all.
+	// Reset stops the iterator; subsequent calls to Next() will begin the
+	// iterator from the start. Note not all iterators are guaranteed to return
+	// the same sequence again, for example iterators that perform IO may not
+	// read the same data again, or may return no data at all.
 	Reset()
 }
 

@@ -73,9 +73,23 @@ func TestToChan(t *testing.T) {
 	assert.Equal(t, buffer.String(), expectedPrint)
 }
 
+func TestRangeByExample(t *testing.T) {
+	ascending := iterator.IncRangeBy(0, 5, 2) // 0,2,4
+	descending := iterator.RangeBy(5, 0, -2)  // 5,3,1
+	assert.Equal(t, []int{0, 2, 4}, ascending.Collect())
+	assert.Equal(t, []int{5, 3, 1}, descending.Collect())
+}
+
 func TestCollectToMap(t *testing.T) {
 	m := iterator.CollectMap(iterator.Of("zero", "one", "two", "three").Enumerate()) // map[int]string{0: "zero", 1: "one", 2: "two", 3: "three"}
 	assert.Equal(t, map[int]string{0: "zero", 1: "one", 2: "two", 3: "three"}, m)
+}
+
+func TestFilterExample(t *testing.T) {
+	predicate := func(n int) bool { return n%2 == 0 }
+	i := iterator.IncRange(1, 5).Filter(predicate)
+	c := i.Collect() // []int{2,4}
+	assert.Equal(t, []int{2, 4}, c)
 }
 
 func TestMutableSlice(t *testing.T) {

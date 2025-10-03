@@ -264,6 +264,19 @@ fltIter := iterator.Range(0.0, 5.0) // iterator.Iterator[float64]
                                     // 0.0, 1.0, 2.0, 3.0, 4.0
 ```
 
+Inclusive ranges can be created with the `IncRange` function:
+
+```go
+incIntIter := iterator.IncRange(0,5) // 0,1,2,3,4,5
+```
+
+Different intervals between elements can be specified using `RangeBy` or `IncRangeBy`.
+
+```go
+ascending  := iterator.IncRangeBy(0,5,2) // 0,2,4
+descending := itreator.RangeBy(5,0,-2)   // 5,3,1
+```
+
 #### From slices
 
 An iterator can be created over a slice. Such an iterator carries sizing information:
@@ -371,6 +384,16 @@ The `Morph` method is the more limited form that will only support mappings to v
 iterator.Range(0,5).Morph(func(n int) int { return n*2 }).Collect() // []int{0,2,4,6,8}
 ```
 
+#### Filtering
+
+An iterator may be filtered, whereby the resultant iterator contains a subset of elements from the original iterator. This is achieved via the `Filter` method which takes a predicate function that determines which elements are to be retained.
+
+```go
+	predicate := func(n int) bool { return n%2 == 0 }
+	i := iterator.IncRange(1, 5).Filter(predicate)
+	c := i.Collect() // []int{2,4}
+```
+
 ### Mutability
 
 Some iterators support the mutation of the underlying collection from which their elements are drawn. Out of the box, an `iterator.MutableIterator` can be constructed over slices, and an `iterator.MutableIterator2` can be constructed over maps. Both iterators have a `Set(v T)` method which provides for the mutation of the current element (not the key), and a `Delete()` method which removes the current element (or element pair) from the collection.
@@ -415,6 +438,13 @@ for k, v := range itr.Seq2() {
 fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
 ```
 
+### Custom iterators
+
+There are a number of ways to implement your own iterator. The simplest way is to construct an iterator from a Go native `iter.Seq` iterator using the `iterator.New` method.
+
+#### SimpleIterator
+
+It is possible to create iterators by implementing interfaces, the simplest of these
 
 An `Iterator` is a generic type equivalent to the following definition 
 
