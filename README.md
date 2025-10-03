@@ -444,7 +444,32 @@ There are a number of ways to implement your own iterator. The simplest way is t
 
 #### SimpleIterator
 
-It is possible to create iterators by implementing interfaces, the simplest of these
+It is possible to create iterators by implementing interfaces, the simplest of these being `SimpleIterator`
+
+```go
+// SimpleIterator defines a core set of methods for iterating over a collection
+// of elements, of type T. More complete Iterator implementations can be built
+// on this core set of methods.
+type SimpleIterator[T any] interface {
+
+	// Next sets the iterator's current value to be the first, and subsequent,
+	// iterator elements. False is returned only when there are no more elements
+	// (the current value remains unchanged)
+	Next() bool
+
+	// Value gets the current iterator value.
+	Value() T
+
+	// Abort stops the iterator; subsequent calls to Next() will return false.
+	Abort()
+
+	// Reset stops the iterator; subsequent calls to Next() will begin the
+	// iterator from the start. Note not all iterators are guaranteed to return
+	// the same sequence again, for example iterators that perform IO may not
+	// read the same data again, or may return no data at all.
+	Reset()
+}
+```
 
 An `Iterator` is a generic type equivalent to the following definition 
 
