@@ -332,11 +332,11 @@ itr := maps.IterMut(m) // MutableIterator2[int,string]
 
 ### Consumption
 
-Iterators can be consumed in a number of ways. 
+There are a few ways to consume iterators. 
 
 #### For loops
 
-The most straight forward way to consume an iterator is using a `for` loop. The recommended way is by converting to a native Go iterator with the `Seq` method.
+There are a couple of ways using a `for` loop. The recommended way is by converting to a native Go iterator with the `Seq` method.
 
 ```go
 for n := range iterator.Range(0,10).Seq() {
@@ -352,17 +352,18 @@ for itr := iterator.Range(0, 10); itr.Next(); {
 }
 ```
 
-Generally speaking, the `Seq()` method is preferred since using `Next()` against an iterator that is backed by an `iter.Seq` native iterator incurs a performance penalty (due to use of `iter.Pull`). 
+Generally speaking, the `Seq()` method is preferred since using `Next()` against an iterator that is backed by an `iter.Seq` native iterator incurs a performance penalty (due to use of `iter.Pull`). However, using `Seq()` usually performs well,
+regardless of the underlying iterator in use.
 
 #### Collection
 
-Iterators have a `Collect()` method that allows elements to be collected in to a slice.
+Another way to consume an iterator is to collect it's elements into a slice. Iterators have a `Collect()` method that does this.
 
 ```go
 c := iterator.Range(0,5).Collect() // []int{0, 1, 2 ,3, 4}
 ```
 
-Iterators of element pairs can be collected into a map, provided the key value is comparable.
+Iterators of element pairs, such as an Iterator2, can be collected into a map, provided the key value is comparable.
 
 ```go
 m := iterator.CollectMap(iterator.Of("zero", "one","two","three").Enumerate()) // map[int]string{0, "zero", 1: "one", 2: "two", 3: "three"}
@@ -438,7 +439,7 @@ for k, v := range itr.Seq2() {
 fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
 ```
 
-### Custom iterators
+### Building iterators
 
 There are a number of ways to implement your own iterator. The simplest way is to construct an iterator from a Go native `iter.Seq` iterator using the `iterator.New` method.
 
