@@ -395,6 +395,14 @@ An iterator may be filtered, whereby the resultant iterator contains a subset of
 	c := i.Collect() // []int{2,4}
 ```
 
+#### Truncating
+
+The `Take(`*n*`)` method can be used to truncate an iterator to at most its first *n* elements:
+
+```go
+i := iterator.Range(0,100).Take(5)
+c := i.Collect() // []int{0,1,2,3,4}
+```
 ### Mutability
 
 Some iterators support the mutation of the underlying collection from which their elements are drawn. Out of the box, an `iterator.MutableIterator` can be constructed over slices, and an `iterator.MutableIterator2` can be constructed over maps. Both iterators have a `Set(v T)` method which provides for the mutation of the current element (not the key), and a `Delete()` method which removes the current element (or element pair) from the collection.
@@ -443,9 +451,11 @@ fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
 
 There are a number of ways to implement your own iterator. The simplest way is to construct an iterator from a Go native `iter.Seq` iterator using the `iterator.New` method.
 
+There are other ways to create iterators, outlined below.
+
 #### SimpleIterator
 
-It is possible to create iterators by implementing interfaces, the simplest of these being `SimpleIterator`
+It is possible to create iterators by implementing various interfaces, the simplest of these appropriately being `SimpleIterator`.
 
 ```go
 // SimpleIterator defines a core set of methods for iterating over a collection
@@ -471,6 +481,62 @@ type SimpleIterator[T any] interface {
 	Reset()
 }
 ```
+
+Below is an example implementation of `SimpleIterator` for an iterator that just counts upwards from zero.
+
+```go
+// counter is a SimpleIterator implementation that produces an
+// infinite string of integers, starting from 0.
+type counter struct {
+	value   int  // value is the current value.
+	count   int  // count is the next value.
+	aborted bool // aborred indicates the iterator is stopped.
+}
+
+// Next sets value to the next count, increments the count, and
+// returns true, unless aborted. When aborted, it is a no-op.
+func (c *counter) Next() bool {
+	if c.aborted {
+		return false
+	} else {
+		c.value = c.count
+		c.count++
+		return true
+	}
+}
+
+// Value returns the current value.
+func (c *counter) Value() int {
+	return c.value
+}
+
+// Abort stops the iterator by setting the aborted flag.
+func (c *counter) Abort() {
+	c.aborted = true
+}
+
+// Reset sets the counter back to 0.
+func (c *counter) Reset() {
+	c.count = 0
+}
+
+
+```
+From a `SimpleIterator` instance, a full iterator can be constructed via the `NewFromSimple` method:
+
+```go
+i := iterator.NewFromSimple(&counter{})
+c := i.Take(5).Collect() // []int{0,1,2,3,4}
+```
+
+It's also possible to add sizing information to a `SimpleIterator`, via the `iterator.NewFromSimpleWithSize`. In this case, our `counter` iterator does not terminate, so we can indicate that it has infinite size as follows:
+
+```go
+i := iterator.NewFromSimpleWithSize(&counter{},
+	func() iterator.IteratorSize { return iterator.INFINITE_SIZE })
+c := i.Collect() // Panics
+```
+
 
 An `Iterator` is a generic type equivalent to the following definition 
 

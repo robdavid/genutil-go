@@ -122,3 +122,52 @@ func TestMutableMap(t *testing.T) {
 	fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
 	assert.Equal(t, map[int]int{0: 5, 2: 6, 4: 7, 6: 8, 8: 9}, m)
 }
+
+// counter is a SimpleIterator implementation that produces an
+// infinite string of integers, starting from 0.
+type counter struct {
+	value   int  // value is the current value
+	count   int  // count is the next value
+	aborted bool // if true, the iterator is aborted
+}
+
+// Next sets value to the next count, increments the count, and
+// returns true, unless aborted. When aborted, it is a no-op.
+func (c *counter) Next() bool {
+	if c.aborted {
+		return false
+	} else {
+		c.value = c.count
+		c.count++
+		return true
+	}
+}
+
+// Value returns the current value.
+func (c *counter) Value() int {
+	return c.value
+}
+
+// Abort stops the iterator by setting the aborted flag.
+func (c *counter) Abort() {
+	c.aborted = true
+}
+
+// Reset sets the counter back to 0.
+func (c *counter) Reset() {
+	c.count = 0
+}
+
+func TestSimpleExample(t *testing.T) {
+	i := iterator.NewFromSimple(&counter{})
+	c := i.Take(10).Collect()
+	assert.Equal(t, slices.Range(0, 10), c)
+}
+
+func TestInfiniteSimpleExample(t *testing.T) {
+	i := iterator.NewFromSimpleWithSize(&counter{},
+		func() iterator.IteratorSize { return iterator.INFINITE_SIZE })
+	assert.Panics(t, func() { i.Collect() })
+	c := i.Take(10).Collect()
+	assert.Equal(t, slices.Range(0, 10), c)
+}
