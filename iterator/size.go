@@ -16,8 +16,8 @@ type IteratorSize struct {
 }
 
 var (
-	UNKNOWN_SIZE  IteratorSize = IteratorSize{Type: SizeUnknown}
-	INFINITE_SIZE              = IteratorSize{Type: SizeInfinite, Size: -1}
+	SIZE_UNKNOWN  IteratorSize = IteratorSize{Type: SizeUnknown}
+	SIZE_INFINITE              = IteratorSize{Type: SizeInfinite, Size: -1}
 )
 
 // Allocate returns an estimated allocation size needed to accommodate the remaining elements in the
@@ -55,7 +55,7 @@ func (isz IteratorSize) Subset() IteratorSize {
 
 // Iterator sizing information; size is unknown
 func NewSizeUnknown() IteratorSize {
-	return UNKNOWN_SIZE
+	return SIZE_UNKNOWN
 }
 
 // IsUnknown returns true if the given IteratorSize instance represents
@@ -95,7 +95,7 @@ func (size IteratorSize) IsMaxKnownToBe(n int) bool {
 }
 
 func NewSizeInfinite() IteratorSize {
-	return INFINITE_SIZE
+	return SIZE_INFINITE
 }
 
 func (size IteratorSize) IsInfinite() bool {

@@ -9,5 +9,8 @@
                 "streetsidesoftware.code-spell-checker-british-english-ise"
             ]
         }
+    },
+    "features": {
+        "ghcr.io/devcontainers-extra/features/starship:1":{}
     }
 }

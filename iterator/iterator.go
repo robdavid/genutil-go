@@ -17,7 +17,7 @@ var ErrInvalidIteratorSizeType = errors.New("invalid iterator size type")
 var ErrInvalidIteratorRange = errors.New("invalid iterator range")
 var ErrDeleteNotImplemented = errors.New("delete not implemented")
 
-// Seq is a generic iter.Seq implementation for any simple iterator
+// Seq transforms any generic [SimpleIterator] into a native [iter.Seq] iterator.
 func Seq[T any](i SimpleIterator[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for i.Next() {
@@ -40,7 +40,7 @@ func KVOf[K any, V any](key K, value V) KeyValue[K, V] {
 	return KeyValue[K, V]{key, value}
 }
 
-// Seq2 is a generic iter.Seq2 implementation for any simple iterator returning key value pairs
+// Seq2 transforms a [SimpleIterator] of [KeyValue] pairs into a native [iter.Seq2] iterator.
 func Seq2[K any, V any](i SimpleIterator[KeyValue[K, V]]) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for i.Next() {
@@ -124,7 +124,7 @@ func NewDefaultMutableIterator2[K any, V any](citr CoreMutableIterator2[K, V]) D
 	return DefaultMutableIterator2[K, V]{CoreMutableIterator2: citr, DefaultIterator2: NewDefaultIterator2(citr)}
 }
 
-// New builds an Iterator from a standard library iter.Seq
+// New builds an Iterator from a standard library [iter.Seq]
 func New[T any](seq iter.Seq[T]) Iterator[T] {
 	return NewDefaultIterator(NewSeqCoreIterator(seq))
 }

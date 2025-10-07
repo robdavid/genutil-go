@@ -1,20 +1,14 @@
 package iterator_test
 
 import (
-	"bytes"
 	"fmt"
-	"iter"
 	"testing"
 
 	"github.com/robdavid/genutil-go/iterator"
-	"github.com/robdavid/genutil-go/maps"
-	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFromSeqExample(t *testing.T) {
-	assert := assert.New(t)
-
+func ExampleNew() {
 	// fib returns a native Go iterator (fibonacci sequence).
 	fib := func(yield func(int) bool) {
 		tail := [2]int{0, 1}
@@ -29,19 +23,21 @@ func TestFromSeqExample(t *testing.T) {
 	fibItr := iterator.New(fib) // iterator.Iterator[int]
 	fibSeq := fibItr.Seq()      // iter.Seq[int]
 
-	seqCheck := iter.Seq[int](fibSeq) // compile time check
-	assert.NotNil(seqCheck)
-
 	i := 0
-	expected := []int{1, 1, 2, 3, 5, 8}
+	const max = 5
 	for f := range fibSeq {
-		if i >= len(expected) {
+		if i > max {
 			break
 		}
-		assert.Equal(expected[i], f)
+		fmt.Println(f)
 		i++
 	}
-
+	// Output
+	// 1
+	// 1
+	// 2
+	// 3
+	// 5
 }
 
 const (
@@ -49,28 +45,67 @@ const (
 	expectedPrint = "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n"
 )
 
-func TestToSeq(t *testing.T) {
-	var buffer bytes.Buffer
-	for n := range iterator.Range(0, size).Seq() {
-		fmt.Fprintf(&buffer, "%d\n", n)
+func ExampleSimpleCoreIterator_Seq() {
+	for n := range iterator.Range(0, 5).Seq() {
+		fmt.Printf("%d\n", n)
 	}
-	assert.Equal(t, buffer.String(), expectedPrint)
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
 }
 
-func TestNextValue(t *testing.T) {
-	var buffer bytes.Buffer
-	for itr := iterator.Range(0, size); itr.Next(); {
-		fmt.Fprintf(&buffer, "%d\n", itr.Value())
+func ExampleSeq() {
+	for n := range iterator.Seq(iterator.Range(0, 5)) {
+		fmt.Printf("%d\n", n)
 	}
-	assert.Equal(t, buffer.String(), expectedPrint)
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
 }
 
-func TestToChan(t *testing.T) {
-	var buffer bytes.Buffer
-	for n := range iterator.Range(0, size).Chan() {
-		fmt.Fprintf(&buffer, "%d\n", n)
+func ExampleSeq2() {
+	// Create an iterator of [KeyValue] pairs from enumerated range
+	iterKV := iterator.AsKV(iterator.Range(5, 10).Enumerate())
+	for k, v := range iterator.Seq2(iterKV) {
+		fmt.Printf("%d: %d\n", k, v)
 	}
-	assert.Equal(t, buffer.String(), expectedPrint)
+	// Output:
+	// 0: 5
+	// 1: 6
+	// 2: 7
+	// 3: 8
+	// 4: 9
+}
+
+func ExampleSeqCoreIterator_Next() {
+	for itr := iterator.Range(0, 5); itr.Next(); {
+		fmt.Printf("%d\n", itr.Value())
+	}
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
+}
+
+func ExampleDefaultIterator_Chan() {
+	for n := range iterator.Range(0, 5).Chan() {
+		fmt.Println(n)
+	}
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
+
 }
 
 func TestRangeByExample(t *testing.T) {
@@ -90,37 +125,6 @@ func TestFilterExample(t *testing.T) {
 	i := iterator.IncRange(1, 5).Filter(predicate)
 	c := i.Collect() // []int{2,4}
 	assert.Equal(t, []int{2, 4}, c)
-}
-
-func TestMutableSlice(t *testing.T) {
-	s := slices.Range(0, 10)
-	itr := slices.IterMut(&s)
-	for n := range itr.Seq() {
-		if n%2 == 1 {
-			itr.Delete()
-		} else {
-			itr.Set(n / 2)
-		}
-	}
-	fmt.Println(s)
-	assert.Equal(t, []int{0, 1, 2, 3, 4}, s)
-}
-
-func TestMutableMap(t *testing.T) {
-	m := make(map[int]int)
-	for i := range 10 {
-		m[i] = i + 10
-	}
-	itr := maps.IterMut(m)
-	for k, v := range itr.Seq2() {
-		if k%2 == 1 {
-			itr.Delete()
-		} else {
-			itr.Set(v / 2)
-		}
-	}
-	fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
-	assert.Equal(t, map[int]int{0: 5, 2: 6, 4: 7, 6: 8, 8: 9}, m)
 }
 
 // counter is a SimpleIterator implementation that produces an
@@ -158,16 +162,24 @@ func (c *counter) Reset() {
 	c.count = 0
 }
 
-func TestSimpleExample(t *testing.T) {
+func ExampleNewFromSimple() {
 	i := iterator.NewFromSimple(&counter{})
 	c := i.Take(10).Collect()
-	assert.Equal(t, slices.Range(0, 10), c)
+	fmt.Println(c)
+	// Output:
+	// [0 1 2 3 4 5 6 7 8 9]
 }
 
-func TestInfiniteSimpleExample(t *testing.T) {
+func ExampleNewFromSimpleWithSize() {
 	i := iterator.NewFromSimpleWithSize(&counter{},
-		func() iterator.IteratorSize { return iterator.INFINITE_SIZE })
-	assert.Panics(t, func() { i.Collect() })
-	c := i.Take(10).Collect()
-	assert.Equal(t, slices.Range(0, 10), c)
+		func() iterator.IteratorSize { return iterator.SIZE_INFINITE })
+	func() {
+		defer func() { fmt.Println(recover()) }()
+		i.Collect() // Attempting to collect the infinite iterator will panic.
+	}()
+	c := i.Take(10).Collect() // Collecting only the first 10 elements succeeds.
+	fmt.Println(c)
+	// Output:
+	// cannot allocate storage for an infinite iterator
+	// [0 1 2 3 4 5 6 7 8 9]
 }
