@@ -3,7 +3,7 @@ package iterator
 import "iter"
 
 // SimpleIterator defines a core set of methods for iterating over a collection
-// of elements, of type T. More complete Iterator implementations can be built
+// of elements, of type T. More complete iterator implementations can be built
 // on this core set of methods.
 type SimpleIterator[T any] interface {
 
@@ -25,8 +25,8 @@ type SimpleIterator[T any] interface {
 	Reset()
 }
 
-// SimpleMutableIterator extends SimpleIterator by adding methods to support element mutation. More
-// complete MutableIterator implementations can be built on this core set of methods.
+// SimpleMutableIterator extends [SimpleIterator] by adding methods to support element mutation. More
+// complete [MutableIterator] implementations can be built on this core set of methods.
 type SimpleMutableIterator[T any] interface {
 	SimpleIterator[T]
 
@@ -35,20 +35,20 @@ type SimpleMutableIterator[T any] interface {
 
 	// Delete deletes the current value, which must be the last value returned by Next(). This
 	// function may not be implemented for all iterator types, in which case it will return an
-	// ErrDeleteNotImplemented error.
+	// [ErrDeleteNotImplemented] error.
 	Delete()
 }
 
-// CoreIterator is an extension of SimpleIterator that in aggregate provides the minimum set of
+// CoreIterator is an extension of [SimpleIterator] that in aggregate provides the minimum set of
 // methods that are intrinsic to an iterator implementation, i.e. those methods that are concerned
 // with interacting the underlying data.
 type CoreIterator[T any] interface {
 	SimpleIterator[T]
 
-	// Seq returns the iterator as a Go `iter.Seq` iterator. The iterator may be backed by an
-	// `iter.Seq[T]` object, in which case that iterator object will typically be returned directly.
-	// Otherwise, an `iter.Seq[T]` will be synthesised from the underlying iterator, typically a
-	// SimpleIterator.
+	// Seq returns the iterator as a Go [iter.Seq] iterator. The iterator may be backed by an
+	// iter.Seq[T] object, in which case that iterator object will typically be returned directly.
+	// Otherwise, an iter.Seq[T] will be synthesised from the underlying iterator, typically a
+	// [SimpleIterator].
 	Seq() iter.Seq[T]
 
 	// Size is an estimate, where possible, of the number of elements remaining.
@@ -64,7 +64,7 @@ type CoreIterator[T any] interface {
 	SeqOK() bool
 }
 
-// CoreMutableIterator is an extension of CoreIterator which adds methods to facilitate
+// CoreMutableIterator is an extension of [CoreIterator] which adds methods to facilitate
 // iterator mutation.
 type CoreMutableIterator[T any] interface {
 	CoreIterator[T]
@@ -76,26 +76,26 @@ type CoreMutableIterator[T any] interface {
 	Delete()
 }
 
-// CoreIterator2 is an extension of CoreIterator that adds support for a second variable of type
+// CoreIterator2 is an extension of [CoreIterator] that adds support for a second variable of type
 // K (the "key") in addition to the existing value, of type V.
 type CoreIterator2[K any, V any] interface {
 	CoreIterator[V]
-	// Seq returns the iterator as a Go `iter.Seq2` iterator. The iterator may be backed by
-	// an `iter.Seq2[T]` object, in which case that iterator object will typically be returned
-	// directly. Otherwise, an `iter.Seq2[T]` will be synthesised from the underlying iterator.
+	// Seq returns the iterator as a Go [iter.Seq2] iterator. The iterator may be backed by
+	// an iter.Seq2[T] object, in which case that iterator object will typically be returned
+	// directly. Otherwise, an iter.Seq2[T] will be synthesized from the underlying iterator.
 	Seq2() iter.Seq2[K, V]
 	// Key returns the current iterator key.
 	Key() K
 }
 
-// CoreMutableIterator2 is an extension of CoreIterator2 that adds support for mutability. The
+// CoreMutableIterator2 is an extension of [CoreIterator2] that adds support for mutability. The
 // iterator value may be changed, and the current item may be deleted. There is no support
-// for modifing the key.
+// for modifying the key.
 type CoreMutableIterator2[K any, V any] interface {
 	CoreIterator2[K, V]
 	// Set will modify the current iterator value.
 	Set(V)
-	// Delete will remove the current iterator item. Calliing Next() is still required to advance
+	// Delete will remove the current iterator item. Calling Next() is still required to advance
 	// to the next item.
 	Delete()
 }
@@ -129,7 +129,7 @@ type IteratorExtensions[T any] interface {
 	// Morph is a mapping function that creates a new iterator which contains the elements of the
 	// current iterator with the supplied function m applied to each one. The type of the return
 	// value of m must be the same as that of the elements of the current iterator. This is because of
-	// limitations of Go generics. To apply a mapping that changes the type, see the iterator.Map
+	// limitations of Go generics. To apply a mapping that changes the type, see the [iterator.Map]
 	// function.
 	Morph(m func(T) T) Iterator[T]
 
@@ -143,7 +143,7 @@ type IteratorExtensions[T any] interface {
 	//  result := itrMorph.Collect() // []int{0,4,8}
 	// Note that this function is not able to map elements to values of a different type due to
 	// limitations of Go generics. For a filter mapping function that can change the type, see the
-	// iterator.FilterMap function.
+	// [iterator.FilterMap] function.
 	FilterMorph(f func(T) (T, bool)) Iterator[T]
 
 	// Take returns a variant of the current iterator that which returns at most n elements. If the
@@ -183,7 +183,7 @@ type Iterator2Extensions[K any, V any] interface {
 	// the current iterator with the supplied function m applied to each key and value. The type of
 	// the return value and key of m must be of the same type as the kay and value of the current
 	// iterator. This is because of limitations of Go generics. To apply a mapping that changes the
-	// type, see the iterator.Map2 function.
+	// type, see the [iterator.Map2] function.
 	Morph2(m func(K, V) (K, V)) Iterator2[K, V]
 
 	// FilterMorph2 is a filtering and mapping method that creates a new iterator from an existing
@@ -198,7 +198,7 @@ type Iterator2Extensions[K any, V any] interface {
 	//  output := iterator.CollectMap(itr) // map[int]int{1: 4, 3: 12}
 	// Note that this function is not able to map element keys or values to different types due to
 	// limitations of Go generics. For a filter mapping function that can map to different types,
-	// see the iterator.FilterMap2 function.
+	// see the [iterator.FilterMap2] function.
 	FilterMorph2(f func(K, V) (K, V, bool)) Iterator2[K, V]
 
 	// Take2 returns a variant of the current iterator that which returns at most n pairs of
@@ -210,8 +210,8 @@ type Iterator2Extensions[K any, V any] interface {
 // Top level iterator types
 
 // Iterator is a generic iterator type, facilitating iteration over single elements of a generic type
-// plus some utility methods. It consists of methods from CoreIterator, plus the ones from
-// IteratorExtensions.
+// plus some utility methods. It consists of methods from [CoreIterator], plus the ones from
+// [IteratorExtensions].
 type Iterator[T any] interface {
 	CoreIterator[T]
 	IteratorExtensions[T]
@@ -220,7 +220,7 @@ type Iterator[T any] interface {
 // MutableIterator is a generic iterator type, facilitating iteration over single elements of a
 // generic type that also supports mutation of the underlying value. Elements can be modified in
 // place or removed from their underlying collection. This type also includes some utility methods.
-// It consists of methods from CoreMutableIterator, plus the ones from IteratorExtensions.
+// It consists of methods from [CoreMutableIterator], plus the ones from [IteratorExtensions].
 type MutableIterator[T any] interface {
 	CoreMutableIterator[T]
 	IteratorExtensions[T]
@@ -228,8 +228,8 @@ type MutableIterator[T any] interface {
 
 // Iterator2 is a generic iterator type, facilitating iteration over pairs of elements of different
 // generic types. One of these is the "value", and the other is the "key" which may be something like a
-// map key or slice index. It also has some utility methods. It consists of methods from CoreIterator2,
-// IteratorExtensions and Iterator2Extensions.
+// map key or slice index. It also has some utility methods. It consists of methods from [CoreIterator2],
+// [IteratorExtensions] and [Iterator2Extensions].
 type Iterator2[K any, V any] interface {
 	CoreIterator2[K, V]
 	IteratorExtensions[V]
@@ -240,8 +240,8 @@ type Iterator2[K any, V any] interface {
 // different generic types. One of these is the "value", and the other is the "key" which may be
 // something like a map key or slice index. Two mutation operations are supported; the modification
 // of the the "value" element, and removal of the element pair from the underlying collection. It
-// also has some utility methods. It consists of methods from CoreIterator2, IteratorExtensions and
-// Iterator2Extensions.
+// also has some utility methods. It consists of methods from [CoreIterator2], [IteratorExtensions] and
+// [Iterator2Extensions].
 type MutableIterator2[K any, V any] interface {
 	CoreMutableIterator2[K, V]
 	IteratorExtensions[V]

@@ -2,46 +2,46 @@ package iterator
 
 import "iter"
 
-// SimpleCoreIterator wraps a SimpleIterator and provides methods to implement CoreIterator
+// SimpleCoreIterator wraps a [SimpleIterator] and provides methods to implement [CoreIterator]
 type SimpleCoreIterator[T any] struct {
 	SimpleIterator[T]
 	size func() IteratorSize
 }
 
-// NewSimpleCoreIterator builds a CoreIterator from a SimpleIterator
+// NewSimpleCoreIterator builds a [CoreIterator] from a [SimpleIterator]
 func NewSimpleCoreIterator[T any](itr SimpleIterator[T]) *SimpleCoreIterator[T] {
 	return &SimpleCoreIterator[T]{SimpleIterator: itr}
 }
 
-// NewSimpleCoreIteratorWithSize builds a CoreIterator from a SimpleIterator plus a function
+// NewSimpleCoreIteratorWithSize builds a [CoreIterator] from a [SimpleIterator] plus a function
 // that returns the remaining number of items in the iterator.
 func NewSimpleCoreIteratorWithSize[T any](itr SimpleIterator[T], size func() IteratorSize) *SimpleCoreIterator[T] {
 	return &SimpleCoreIterator[T]{SimpleIterator: itr, size: size}
 }
 
-// SimpleCoreMutableIterator wraps a SimpleMutableIterator and provides methods to implement CoreMutableIterator
+// SimpleCoreMutableIterator wraps a [SimpleMutableIterator] and provides methods to implement [CoreMutableIterator]
 type SimpleCoreMutableIterator[T any] struct {
 	SimpleMutableIterator[T]
 	size func() IteratorSize
 }
 
-// NewSimpleCoreMutableIterator builds a CoreMutableIterator from a SimpleMutableIterator.
+// NewSimpleCoreMutableIterator builds a [CoreMutableIterator] from a [SimpleMutableIterator].
 func NewSimpleCoreMutableIterator[T any](itr SimpleMutableIterator[T]) *SimpleCoreMutableIterator[T] {
 	return &SimpleCoreMutableIterator[T]{SimpleMutableIterator: itr}
 }
 
-// NewSimpleCoreMutableIterator builds a CoreMutableIterator from a SimpleMutableIterator plus a function
+// NewSimpleCoreMutableIterator builds a [CoreMutableIterator] from a [SimpleMutableIterator] plus a function
 // that returns the number item remaining in the iterator.
 func NewSimpleCoreMutableIteratorWithSize[T any](itr SimpleMutableIterator[T], size func() IteratorSize) *SimpleCoreMutableIterator[T] {
 	return &SimpleCoreMutableIterator[T]{SimpleMutableIterator: itr, size: size}
 }
 
-// NewFromSimpleMutable builds a MutableIterator from a SimpleMutableIterator
+// NewFromSimpleMutable builds a [MutableIterator] from a [SimpleMutableIterator]
 func NewFromSimpleMutable[T any](itr SimpleMutableIterator[T]) MutableIterator[T] {
 	return NewDefaultMutableIterator(NewSimpleCoreMutableIterator(itr))
 }
 
-// NewFromSimpleMutableWithSize builds a MutableIterator from a SimpleMutableIterator and a size
+// NewFromSimpleMutableWithSize builds a [MutableIterator] from a [SimpleMutableIterator] and a size
 // function that returns the remaining items in the iterator.
 func NewFromSimpleMutableWithSize[T any](itr SimpleMutableIterator[T], size func() IteratorSize) MutableIterator[T] {
 	return NewDefaultMutableIterator(NewSimpleCoreMutableIteratorWithSize(itr, size))
@@ -58,12 +58,12 @@ type SeqCoreIterator[T any] struct {
 	seqCalled bool
 }
 
-// NewSeqCoreIterator builds a CoreIterator from a standard library iter.Seq
+// NewSeqCoreIterator builds a [CoreIterator] from a standard library [iter.Seq]
 func NewSeqCoreIterator[T any](seq iter.Seq[T]) *SeqCoreIterator[T] {
 	return &SeqCoreIterator[T]{seq: seq}
 }
 
-// NewSeqCoreIterator builds a CoreIterator from a standard library iter.Seq and a function that
+// NewSeqCoreIterator builds a [CoreIterator] from a standard library [iter.Seq] and a function that
 // returns the number of items in the iterator.
 func NewSeqCoreIteratorWithSize[T any](seq iter.Seq[T], size func() IteratorSize) *SeqCoreIterator[T] {
 	return &SeqCoreIterator[T]{seq: seq, size: size}
