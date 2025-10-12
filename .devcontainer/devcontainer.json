@@ -11,6 +11,6 @@
         }
     },
     "features": {
-        "ghcr.io/devcontainers-extra/features/starship:1":{}
+        "ghcr.io/devcontainer-community/devcontainer-features/starship.rs:1":{}
     }
 }

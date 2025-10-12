@@ -58,8 +58,8 @@ type DefaultIterator[T any] struct {
 	CoreIterator[T]
 }
 
-// NewDefaultIterator builds an Iterator from a CoreIterator by adding the methods defined in
-// IteratorExtensions.
+// NewDefaultIterator builds an [Iterator] from a [CoreIterator] by adding the methods defined in
+// [IteratorExtensions].
 func NewDefaultIterator[T any](citr CoreIterator[T]) DefaultIterator[T] {
 	return DefaultIterator[T]{CoreIterator: citr}
 }

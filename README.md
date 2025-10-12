@@ -299,19 +299,19 @@ intIter := slices.IterMut(myslice) // iterator.MutableIterator[int]
 An iterator can be created from a native Go iterator. This underlying iterator can be accessed directly.
 
 ```go
-	// fib returns a native Go iterator (fibonacci sequence).
-	fib := func(yield func(int) bool) {
-		tail := [2]int{0, 1}
-		for {
-			if !yield(tail[1]) {
-				return
-			}
-			tail[0], tail[1] = tail[1], tail[0]+tail[1]
-		}
-	}
+// fib returns a native Go iterator (fibonacci sequence).
+fib := func(yield func(int) bool) {
+  tail := [2]int{0, 1}
+  for {
+    if !yield(tail[1]) {
+      return
+    }
+    tail[0], tail[1] = tail[1], tail[0]+tail[1]
+  }
+}
 
-	fibItr := iterator.New(fib) // iterator.Iterator[int]
-	fibSeq := fibItr.Seq()      // iter.Seq[int]
+fibItr := iterator.New(fib) // iterator.Iterator[int]
+fibSeq := fibItr.Seq()      // iter.Seq[int]
 ```
 
 #### From maps
@@ -339,17 +339,29 @@ There are a few ways to consume iterators.
 There are a couple of ways using a `for` loop. The recommended way is by converting to a native Go iterator with the `Seq` method.
 
 ```go
-for n := range iterator.Range(0,10).Seq() {
-  fmt.Printf("%d\n",n) // 0..1..2..
-}
+	for n := range iterator.Range(0, 5).Seq() {
+		fmt.Printf("%d\n", n)
+	}
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
 ```
 
 It's also possible to use `Next()` and `Value()` methods provided by iterators in a `for` loop as follows:
 
 ```go
-for itr := iterator.Range(0, 10); itr.Next(); {
-  fmt.Fprintf(&buffer, "%d\n", itr.Value()) // 0..1..2.. .. ..9
-}
+	for itr := iterator.Range(0, 5); itr.Next(); {
+		fmt.Printf("%d\n", itr.Value())
+	}
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
 ```
 
 Generally speaking, the `Seq()` method is preferred since using `Next()` against an iterator that is backed by an `iter.Seq` native iterator incurs a performance penalty (due to use of `iter.Pull`). However, using `Seq()` usually performs well,
@@ -360,13 +372,18 @@ regardless of the underlying iterator in use.
 Another way to consume an iterator is to collect it's elements into a slice. Iterators have a `Collect()` method that does this.
 
 ```go
-c := iterator.Range(0,5).Collect() // []int{0, 1, 2 ,3, 4}
+c := iterator.Range(0, 5).Collect()
+fmt.Printf("%#v\n", c)
+// Output: []int{0, 1, 2, 3, 4}
 ```
 
 Iterators of element pairs, such as an Iterator2, can be collected into a map, provided the key value is comparable.
 
 ```go
-m := iterator.CollectMap(iterator.Of("zero", "one","two","three").Enumerate()) // map[int]string{0, "zero", 1: "one", 2: "two", 3: "three"}
+i := iterator.Of("zero", "one", "two", "three").Enumerate()
+m := iterator.CollectMap(i)
+fmt.Printf("%#v\n", m)
+// Output: map[int]string{0:"zero", 1:"one", 2:"two", 3:"three"}
 ```
 
 The `Enumerate()` method turns an `iterator.Iterator[T]` into an `iterator.Iterator2[int,T]` by adding a counter key starting at zero. The `iterator.CollectMap` function is a function rather than a method because the comparable constraint needs to be enforced, which cannot be done in a method.
@@ -382,7 +399,11 @@ One of the classic transformations is a mapping function applied to each element
 The `Morph` method is the more limited form that will only support mappings to values with the same type as the original. So, for example, an iterator of integers can only be transformed to another iterator of integers. The following example converts from an iterator of integers to another where each value is doubled.
 
 ```go
-iterator.Range(0,5).Morph(func(n int) int { return n*2 }).Collect() // []int{0,2,4,6,8}
+	f := func(n int) int { return n * 2 }
+	i := iterator.Range(0, 5).Morph(f)
+	c := i.Collect()
+	fmt.Printf("%#v", c)
+	// Output: []int{0, 2, 4, 6, 8}
 ```
 
 #### Filtering
@@ -392,7 +413,9 @@ An iterator may be filtered, whereby the resultant iterator contains a subset of
 ```go
 	predicate := func(n int) bool { return n%2 == 0 }
 	i := iterator.IncRange(1, 5).Filter(predicate)
-	c := i.Collect() // []int{2,4}
+	c := i.Collect()
+	fmt.Printf("%#v\n", c)
+	// Output: []int{2, 4}
 ```
 
 #### Truncating
@@ -400,8 +423,10 @@ An iterator may be filtered, whereby the resultant iterator contains a subset of
 The `Take(`*n*`)` method can be used to truncate an iterator to at most its first *n* elements:
 
 ```go
-i := iterator.Range(0,100).Take(5)
-c := i.Collect() // []int{0,1,2,3,4}
+i := iterator.Range(0, 100).Take(5)
+c := i.Collect()
+fmt.Printf("%#v\n", c)
+// Output: []int{0, 1, 2, 3, 4}
 ```
 ### Mutability
 
@@ -412,16 +437,18 @@ Some iterators support the mutation of the underlying collection from which thei
 In order to support mutability over slices, especially the removal of elements, the iterator needs to operate on a pointer to a slice; the removal of an element may lead to reallocation of the slice to a new location. The following example builds a slice of integers from 0...9 (inclusive), and runs a mutable iterator over it, deleting elements that are odd, whilst dividing even numbers by 2.
 
 ```go
-s := slices.Range(0,10)
+s := slices.Range(0, 10)
 itr := slices.IterMut(&s)
 for n := range itr.Seq() {
   if n%2 == 1 {
     itr.Delete()
   } else {
-    itr.Set(n/2)
+    itr.Set(n / 2)
   }
 }
-fmt.Println(s) // [0 1 2 3 4]
+fmt.Println(s)
+// Output:
+// [0 1 2 3 4]
 ```
 
 #### Mutability over maps
@@ -444,7 +471,9 @@ for k, v := range itr.Seq2() {
     itr.Set(v / 2)
   }
 }
-fmt.Println(m) // map[0:5 2:6 4:7 6:8 8:9]
+fmt.Println(m)
+// Output:
+// map[0:5 2:6 4:7 6:8 8:9]
 ```
 
 ### Building iterators
@@ -526,203 +555,62 @@ From a `SimpleIterator` instance, a full iterator can be constructed via the `Ne
 
 ```go
 i := iterator.NewFromSimple(&counter{})
-c := i.Take(5).Collect() // []int{0,1,2,3,4}
+c := i.Take(10).Collect()
+fmt.Println(c)
+// Output:
+// [0 1 2 3 4 5 6 7 8 9]
 ```
 
 It's also possible to add sizing information to a `SimpleIterator`, via the `iterator.NewFromSimpleWithSize`. In this case, our `counter` iterator does not terminate, so we can indicate that it has infinite size as follows:
 
 ```go
 i := iterator.NewFromSimpleWithSize(&counter{},
-	func() iterator.IteratorSize { return iterator.INFINITE_SIZE })
-c := i.Collect() // Panics
+  func() iterator.IteratorSize { return iterator.SIZE_INFINITE })
+func() {
+  defer func() { fmt.Println(recover()) }()
+  i.Collect() // Attempting to collect the infinite iterator will panic.
+}()
+c := i.Take(10).Collect() // Collecting only the first 10 elements succeeds.
+fmt.Println(c)
+// Output:
+// cannot allocate storage for an infinite iterator
+// [0 1 2 3 4 5 6 7 8 9]
 ```
 
+#### CoreIterator
 
-An `Iterator` is a generic type equivalent to the following definition 
-
-```go
-type Iterator[T any] interface {
-  // Set the iterator's current value to be the first, and subsequent, iterator elements.
-  // False is returned when there are no more elements (the current value remains unchanged)
-  Next() bool
-  // Get the current iterator value.
-  Value() T
-  // Stop the iterator; subsequent calls to Next() will return false.
-  Abort()
-  // Size estimate, where possible, of the number of elements remaining.
-  Size() IteratorSize
-  // Return iterator as a channel.
-  Chan() <-chan T
-}
-```
-
-Iterators can be consumed in a `for` loop in two ways. The first is to use `Next()` and `Value()`.
+The `CoreIterator` interface is an extension of `SimpleIterator` which adds the following methods.
 
 ```go
-  var iter iterator.Iterator[int] // Iterator of integers
-  // instantiate iterator
-  for iter.Next() {
-    fmt.Sprintf("%d",iter.Value())
-  }
-```
+type CoreIterator[T any] interface {
+	SimpleIterator[T]
 
-The other is to range over the channel that the iterator provides. Each element in the iterator is sent over the channel in sequence, and closed when the iterator has no more elements.
+type CoreIterator[T any] interface {
+	SimpleIterator[T]
 
-```go
-  var iter iterator.Iterator[int] // Iterator of integers
-  // instantiate iterator
-  for v := range iter.Chan() {
-    fmt.Sprintf("%d",v)
-  }
-```
+	// Seq returns the iterator as a Go [iter.Seq] iterator. The iterator may be
+	// backed by an iter.Seq[T] object, in which case that iterator object will
+	// typically be returned directly. Otherwise, an iter.Seq[T] will be
+	// synthesised from the underlying iterator, typically a [SimpleIterator].
+	Seq() iter.Seq[T]
 
-The `Abort` method can be used to stop the iterator; once called the `Next` method will return `false` and the channel (if used) will be closed. Eg.
+	// Size is an estimate, where possible, of the number of elements remaining.
+	Size() IteratorSize
 
-```go
-  for v := range iter.Chan() {
-    fmt.Sprintf("%d",v)
-    if v == 0 {
-      iter.Abort() // loop will end after current iteration
-    } 
-  }
-```
-
-### Constructing iterators
-
-Aside from just implementing the `Iterator` interface, there are a number of ways available for constructing iterators.
-
-#### Iterators over slices
-
-An iterator over a slice of values is easily created with the `Slice` function.
-
-```go
-input := []int{1, 2, 3, 4}
-iter := iterator.Slice(input)
-for iter.Next() {
-  fmt.Sprintf("%d ",iter.Value()) // 1 2 3 4
-}
-```
-
-An iterator can also be collected into a slice with `Collect`
-
-```go
-input := []int{1, 2, 3, 4}
-iter := iterator.Slice(input)
-output := iterator.Collect(iter) // output is equal to input
-```
-
-#### Ranges
-
-An iterator over a range of scalar numeric values can be built using the `Range` function.
-
-```go
-iter := iterator.Range(1,5)
-slice := iterator.Collect(iter) // []int{1,2,3,4}
-```
-
-Ranges can be built over any scalar numeric type, including float
-
-```go
-iter := iterator.Range(0.0, 5.0)
-slice := iterator.Collect(iter) // []float64{0.0, 1.0, 2.0, 3.0, 4.0}
-```
-
-The `RangeBy` method creates a range with a given increment.
-
-```go
-iter := iterator.RangeBy(0.0, 2.0, 0.5)
-slice := iterator.Collect(iter) // []float64{0.0, 0.5, 1.0, 1.5, 2.0 }
-```
-
-The increment may be negative, in which case the `from` value must be less than the `upto` value.
-
-```go
-iter := iterator.RangeBy(5.0, 0.0, -0.5)
-slice := iterator.Collect(iter) // []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5}
-```
-
-### Simple Iterator
-
-An iterator can be built via a simplified SimpleIterator interface.
-
-```go
-type SimpleIterator[T any] interface {
-  // Next sets the iterator's current value to be the first, and subsequent, iterator elements.
-  // False is returned only when there are no more elements (the current value remains unchanged)
-  Next() bool
-  // Value gets the current iterator value.
-  Value() T
-  // Abort stops the iterator; subsequent calls to Next() will return false.
-  Abort()
-}
-```
-
-Instances implementing this interface can be transformed to a full `Iterator[T]` via one of the utility methods.
-
-To make an `Iterator[T]` of indeterminate size, use
-
-```go
-func NewFromSimple[T any](base SimpleIterator[T]) Iterator[T]
-```
-
-or to make one with a given size use
-
-```go
-func NewFromSimpleWithSize[T any](base SimpleIterator[T], size func() IteratorSize) Iterator[T]
-```
-
-The following example illustrates how an Iterator over a slice can be created by implementing only
-the SimpleIterator interface.
-
-```go
-
-// iterSlice is a SimpleIterator over a slice; it implements Next, Value and Abort methods
-type iterSlice[T any] struct {
-  slice []T
-  index int
-  value T
+	// SeqOK returns true if the Seq() method should be used to perform
+	// iterations. Generally, using Seq() is the preferred method for efficiency
+	// reasons. However there are situations where this is not the case and in
+	// those cases this method will return false. For example, if the underlying
+	// iterator is based on a simple iterator, it is slightly more efficient to
+	// stick to the simple iterator methods. Also, if simple iterator methods
+	// have already been called against a Seq based iterator, calling Seq() will
+	// cause inconsistent results, as it will restart the iterator from the
+	// beginning, and so in these cases, SeqOK() will return false.
+	SeqOK() bool
 }
 
-// Advance to first/next element
-func (is *iterSlice[T]) Next() bool {
-  if is.index < len(is.slice) {
-    is.value = is.slice[is.index]
-    is.index++
-    return true
-  } else {
-    return false
-  }
-}
-
-// Return current element
-func (is *iterSlice[T]) Value() T {
-  return is.slice.value
-}
-
-// Move index after last element; ensures next Next() call returns false
-func (is *iterSlice[T]) Abort() {
-  is.index = len(is.slice)
-}
-
-// Reset index to the beginning
-func (is *iterSlice[T]) Reset() {
-  is.index = 0
-}
-
-
-// newIterSlice creates an Iterator over a slice
-func newIterSlice[T any](slice []T) Iterator[T] {
-  // First, create the SimpleIterator over the slice.
-  simpleIter := &iterSlice[T]{slice, 0}
-  // Then create an Iterator from the SimpleIterator, with known size (the slice's length)
-  return iterator.NewFromSimpleWithSize[T](
-    simpleIter, 
-    func() iterator.IteratorSize { 
-      return iterator.NewSize(len(simpleIter.slice)-simpleIter.index) 
-    },
-  )
-}
 ```
+An implementation of `CoreIterator` can be converted to a full `Iterator` via the `iterator.NewDefaultIterator` or method.
 
 ## Maps
 

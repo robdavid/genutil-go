@@ -69,19 +69,19 @@ func NewSeqCoreIteratorWithSize[T any](seq iter.Seq[T], size func() IteratorSize
 	return &SeqCoreIterator[T]{seq: seq, size: size}
 }
 
-// SeqCoreIterator2 wraps an iter.Seq2, providing methods to implement CoreIterator2
+// SeqCoreIterator2 wraps an [iter.Seq2], providing methods to implement [CoreIterator2]
 type SeqCoreIterator2[K any, V any] struct {
 	*SeqCoreIterator[V]
 	seq2 iter.Seq2[K, V]
 	key  K
 }
 
-// NewSeqCoreIterator2 builds a CoreIterator2 implementation from an iter.Seq iterator
+// NewSeqCoreIterator2 builds a [CoreIterator2] implementation from an [iter.Seq2] iterator
 func NewSeqCoreIterator2[K any, V any](seq2 iter.Seq2[K, V]) *SeqCoreIterator2[K, V] {
 	return NewSeqCoreIterator2WithSize(seq2, nil)
 }
 
-// NewSeqCoreIterator2WithSize builds a CoreIterator2 implementation from an iter.Seq and a function that returns the
+// NewSeqCoreIterator2WithSize builds a [CoreIterator2] implementation from an [iter.Seq2] and a function that returns the
 // size of the remaining items in the iterator.
 func NewSeqCoreIterator2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func() IteratorSize) *SeqCoreIterator2[K, V] {
 	itr2 := SeqCoreIterator2[K, V]{

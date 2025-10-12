@@ -7,10 +7,14 @@ import (
 )
 
 func ExampleIterMut() {
+
+	// Make a map
 	m := make(map[int]int)
 	for i := range 10 {
 		m[i] = i + 10
 	}
+
+	// Iterate
 	itr := maps.IterMut(m)
 	for k, v := range itr.Seq2() {
 		if k%2 == 1 {

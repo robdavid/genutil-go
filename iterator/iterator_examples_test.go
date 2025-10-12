@@ -2,6 +2,7 @@ package iterator_test
 
 import (
 	"fmt"
+	"iter"
 	"testing"
 
 	"github.com/robdavid/genutil-go/iterator"
@@ -40,10 +41,34 @@ func ExampleNew() {
 	// 5
 }
 
-const (
-	size          = 10
-	expectedPrint = "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n"
-)
+func ExampleDefaultIterator_Collect() {
+	c := iterator.Range(0, 5).Collect()
+	fmt.Printf("%#v\n", c)
+	// Output: []int{0, 1, 2, 3, 4}
+}
+
+func ExampleDefaultIterator_Morph() {
+	f := func(n int) int { return n * 2 }
+	i := iterator.Range(0, 5).Morph(f)
+	c := i.Collect()
+	fmt.Printf("%#v\n", c)
+	// Output: []int{0, 2, 4, 6, 8}
+}
+
+func ExampleDefaultIterator_Filter() {
+	predicate := func(n int) bool { return n%2 == 0 }
+	i := iterator.IncRange(1, 5).Filter(predicate)
+	c := i.Collect()
+	fmt.Printf("%#v\n", c)
+	// Output: []int{2, 4}
+}
+
+func ExampleDefaultIterator_Take() {
+	i := iterator.Range(0, 100).Take(5)
+	c := i.Collect()
+	fmt.Printf("%#v\n", c)
+	// Output: []int{0, 1, 2, 3, 4}
+}
 
 func ExampleSimpleCoreIterator_Seq() {
 	for n := range iterator.Range(0, 5).Seq() {
@@ -115,16 +140,11 @@ func TestRangeByExample(t *testing.T) {
 	assert.Equal(t, []int{5, 3, 1}, descending.Collect())
 }
 
-func TestCollectToMap(t *testing.T) {
-	m := iterator.CollectMap(iterator.Of("zero", "one", "two", "three").Enumerate()) // map[int]string{0: "zero", 1: "one", 2: "two", 3: "three"}
-	assert.Equal(t, map[int]string{0: "zero", 1: "one", 2: "two", 3: "three"}, m)
-}
-
-func TestFilterExample(t *testing.T) {
-	predicate := func(n int) bool { return n%2 == 0 }
-	i := iterator.IncRange(1, 5).Filter(predicate)
-	c := i.Collect() // []int{2,4}
-	assert.Equal(t, []int{2, 4}, c)
+func ExampleCollectMap() {
+	i := iterator.Of("zero", "one", "two", "three").Enumerate()
+	m := iterator.CollectMap(i)
+	fmt.Printf("%#v\n", m)
+	// Output: map[int]string{0:"zero", 1:"one", 2:"two", 3:"three"}
 }
 
 // counter is a SimpleIterator implementation that produces an
@@ -173,6 +193,39 @@ func ExampleNewFromSimple() {
 func ExampleNewFromSimpleWithSize() {
 	i := iterator.NewFromSimpleWithSize(&counter{},
 		func() iterator.IteratorSize { return iterator.SIZE_INFINITE })
+	func() {
+		defer func() { fmt.Println(recover()) }()
+		i.Collect() // Attempting to collect the infinite iterator will panic.
+	}()
+	c := i.Take(10).Collect() // Collecting only the first 10 elements succeeds.
+	fmt.Println(c)
+	// Output:
+	// cannot allocate storage for an infinite iterator
+	// [0 1 2 3 4 5 6 7 8 9]
+}
+
+// Extend counter to add [CoreIterator] methods
+type coreCounter struct {
+	counter
+}
+
+// Seq implements the [CoreIterator] method Seq() by delegating to [iterator.Seq].
+func (c *counter) Seq() iter.Seq[int] {
+	return iterator.Seq(c)
+}
+
+// SeqOK implements the [CoreIterator] method SeqOK(), returning false since this
+// iterator is not backed by a [iter.Seq].
+func (c counter) SeqOK() bool { return false }
+
+// Size implements the [CoreIterator] method Size(), returning a value indicating
+// the size is infinite.
+func (c counter) Size() iterator.IteratorSize {
+	return iterator.SIZE_INFINITE
+}
+
+func ExampleNewDefaultIterator() {
+	i := iterator.NewDefaultIterator(&coreCounter{})
 	func() {
 		defer func() { fmt.Println(recover()) }()
 		i.Collect() // Attempting to collect the infinite iterator will panic.
