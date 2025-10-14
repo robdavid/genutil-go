@@ -1,12 +1,16 @@
 package iterator
 
+// The largest slice capacity we are prepared to allocate to collect
+// iterators of uncertain size.
+const maxUncertainAllocation = 100000
+
 type IteratorSizeType int
 
 const (
-	SizeUnknown IteratorSizeType = iota
-	SizeKnown
-	SizeAtMost
-	SizeInfinite
+	SizeUnknown  IteratorSizeType = iota // SizeUnknown represents an unknown size.
+	SizeKnown                            // SizeKnown represents a completely known size.
+	SizeAtMost                           // SizeAtMost represents a number of elements whose upper limit is known.
+	SizeInfinite                         // SizeInfinite represents the knowledge that an iterator will not end.
 )
 
 // IteratorSize holds iterator sizing information
@@ -43,6 +47,10 @@ func (isz IteratorSize) Allocate() int {
 	panic(ErrInvalidIteratorSizeType)
 }
 
+// Subset is used to transform an [IteratorSize] to one which is a subset of the
+// current one. Given an iterator A whose size is described by the current [IteratorSize],
+// this functions returns a size corresponding to the number of elements in iterator B, where
+// iterator B contains no more than the number of elements of iterator A.
 func (isz IteratorSize) Subset() IteratorSize {
 	switch isz.Type {
 	case SizeUnknown, SizeInfinite, SizeAtMost:

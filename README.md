@@ -399,11 +399,11 @@ One of the classic transformations is a mapping function applied to each element
 The `Morph` method is the more limited form that will only support mappings to values with the same type as the original. So, for example, an iterator of integers can only be transformed to another iterator of integers. The following example converts from an iterator of integers to another where each value is doubled.
 
 ```go
-	f := func(n int) int { return n * 2 }
-	i := iterator.Range(0, 5).Morph(f)
-	c := i.Collect()
-	fmt.Printf("%#v", c)
-	// Output: []int{0, 2, 4, 6, 8}
+f := func(n int) int { return n * 2 }
+i := iterator.Range(0, 5).Morph(f)
+c := i.Collect()
+fmt.Printf("%#v", c)
+// Output: []int{0, 2, 4, 6, 8}
 ```
 
 #### Filtering
@@ -411,11 +411,11 @@ The `Morph` method is the more limited form that will only support mappings to v
 An iterator may be filtered, whereby the resultant iterator contains a subset of elements from the original iterator. This is achieved via the `Filter` method which takes a predicate function that determines which elements are to be retained.
 
 ```go
-	predicate := func(n int) bool { return n%2 == 0 }
-	i := iterator.IncRange(1, 5).Filter(predicate)
-	c := i.Collect()
-	fmt.Printf("%#v\n", c)
-	// Output: []int{2, 4}
+predicate := func(n int) bool { return n%2 == 0 }
+i := iterator.IncRange(1, 5).Filter(predicate)
+c := i.Collect()
+fmt.Printf("%#v\n", c)
+// Output: []int{2, 4}
 ```
 
 #### Truncating
@@ -610,7 +610,98 @@ type CoreIterator[T any] interface {
 }
 
 ```
-An implementation of `CoreIterator` can be converted to a full `Iterator` via the `iterator.NewDefaultIterator` or method.
+An implementation of `CoreIterator` can be converted to a full `Iterator` via the `iterator.NewDefaultIterator` or method. For example, the previous counter `SimpleIterator` can be extended by adding the required additional methods.
+
+```go
+// Extend counter to add [CoreIterator] methods
+type coreCounter struct {
+	counter
+}
+
+// Seq implements the [CoreIterator] method Seq() by delegating to [iterator.Seq].
+func (c *counter) Seq() iter.Seq[int] {
+	return iterator.Seq(c)
+}
+
+// SeqOK implements the [CoreIterator] method SeqOK(), returning false since this
+// iterator is not backed by a [iter.Seq].
+func (c counter) SeqOK() bool { return false }
+
+// Size implements the [CoreIterator] method Size(), returning a value indicating
+// the size is infinite.
+func (c counter) Size() iterator.IteratorSize {
+	return iterator.SIZE_INFINITE
+}
+```
+
+This extended `CoreIterator` can then be converted to a full `Iterator`:
+
+```go
+i := iterator.NewDefaultIterator(&coreCounter{})
+func() {
+  defer func() { fmt.Println(recover()) }()
+  i.Collect() // Attempting to collect the infinite iterator will panic.
+}()
+c := i.Take(10).Collect() // Collecting only the first 10 elements succeeds.
+fmt.Println(c)
+// Output:
+// cannot allocate storage for an infinite iterator
+// [0 1 2 3 4 5 6 7 8 9]
+```
+
+The `NewDefaultIterator` method wraps the `CoreIterator` in a `DefaultIterator` struct. The `CoreIterator` methods are considered to be intrinsic to the iterator itself, and implementation dependent, whereas the `DefaultIterator` methods each have a singular implementation, abstracted through `CoreIterator`.
+
+#### Other iterator types
+
+Other iterator types can similarly be divided into core methods and "default" extension methods; given a core iterator type, a corresponding full iterator can be constructed. The full list is in the following table:
+
+| Core Type              | Wrapper struct            | Constructor                  | Full iterator type  |
+|------------------------|---------------------------|------------------------------|---------------------|
+| `CoreIterator`         | `DefaultIterator`         | `NewDefaultIterator`         | `Iterator`          |
+| `CoreIterator2`        | `DefaultIterator2`        | `NewDefaultIterator2`        | `Iterator2`         |
+| `CoreMutableIterator`  | `DefaultMutableIterator`  | `NewDefaultMutableIterator`  | `MutableIterator`   |
+| `CoreMutableIterator2` | `DefaultMutableIterator2` | `NewDefaultMutableIterator2` | `MutableIterator2`  |
+
+#### Iterator Sizing
+
+When implementing an iterator, you have the option of supplying sizing information, either by using methods such as `iterator.NewWithSize`, or by implementing the `Size` method in a `CoreIterator`. This is useful for certain methods, like `Collect` where knowing something about the the number of elements remaining in an iterator can help when it comes to pre-allocating space to store them.
+
+Since precise size information is not always possible, an `IteratorSize` struct is defined, holding integer `Size` and an 
+`IteratorSizeType` value `Type`.
+
+```go
+type IteratorSize struct {
+	Type IteratorSizeType
+	Size int
+}
+```
+
+An `IteratorSizeType` is defined as:
+```go
+type IteratorSizeType int
+
+const (
+	SizeUnknown IteratorSizeType = iota
+	SizeKnown
+	SizeAtMost
+	SizeInfinite
+)
+
+```
+
+This value is used to interpret the meaning of the `Size`, according to the following table.
+
+| Type          | `Size` Interpretation          | Capacity pre-allocated |
+|---------------|--------------------------------|------------------------|
+| SizeUnknown   | N/A (0)                        | 0                      |
+| SizeKnown     | The exact number of elements   | `Size`                 |
+| SizeAtMost    | The maximum number of elements | `max(Size/2, 100000)`  |
+| SizeInfinite  | N/A (-1)                       | Panic                  |
+
+
+
+
+
 
 ## Maps
 

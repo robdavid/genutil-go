@@ -8,10 +8,6 @@ import (
 	"github.com/robdavid/genutil-go/errors/result"
 )
 
-// The largest slice capacity we are prepared to allocate to collect
-// iterators of uncertain size.
-const maxUncertainAllocation = 100000
-
 var ErrAllocationSizeInfinite = errors.New("cannot allocate storage for an infinite iterator")
 var ErrInvalidIteratorSizeType = errors.New("invalid iterator size type")
 var ErrInvalidIteratorRange = errors.New("invalid iterator range")

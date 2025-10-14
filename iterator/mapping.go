@@ -20,12 +20,12 @@ type funcNext[T any, U any] func(T) (U, bool)
 type func2Next[K, V, X, Y any] func(K, V) (X, Y, bool)
 
 type mapIterBase[T, U any] struct {
-	base     Iterator[T]
+	base     CoreIterator[T]
 	value    U
 	sizeFunc func(IteratorSize) IteratorSize
 }
 
-func newMapIterBase[T, U any](iterator Iterator[T], sizeFunc func(sz IteratorSize) IteratorSize) mapIterBase[T, U] {
+func newMapIterBase[T, U any](iterator CoreIterator[T], sizeFunc func(sz IteratorSize) IteratorSize) mapIterBase[T, U] {
 	return mapIterBase[T, U]{base: iterator, sizeFunc: sizeFunc}
 }
 
@@ -37,7 +37,7 @@ type mapIter[T, U any] struct {
 
 // wrapFunc creates a new Iterator from an existing iterator and a function that consumes it, yielding
 // (at most) one element at a time.
-func wrapFunc[T any, U any](iterator Iterator[T], f funcNext[T, U], sizeFunc func(sz IteratorSize) IteratorSize) Iterator[U] {
+func wrapFunc[T any, U any](iterator CoreIterator[T], f funcNext[T, U], sizeFunc func(sz IteratorSize) IteratorSize) Iterator[U] {
 	return NewDefaultIterator(&mapIter[T, U]{mapIterBase: newMapIterBase[T, U](iterator, sizeFunc), mapping: f})
 }
 
@@ -45,13 +45,13 @@ func wrapFunc[T any, U any](iterator Iterator[T], f funcNext[T, U], sizeFunc fun
 type mapIter2[K, V, X, Y any] struct {
 	mapIterBase[V, Y]
 	key      X
-	base2    Iterator2[K, V]
+	base2    CoreIterator2[K, V]
 	mapping2 func2Next[K, V, X, Y]
 }
 
 // wrapFunc2 creates a new Iterator2 from an existing Iterator2 and a function that
 // consumes it, yielding (at most) one key and value at a time.
-func wrapFunc2[K, V, X, Y any](iterator Iterator2[K, V], f func2Next[K, V, X, Y], sizeFunc func(sz IteratorSize) IteratorSize) Iterator2[X, Y] {
+func wrapFunc2[K, V, X, Y any](iterator CoreIterator2[K, V], f func2Next[K, V, X, Y], sizeFunc func(sz IteratorSize) IteratorSize) Iterator2[X, Y] {
 	return NewDefaultIterator2(&mapIter2[K, V, X, Y]{mapIterBase: newMapIterBase[V, Y](iterator, sizeFunc), mapping2: f, base2: iterator})
 }
 
@@ -140,7 +140,7 @@ func (i *mapIter2[K, V, X, Y]) Seq2() iter.Seq2[X, Y] {
 
 // Map applies function `mapping` of type `func(T) U` to each value, producing
 // a new iterator over `U`.
-func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
+func Map[T any, U any](iter CoreIterator[T], mapping func(T) U) Iterator[U] {
 	mapNext := func(value T) (U, bool) {
 		return mapping(value), true
 	}
@@ -149,7 +149,7 @@ func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
 
 // Map2 applies function `mapping` of type `func(K, V) (X,Y)` to each key and value pair, producing
 // a new Iterator2 over `X` and `Y`.
-func Map2[K, V, X, Y any](iter Iterator2[K, V], mapping func(K, V) (X, Y)) Iterator2[X, Y] {
+func Map2[K, V, X, Y any](iter CoreIterator2[K, V], mapping func(K, V) (X, Y)) Iterator2[X, Y] {
 	mapNext2 := func(key K, value V) (X, Y, bool) {
 		k, v := mapping(key, value)
 		return k, v, true
@@ -159,7 +159,7 @@ func Map2[K, V, X, Y any](iter Iterator2[K, V], mapping func(K, V) (X, Y)) Itera
 
 // Filter applies a filter function `predicate` of type `func(T) bool`, producing
 // a new iterator containing only the elements that satisfy the function.
-func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
+func Filter[T any](iter CoreIterator[T], predicate func(T) bool) Iterator[T] {
 	filterNext := func(value T) (T, bool) {
 		return value, predicate(value)
 	}
@@ -168,7 +168,7 @@ func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
 
 // Filter2 applies a filter function of type `func(K, V) bool` over each key and value pair,
 // producing a new iterator containing only the elements that satisfy the function.
-func Filter2[K, V any](iter Iterator2[K, V], predicate func(K, V) bool) Iterator2[K, V] {
+func Filter2[K, V any](iter CoreIterator2[K, V], predicate func(K, V) bool) Iterator2[K, V] {
 	filterNext := func(key K, value V) (K, V, bool) {
 		return key, value, predicate(key, value)
 	}
@@ -180,7 +180,7 @@ func Filter2[K, V any](iter Iterator2[K, V], predicate func(K, V) bool) Iterator
 // and a true boolean, or undefined value and a false boolean. Values are taken from
 // the value when the boolean is true to produce a new Iterator; returns when
 // the boolean is false are ignored.
-func FilterMap[T, U any](iter Iterator[T], mapping func(T) (U, bool)) Iterator[U] {
+func FilterMap[T, U any](iter CoreIterator[T], mapping func(T) (U, bool)) Iterator[U] {
 	return wrapFunc(iter, mapping, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
 
@@ -188,7 +188,7 @@ func FilterMap[T, U any](iter Iterator[T], mapping func(T) (U, bool)) Iterator[U
 // function `mapping` is applied to each element of type `T`, producing either an option
 // value of type `U` or an empty option. The result is an iterator over `U` drawn from
 // only the non-empty options returned.
-func FilterMapOpt[T any, U any](iter Iterator[T], mapping func(T) option.Option[U]) Iterator[U] {
+func FilterMapOpt[T any, U any](iter CoreIterator[T], mapping func(T) option.Option[U]) Iterator[U] {
 	filterMapNext := func(value T) (U, bool) {
 		return mapping(value).GetOK()
 	}
@@ -200,13 +200,13 @@ func FilterMapOpt[T any, U any](iter Iterator[T], mapping func(T) option.Option[
 // producing either a new key and value pairs (of type X and Y) and a true boolean, or
 // undefined key and value and a false boolean. Values are taken from the keys and values
 // when the boolean is true to produce a new Iterator2.
-func FilterMap2[K, V, X, Y any](iter Iterator2[K, V], mapping func(K, V) (X, Y, bool)) Iterator2[X, Y] {
+func FilterMap2[K, V, X, Y any](iter CoreIterator2[K, V], mapping func(K, V) (X, Y, bool)) Iterator2[X, Y] {
 	return wrapFunc2(iter, mapping, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
 
 // FilterValues takes an iterator of results and returns an iterator of the underlying
 // result value type for only those results that have no error.
-func FilterValues[T any](iter Iterator[result.Result[T]]) Iterator[T] {
+func FilterValues[T any](iter CoreIterator[result.Result[T]]) Iterator[T] {
 	return FilterMapOpt(iter, func(res result.Result[T]) option.Option[T] {
 		if res.IsError() {
 			return option.Empty[T]()
