@@ -229,7 +229,7 @@ Various other methods and types exist to handle return values with errors only o
 
 A number of generic iterator types are provided with some useful abilities such as filtering, mapping, enumeration, sizing information, and mutation of underlying values. They can be consumed via `for` loops, or via collected into slices or maps, converted to and from Go native `iter.Seq` and `iter.Seq2` types, or their elements sent from a goroutine over a channel.
 
-The principle abstract iterator types are:
+There are 4 abstract interfaces that comprise the principal API:
 
 | Interface Type | Description |
 |------|-------------|
@@ -336,7 +336,7 @@ There are a few ways to consume iterators.
 
 #### For loops
 
-There are a couple of ways using a `for` loop. The recommended way is by converting to a native Go iterator with the `Seq` method.
+There are a couple of ways of using a `for` loop. The recommended way is by converting to a native Go iterator with the `Seq` method.
 
 ```go
 	for n := range iterator.Range(0, 5).Seq() {
@@ -369,7 +369,7 @@ regardless of the underlying iterator in use.
 
 #### Collection
 
-Another way to consume an iterator is to collect it's elements into a slice. Iterators have a `Collect()` method that does this.
+Another way to consume an iterator is to collect it's elements into a slice. Iterators have a `Collect()` method to facilitate this:
 
 ```go
 c := iterator.Range(0, 5).Collect()
@@ -386,15 +386,15 @@ fmt.Printf("%#v\n", m)
 // Output: map[int]string{0:"zero", 1:"one", 2:"two", 3:"three"}
 ```
 
-The `Enumerate()` method turns an `iterator.Iterator[T]` into an `iterator.Iterator2[int,T]` by adding a counter key starting at zero. The `iterator.CollectMap` function is a function rather than a method because the comparable constraint needs to be enforced, which cannot be done in a method.
+The `Enumerate()` method turns an `iterator.Iterator[T]` into an `iterator.Iterator2[int,T]` by adding a counter key starting at zero. The `iterator.CollectMap` function is a function rather than a method because the comparable constraint needs to be enforced, which cannot be done in a generic method.
 
 ### Transformation
 
-Iterators may be converted into different iterators by means of specific methods and functions that apply various kinds of transformations.
+Iterators may be converted into different iterators via methods and functions that apply various kinds of transformations.
 
 #### Morph and Map
 
-One of the classic transformations is a mapping function applied to each element of the iterator, producing a new iterator yielding the transformed values. Two forms are available; the `Morph` method and the `iterator.Map` function.
+One of the classic functional transformations is a mapping function applied to each element of the iterator, producing a new iterator yielding the transformed values. Two forms are available; the `Morph` method and the `iterator.Map` function.
 
 The `Morph` method is the more limited form that will only support mappings to values with the same type as the original. So, for example, an iterator of integers can only be transformed to another iterator of integers. The following example converts from an iterator of integers to another where each value is doubled.
 
@@ -411,7 +411,7 @@ fmt.Printf("%#v", c)
 An iterator may be filtered, whereby the resultant iterator contains a subset of elements from the original iterator. This is achieved via the `Filter` method which takes a predicate function that determines which elements are to be retained.
 
 ```go
-predicate := func(n int) bool { return n%2 == 0 }
+predicate := func(n int) bool { return n%2 == 0 } // pick even numbers
 i := iterator.IncRange(1, 5).Filter(predicate)
 c := i.Collect()
 fmt.Printf("%#v\n", c)
@@ -434,7 +434,7 @@ Some iterators support the mutation of the underlying collection from which thei
 
 #### Mutability over slices
 
-In order to support mutability over slices, especially the removal of elements, the iterator needs to operate on a pointer to a slice; the removal of an element may lead to reallocation of the slice to a new location. The following example builds a slice of integers from 0...9 (inclusive), and runs a mutable iterator over it, deleting elements that are odd, whilst dividing even numbers by 2.
+In order to support mutability over slices, the iterator needs to operate on a pointer to a slice; the removal of an element may lead to reallocation of the slice at a new location. The following example builds a slice of integers from 0...9 (inclusive), and runs a mutable iterator over it, deleting elements that are odd, whilst dividing even numbers by 2.
 
 ```go
 s := slices.Range(0, 10)
@@ -476,7 +476,7 @@ fmt.Println(m)
 // map[0:5 2:6 4:7 6:8 8:9]
 ```
 
-### Building iterators
+### Implementing iterators
 
 There are a number of ways to implement your own iterator. The simplest way is to construct an iterator from a Go native `iter.Seq` iterator using the `iterator.New` method.
 
@@ -585,9 +585,6 @@ The `CoreIterator` interface is an extension of `SimpleIterator` which adds the 
 type CoreIterator[T any] interface {
 	SimpleIterator[T]
 
-type CoreIterator[T any] interface {
-	SimpleIterator[T]
-
 	// Seq returns the iterator as a Go [iter.Seq] iterator. The iterator may be
 	// backed by an iter.Seq[T] object, in which case that iterator object will
 	// typically be returned directly. Otherwise, an iter.Seq[T] will be
@@ -610,7 +607,7 @@ type CoreIterator[T any] interface {
 }
 
 ```
-An implementation of `CoreIterator` can be converted to a full `Iterator` via the `iterator.NewDefaultIterator` or method. For example, the previous counter `SimpleIterator` can be extended by adding the required additional methods.
+An implementation of `CoreIterator` can be converted to a full `Iterator` via the `iterator.NewDefaultIterator` or method. To demonstrate this, the previous counter `SimpleIterator` can be extended by adding the required additional methods.
 
 ```go
 // Extend counter to add [CoreIterator] methods
@@ -649,7 +646,11 @@ fmt.Println(c)
 // [0 1 2 3 4 5 6 7 8 9]
 ```
 
-The `NewDefaultIterator` method wraps the `CoreIterator` in a `DefaultIterator` struct. The `CoreIterator` methods are considered to be intrinsic to the iterator itself, and implementation dependent, whereas the `DefaultIterator` methods each have a singular implementation, abstracted through `CoreIterator`.
+The `NewDefaultIterator` method wraps the `CoreIterator` in a `DefaultIterator` struct.
+
+#### Iterator anatomy
+
+In the final iterator, the `CoreIterator` methods are considered to be intrinsic to the iterator itself, and implementation dependent, whereas `DefaultIterator` is a wrapper struct around it with a singular implementation, written in terms of the wrapped `CoreIterator` abstraction.
 
 #### Other iterator types
 
@@ -689,14 +690,14 @@ const (
 
 ```
 
-This value is used to interpret the meaning of the `Size`, according to the following table.
+This value is used to interpret the meaning of the `IteratorSize` `Size` field, according to the following table.
 
-| Type          | `Size` Interpretation          | Capacity pre-allocated |
+| Type          | `Size` Meaning                 | Capacity pre-allocated |
 |---------------|--------------------------------|------------------------|
-| SizeUnknown   | N/A (0)                        | 0                      |
-| SizeKnown     | The exact number of elements   | `Size`                 |
-| SizeAtMost    | The maximum number of elements | `max(Size/2, 100000)`  |
-| SizeInfinite  | N/A (-1)                       | Panic                  |
+| `SizeUnknown `| N/A (0)                        | 0                      |
+| `SizeKnown `  | The exact number of elements   | `Size`                 |
+| `SizeAtMost`  | The maximum number of elements | `max(Size/2, 100000)`  |
+| `SizeInfinite`| N/A (-1)                       | Panic                  |
 
 
 
