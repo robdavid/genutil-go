@@ -10,6 +10,7 @@
             ]
         }
     },
+    "postCreateCommand": "echo 'eval $(starship init bash)' >> /home/vscode/.bashrc",
     "features": {
         "ghcr.io/devcontainer-community/devcontainer-features/starship.rs:1":{}
     }
