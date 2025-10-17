@@ -1,4 +1,3 @@
-// Iterators and generators
 package iterator
 
 import (
@@ -6,6 +5,8 @@ import (
 	"iter"
 
 	"github.com/robdavid/genutil-go/errors/result"
+	"github.com/robdavid/genutil-go/functions"
+	"github.com/robdavid/genutil-go/option"
 )
 
 var ErrAllocationSizeInfinite = errors.New("cannot allocate storage for an infinite iterator")
@@ -94,6 +95,24 @@ func (di DefaultIterator[T]) Morph(mapping func(T) T) Iterator[T] {
 
 func (di DefaultIterator[T]) Take(n int) Iterator[T] {
 	return Take(n, di)
+}
+
+// All returns true if p returns true for all the elements in the iterator.
+func (di DefaultIterator[T]) All(predicate func(T) bool) bool {
+	return All(di, predicate)
+}
+
+// Any returns true if p returns true for at least one element in the iterator.
+func (di DefaultIterator[T]) Any(predicate func(T) bool) bool {
+	return Any(di, predicate)
+}
+
+func (di DefaultIterator[T]) Fold1(f func(a, e T) T) T {
+	return Fold1(di, f)
+}
+
+func (di DefaultIterator[T]) Fold(init T, f func(a, e T) T) T {
+	return Fold(di, init, f)
 }
 
 // DefaultMutableIterator wraps a CoreMutableIterator together with a DefaultIterator to provide
@@ -406,4 +425,58 @@ func Any[T any](iter CoreIterator[T], predicate func(v T) bool) bool {
 		}
 	}
 	return false
+}
+
+func Fold[T any, U any](itr CoreIterator[T], init U, f func(a U, e T) U) U {
+	acc := init
+	if itr.SeqOK() {
+		for e := range itr.Seq() {
+			acc = f(acc, e)
+		}
+	} else {
+		for itr.Next() {
+			acc = f(acc, itr.Value())
+		}
+	}
+	return acc
+}
+
+func Fold1[T any](itr CoreIterator[T], f func(a, e T) T) T {
+	if itr.SeqOK() {
+		acc := option.Empty[T]()
+		for e := range itr.Seq() {
+			if acc.HasValue() {
+				acc.Set(f(acc.Get(), e))
+			} else {
+				acc.Set(e)
+			}
+		}
+		return acc.Get()
+	} else {
+		if !itr.Next() {
+			panic("iterator is empty")
+		}
+		acc := itr.Value()
+		for itr.Next() {
+			acc = f(acc, itr.Value())
+		}
+		return acc
+	}
+}
+
+func Intercalate[T any](itr CoreIterator[T], inter T, f func(a, e T) T) T {
+	acc := option.Empty[T]()
+	for e := range itr.Seq() {
+		if acc.HasValue() {
+			a := f(acc.Get(), inter)
+			acc.Set(f(a, e))
+		} else {
+			acc.Set(e)
+		}
+	}
+	return acc.Get()
+}
+
+func Sum[T functions.Numeric](itr CoreIterator[T]) T {
+	return Fold(itr, 0, functions.Sum)
 }

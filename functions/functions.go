@@ -1,8 +1,22 @@
 package functions
 
+import "golang.org/x/exp/constraints"
+
+type Numeric interface {
+	constraints.Integer | constraints.Float | constraints.Complex
+}
+
 // Identity function - returns the value passed.
 func Id[T any](v T) T {
 	return v
+}
+
+func Sum[T Numeric | ~string](a, b T) T {
+	return a + b
+}
+
+func Product[T Numeric](a, b T) T {
+	return a * b
 }
 
 // Returns a pointer to a variable whose value is initialized to v.

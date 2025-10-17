@@ -161,6 +161,16 @@ type IteratorExtensions[T any] interface {
 	// n elements. If the current iterator has less than or exactly n elements,
 	// the returned iterator is equivalent to the input iterator.
 	Take(n int) Iterator[T]
+
+	// Any returns true if p returns true for at least one element in the iterator.
+	Any(p func(T) bool) bool
+
+	// All returns true if p returns true for all the elements in the iterator.
+	All(p func(T) bool) bool
+
+	Fold1(f func(a, e T) T) T
+
+	Fold(init T, f func(a, e T) T) T
 }
 
 // Iterator2Extensions defines additional iterator methods that are specific

@@ -10,8 +10,10 @@ import (
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/maps"
+	"github.com/robdavid/genutil-go/ordered"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1586,6 +1588,17 @@ func TestAll(t *testing.T) {
 	}))
 }
 
+func TestAllMethod(t *testing.T) {
+	trueInput := []rune("---------")
+	assert.True(t, iterator.Slice(trueInput).All(func(r rune) bool {
+		return r == '-'
+	}))
+	falseInput := []rune("-----!----")
+	assert.False(t, iterator.Slice(falseInput).All(func(r rune) bool {
+		return r == '-'
+	}))
+}
+
 func TestAny(t *testing.T) {
 	trueInput := []rune("-----!----")
 	assert.True(t, iterator.Any(iterator.Slice(trueInput), func(r rune) bool {
@@ -1593,6 +1606,17 @@ func TestAny(t *testing.T) {
 	}))
 	falseInput := []rune("---------")
 	assert.False(t, iterator.Any(iterator.Slice(falseInput), func(r rune) bool {
+		return r == '!'
+	}))
+}
+
+func TestAnyMethod(t *testing.T) {
+	trueInput := []rune("-----!----")
+	assert.True(t, iterator.Slice(trueInput).Any(func(r rune) bool {
+		return r == '!'
+	}))
+	falseInput := []rune("---------")
+	assert.False(t, iterator.Slice(falseInput).Any(func(r rune) bool {
 		return r == '!'
 	}))
 }
@@ -1717,4 +1741,29 @@ func TestMapMutSetDelete(t *testing.T) {
 	for k := 3; k < size; k++ {
 		assert.Equal(t, k*2, m[k])
 	}
+}
+
+func TestSum(t *testing.T) {
+	s := iterator.Sum(iterator.IncRange(1, 5))
+	assert.Equal(t, 15, s)
+}
+
+func TestSumByFoldMethod(t *testing.T) {
+	s := iterator.IncRange(1, 5).Fold(0, functions.Sum)
+	assert.Equal(t, 15, s)
+}
+
+func TestSumByFoldString(t *testing.T) {
+	s := iterator.Of("This", "is", "mad").Fold1(functions.Sum)
+	assert.Equal(t, "Thisismad", s)
+}
+
+func TestIntercalateByFoldString(t *testing.T) {
+	s := iterator.Intercalate(iterator.Of("This", "is", "mad"), " ", functions.Sum)
+	assert.Equal(t, "This is mad", s)
+}
+
+func TestMaxByFoldMethod(t *testing.T) {
+	s := iterator.IncRange(1, 5).Fold1(ordered.Max2)
+	assert.Equal(t, 5, s)
 }
