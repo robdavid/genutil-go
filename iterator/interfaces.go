@@ -171,6 +171,8 @@ type IteratorExtensions[T any] interface {
 	Fold1(f func(a, e T) T) T
 
 	Fold(init T, f func(a, e T) T) T
+
+	Intercalate(inter T, f func(a, e T) T) T
 }
 
 // Iterator2Extensions defines additional iterator methods that are specific

@@ -115,6 +115,10 @@ func (di DefaultIterator[T]) Fold(init T, f func(a, e T) T) T {
 	return Fold(di, init, f)
 }
 
+func (di DefaultIterator[T]) Intercalate(inter T, f func(a, e T) T) T {
+	return Intercalate(di, inter, f)
+}
+
 // DefaultMutableIterator wraps a CoreMutableIterator together with a DefaultIterator to provide
 // and implementation of MutableIterator.
 type DefaultMutableIterator[T any] struct {

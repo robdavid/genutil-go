@@ -11,6 +11,9 @@ func Id[T any](v T) T {
 	return v
 }
 
+// Sum sums the two values passed and returns the result. The values must be of
+// the same type and must support the + operator. Such types include all numeric
+// types, including complex numbers and string.
 func Sum[T Numeric | ~string](a, b T) T {
 	return a + b
 }

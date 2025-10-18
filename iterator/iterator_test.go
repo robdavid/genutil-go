@@ -1759,8 +1759,8 @@ func TestSumByFoldString(t *testing.T) {
 }
 
 func TestIntercalateByFoldString(t *testing.T) {
-	s := iterator.Intercalate(iterator.Of("This", "is", "mad"), " ", functions.Sum)
-	assert.Equal(t, "This is mad", s)
+	s := iterator.Of("Hello", "mad", "world").Intercalate("/", functions.Sum)
+	assert.Equal(t, "Hello/mad/world", s)
 }
 
 func TestMaxByFoldMethod(t *testing.T) {
