@@ -34,7 +34,7 @@ func (isz IteratorSize) Allocate() int {
 	case SizeKnown:
 		return isz.Size
 	case SizeInfinite:
-		panic(ErrAllocationSizeInfinite)
+		panic(ErrSizeInfinite)
 	case SizeAtMost:
 		{
 			sz := isz.Size / 2

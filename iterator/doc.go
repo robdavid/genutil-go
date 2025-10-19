@@ -4,7 +4,7 @@ transformation of various types kinds of generic iterators.
 
 # Features
 
-The various iterator types have the following features:
+Iterators in this package have the following features:
 
   - Constructable from [iter.Seq] and [iter.Seq2] objects.
   - Constructable over slices, maps and from explicit elements.

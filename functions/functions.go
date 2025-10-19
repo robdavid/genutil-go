@@ -1,6 +1,8 @@
 package functions
 
-import "golang.org/x/exp/constraints"
+import (
+	"golang.org/x/exp/constraints"
+)
 
 type Numeric interface {
 	constraints.Integer | constraints.Float | constraints.Complex
@@ -18,14 +20,19 @@ func Sum[T Numeric | ~string](a, b T) T {
 	return a + b
 }
 
+// Product multiplies the two values passed and returns the result. The values must
+// be of the same type and must support the * operator. These are the numeric types,
+// including complex numbers.
 func Product[T Numeric](a, b T) T {
 	return a * b
 }
 
+type Enum[T any] struct {
+	Index int
+	Value T
+}
+
 // Returns a pointer to a variable whose value is initialized to v.
-// eg.
-//
-//	hp := functions.Ref("hello") // *hp == "hello"
 func Ref[T any](v T) *T {
 	return &v
 }

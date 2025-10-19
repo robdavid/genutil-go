@@ -5,14 +5,14 @@ import (
 	"iter"
 
 	"github.com/robdavid/genutil-go/errors/result"
-	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/option"
 )
 
-var ErrAllocationSizeInfinite = errors.New("cannot allocate storage for an infinite iterator")
+var ErrSizeInfinite = errors.New("cannot consume an infinite iterator")
 var ErrInvalidIteratorSizeType = errors.New("invalid iterator size type")
 var ErrInvalidIteratorRange = errors.New("invalid iterator range")
 var ErrDeleteNotImplemented = errors.New("delete not implemented")
+var ErrEmptyIterator = errors.New("iterator is empty")
 
 // Seq transforms any generic [SimpleIterator] into a native [iter.Seq] iterator.
 func Seq[T any](i SimpleIterator[T]) iter.Seq[T] {
@@ -24,17 +24,6 @@ func Seq[T any](i SimpleIterator[T]) iter.Seq[T] {
 			}
 		}
 	}
-}
-
-// KeyValue holds a key value pair
-type KeyValue[K any, V any] struct {
-	Key   K
-	Value V
-}
-
-// KVOf constructs a key value pair
-func KVOf[K any, V any](key K, value V) KeyValue[K, V] {
-	return KeyValue[K, V]{key, value}
 }
 
 // Seq2 transforms a [SimpleIterator] of [KeyValue] pairs into a native [iter.Seq2] iterator.
@@ -111,12 +100,22 @@ func (di DefaultIterator[T]) Fold1(f func(a, e T) T) T {
 	return Fold1(di, f)
 }
 
+// Fold combines the elements of the iterator into a single value using an
+// accumulation function. It an initial value init and the accumulation function
+// f. If the iterator is empty, init is returned. Otherwise the initial value is
+// fed into the accumulation function f along with the first element from the
+// iterator. The result is then fed back into f along with the second element,
+// and so on. The final result is the final value returned by the function.
 func (di DefaultIterator[T]) Fold(init T, f func(a, e T) T) T {
 	return Fold(di, init, f)
 }
 
-func (di DefaultIterator[T]) Intercalate(inter T, f func(a, e T) T) T {
-	return Intercalate(di, inter, f)
+func (di DefaultIterator[T]) Intercalate(empty T, inter T, f func(a, e T) T) T {
+	return Intercalate(di, empty, inter, f)
+}
+
+func (di DefaultIterator[T]) Intercalate1(inter T, f func(a, e T) T) T {
+	return Intercalate1(di, inter, f)
 }
 
 // DefaultMutableIterator wraps a CoreMutableIterator together with a DefaultIterator to provide
@@ -236,7 +235,7 @@ func NewSliceCoreIteratorRef[T any](slice *[]T) CoreMutableIterator[*T] {
 // function will panic.
 func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
 	if iter.Size().IsInfinite() {
-		panic(ErrAllocationSizeInfinite)
+		panic(ErrSizeInfinite)
 	}
 	if iter.SeqOK() {
 		for v := range iter.Seq() {
@@ -285,7 +284,7 @@ func CollectIntoCap[T any](iter CoreIterator[T], slice *[]T) []T {
 // have an infinite size, this function will panic.
 func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
 	if iter.Size().IsInfinite() {
-		panic(ErrAllocationSizeInfinite)
+		panic(ErrSizeInfinite)
 	}
 	if iter.SeqOK() {
 		for k, v := range iter.Seq2() {
@@ -306,7 +305,7 @@ func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V
 // have an infinite size, this function will panic.
 func Collect2IntoCap[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
 	if iter.Size().IsInfinite() {
-		panic(ErrAllocationSizeInfinite)
+		panic(ErrSizeInfinite)
 	}
 	max := cap(*slice) - len(*slice)
 	if max > 0 {
@@ -338,7 +337,7 @@ func Collect2IntoCap[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K
 // this function will panic.
 func CollectIntoMap[K comparable, V any](iter CoreIterator2[K, V], m map[K]V) map[K]V {
 	if iter.Size().IsInfinite() {
-		panic(ErrAllocationSizeInfinite)
+		panic(ErrSizeInfinite)
 	}
 	if m == nil {
 		m = make(map[K]V)
@@ -431,7 +430,17 @@ func Any[T any](iter CoreIterator[T], predicate func(v T) bool) bool {
 	return false
 }
 
-func Fold[T any, U any](itr CoreIterator[T], init U, f func(a U, e T) U) U {
+// Fold combines the elements of an iterator into a single value using an
+// accumulation function. It takes an iterator, an initial value init and an
+// accumulation function f. If the iterator is empty, init is returned.
+// Otherwise the initial value is fed into the accumulation function f along
+// with the first element from the iterator. The result is then fed back into f
+// along with the second element, and so on. The final result is the final value
+// returned by the function.
+func Fold[U any, T any](itr CoreIterator[T], init U, f func(a U, e T) U) U {
+	if itr.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
+	}
 	acc := init
 	if itr.SeqOK() {
 		for e := range itr.Seq() {
@@ -445,7 +454,17 @@ func Fold[T any, U any](itr CoreIterator[T], init U, f func(a U, e T) U) U {
 	return acc
 }
 
+// Fold1 combines the elements of an iterator into a single value using an
+// accumulation function. It takes an iterator, an initial value init and an
+// accumulation function f. The iterator must have at least one element, or this
+// function will panic with [ErrEmptyIterator].  If there is only one element, this
+// element be returned. Otherwise, the first two elements are fed into the accumulation
+// function f. The result of this is combined with the next element to get the next
+// result and so on until the iterator is consumed. The final result is returned.
 func Fold1[T any](itr CoreIterator[T], f func(a, e T) T) T {
+	if itr.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
+	}
 	if itr.SeqOK() {
 		acc := option.Empty[T]()
 		for e := range itr.Seq() {
@@ -455,10 +474,13 @@ func Fold1[T any](itr CoreIterator[T], f func(a, e T) T) T {
 				acc.Set(e)
 			}
 		}
+		if acc.IsEmpty() {
+			panic(ErrEmptyIterator)
+		}
 		return acc.Get()
 	} else {
 		if !itr.Next() {
-			panic("iterator is empty")
+			panic(ErrEmptyIterator)
 		}
 		acc := itr.Value()
 		for itr.Next() {
@@ -468,19 +490,40 @@ func Fold1[T any](itr CoreIterator[T], f func(a, e T) T) T {
 	}
 }
 
-func Intercalate[T any](itr CoreIterator[T], inter T, f func(a, e T) T) T {
-	acc := option.Empty[T]()
-	for e := range itr.Seq() {
-		if acc.HasValue() {
-			a := f(acc.Get(), inter)
-			acc.Set(f(a, e))
-		} else {
-			acc.Set(e)
-		}
-	}
-	return acc.Get()
+// Intercalate1 is a variation on [Fold1] which combines the elements of an iterator
+// into a single value using an accumulation function and an interspersed value.
+// The iterator must have at least one element, otherwise it will panic with
+// [ErrEmptyIterator]. The accumulated result is initially set to the first element,
+// and is combined with subsequent elements as follows:
+//
+//	acc = f(f(acc,inter),e)
+//
+// where acc is he accumulated value, e is the next element and inter is the inter parameter.
+// The final value of acc will be the value returned.
+func Intercalate1[T any](itr CoreIterator[T], inter T, f func(a, e T) T) T {
+	interFold := func(a, e T) T { return f(f(a, inter), e) }
+	return Fold1(itr, interFold)
 }
 
-func Sum[T functions.Numeric](itr CoreIterator[T]) T {
-	return Fold(itr, 0, functions.Sum)
+// Intercalate is a variation on [iterator.Fold] which combines the elements of an
+// iterator into a single value using an accumulation function and an
+// interspersed value. If the iterator has no elements, the empty parameter is
+// returned. Otherwise, the accumulated result is initially set to the first
+// element, and is combined with subsequent elements as follows:
+//
+//	acc = f(f(acc,inter),e)
+//
+// where acc is he accumulated value, e is the next element and inter is the
+// inter parameter, and the final value of acc will be the value returned.
+func Intercalate[T any](itr CoreIterator[T], empty T, inter T, f func(a, e T) T) T {
+	first := true
+	interFold := func(a, e T) T {
+		if first {
+			first = false
+			return e
+		} else {
+			return f(f(a, inter), e)
+		}
+	}
+	return Fold(itr, empty, interFold)
 }

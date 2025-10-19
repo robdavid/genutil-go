@@ -13,3 +13,15 @@ func ExampleSum() {
 	// 7
 	// Hello world
 }
+
+func ExampleProduct() {
+	p := functions.Product(3+5i, 4+2i)
+	fmt.Println(p)
+	// Output: (2+26i)
+}
+
+func ExampleRef() {
+	hp := functions.Ref("hello")
+	fmt.Println(*hp)
+	// Output: hello
+}

@@ -2,6 +2,17 @@ package iterator
 
 import "iter"
 
+// KeyValue holds a key value pair
+type KeyValue[K any, V any] struct {
+	Key   K
+	Value V
+}
+
+// KVOf constructs a key value pair
+func KVOf[K any, V any](key K, value V) KeyValue[K, V] {
+	return KeyValue[K, V]{key, value}
+}
+
 type kvIter[K any, V any] struct {
 	base CoreIterator2[K, V]
 }

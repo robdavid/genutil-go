@@ -17,6 +17,7 @@ import (
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/constraints"
 )
 
 func TestSimpleSequence(t *testing.T) {
@@ -967,7 +968,7 @@ func TestCollectFibInf(t *testing.T) {
 	defer func() {
 		p := recover()
 		assert.NotNil(t, p)
-		assert.ErrorIs(t, p.(error), iterator.ErrAllocationSizeInfinite)
+		assert.ErrorIs(t, p.(error), iterator.ErrSizeInfinite)
 	}()
 	fibSeq().Collect()
 	assert.Fail(t, "Expected panic did not occur")
@@ -1743,27 +1744,71 @@ func TestMapMutSetDelete(t *testing.T) {
 	}
 }
 
-func TestSum(t *testing.T) {
-	s := iterator.Sum(iterator.IncRange(1, 5))
-	assert.Equal(t, 15, s)
-}
-
 func TestSumByFoldMethod(t *testing.T) {
 	s := iterator.IncRange(1, 5).Fold(0, functions.Sum)
 	assert.Equal(t, 15, s)
 }
 
 func TestSumByFoldString(t *testing.T) {
-	s := iterator.Of("This", "is", "mad").Fold1(functions.Sum)
-	assert.Equal(t, "Thisismad", s)
+	s := iterator.Of("Generics", "can", "bend", "space").Fold1(functions.Sum)
+	assert.Equal(t, "Genericscanbendspace", s)
 }
 
-func TestIntercalateByFoldString(t *testing.T) {
-	s := iterator.Of("Hello", "mad", "world").Intercalate("/", functions.Sum)
-	assert.Equal(t, "Hello/mad/world", s)
+func TestIntercalate1String(t *testing.T) {
+	s := iterator.Of("Hello", "generics", "world").Intercalate1("/", functions.Sum)
+	assert.Equal(t, "Hello/generics/world", s)
 }
 
-func TestMaxByFoldMethod(t *testing.T) {
-	s := iterator.IncRange(1, 5).Fold1(ordered.Max2)
+func TestIntercalateString(t *testing.T) {
+	inputs := []string{"Hello", "generics", "world"}
+	for l := range len(inputs) + 1 {
+		input := inputs[:l]
+		s := slices.Iter(input).Intercalate("", "/", functions.Sum)
+		expect := strings.Join(input, "/")
+		assert.Equal(t, expect, s)
+	}
+}
+
+func TestIntercalateByFold(t *testing.T) {
+	interf := func(a, e string) string {
+		if a == "" {
+			return e
+		} else {
+			return a + "/" + e
+		}
+	}
+	s := iterator.Of("Hello", "generics", "world").Fold("", interf)
+	assert.Equal(t, "Hello/generics/world", s)
+}
+
+func TestIntercalateByFoldNonSeq(t *testing.T) {
+	i := iterator.Range(0, 5)
+	assert.False(t, i.SeqOK())
+	n := i.Intercalate1(2, functions.Sum)
+	assert.Equal(t, 18, n)
+}
+
+func rangeSeq[T constraints.Ordered](f, t, b T) func(func(T) bool) {
+	return func(yield func(T) bool) {
+		for v := f; v < t; v += b {
+			if !yield(v) {
+				break
+			}
+		}
+	}
+}
+
+func TestMaxByFoldMethodNoSeq(t *testing.T) {
+	i := iterator.IncRange(1, 5)
+	assert.False(t, i.SeqOK())
+	s := i.Fold1(ordered.Max2)
 	assert.Equal(t, 5, s)
+}
+
+func TestMaxByFoldMethodSeq(t *testing.T) {
+	c := iterator.New(rangeSeq(0, 5, 1))
+	assert.True(t, c.SeqOK())
+	app := func(ns []int, n int) []int { return append(ns, n) }
+	acc := iterator.Fold(c, nil, app)
+	assert.Equal(t, slices.Range(0, 5), acc)
 }

@@ -5,7 +5,9 @@ import (
 	"iter"
 	"testing"
 
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/iterator"
+	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -200,7 +202,7 @@ func ExampleNewFromSimpleWithSize() {
 	c := i.Take(10).Collect() // Collecting only the first 10 elements succeeds.
 	fmt.Println(c)
 	// Output:
-	// cannot allocate storage for an infinite iterator
+	// cannot consume an infinite iterator
 	// [0 1 2 3 4 5 6 7 8 9]
 }
 
@@ -233,7 +235,7 @@ func ExampleNewDefaultIterator() {
 	c := i.Take(10).Collect() // Collecting only the first 10 elements succeeds.
 	fmt.Println(c)
 	// Output:
-	// cannot allocate storage for an infinite iterator
+	// cannot consume an infinite iterator
 	// [0 1 2 3 4 5 6 7 8 9]
 }
 
@@ -262,4 +264,54 @@ func ExampleDefaultIterator_All() {
 	// Output:
 	// false
 	// true
+}
+
+func ExampleFold() {
+	add := func(a, b int) int { return a + b }
+	s := iterator.Fold(iterator.IncRange(1, 5), 0, add)
+	fmt.Println(s)
+	// Output: 15
+}
+
+func ExampleFold1() {
+	mul := func(a, b int) int { return a * b }
+	s := iterator.Fold1(iterator.Of(2, 3, 4), mul)
+	fmt.Println(s)
+	// Output: 24
+}
+
+func ExampleIntercalate1() {
+	s1 := iterator.Intercalate1(iterator.Of("Hello"), " ", functions.Sum)
+	fmt.Println(s1)
+	s := iterator.Intercalate1(iterator.Of("Hello", "world"), " ", functions.Sum)
+	fmt.Println(s)
+	// Output:
+	// Hello
+	// Hello world
+}
+
+func ExampleIntercalate() {
+	inputs := []string{"one", "two", "three"}
+	for l := range len(inputs) + 1 {
+		s := iterator.Intercalate(slices.Iter(inputs[:l]), "", " ", functions.Sum)
+		fmt.Printf("%#v\n", s)
+	}
+	// Output:
+	// ""
+	// "one"
+	// "one two"
+	// "one two three"
+}
+
+func ExampleDefaultIterator_Intercalate() {
+	inputs := []string{"one", "two", "three"}
+	for l := range len(inputs) + 1 {
+		s := slices.Iter(inputs[:l]).Intercalate("", " ", functions.Sum)
+		fmt.Printf("%#v\n", s)
+	}
+	// Output:
+	// ""
+	// "one"
+	// "one two"
+	// "one two three"
 }
