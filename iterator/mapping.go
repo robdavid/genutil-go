@@ -138,8 +138,8 @@ func (i *mapIter2[K, V, X, Y]) Seq2() iter.Seq2[X, Y] {
 	}
 }
 
-// Map applies function `mapping` of type `func(T) U` to each value, producing
-// a new iterator over `U`.
+// Map applies function mapping of type func(T) U to each value, producing
+// a new iterator over U.
 func Map[T any, U any](iter CoreIterator[T], mapping func(T) U) Iterator[U] {
 	mapNext := func(value T) (U, bool) {
 		return mapping(value), true
@@ -147,8 +147,8 @@ func Map[T any, U any](iter CoreIterator[T], mapping func(T) U) Iterator[U] {
 	return wrapFunc(iter, mapNext, functions.Id)
 }
 
-// Map2 applies function `mapping` of type `func(K, V) (X,Y)` to each key and value pair, producing
-// a new Iterator2 over `X` and `Y`.
+// Map2 applies function mapping of type func(K, V) (X,Y) to each key and value pair, producing
+// a new Iterator2 over X and Y.
 func Map2[K, V, X, Y any](iter CoreIterator2[K, V], mapping func(K, V) (X, Y)) Iterator2[X, Y] {
 	mapNext2 := func(key K, value V) (X, Y, bool) {
 		k, v := mapping(key, value)
@@ -157,7 +157,7 @@ func Map2[K, V, X, Y any](iter CoreIterator2[K, V], mapping func(K, V) (X, Y)) I
 	return wrapFunc2(iter, mapNext2, functions.Id)
 }
 
-// Filter applies a filter function `predicate` of type `func(T) bool`, producing
+// Filter applies a filter function predicate of type func(T) bool, producing
 // a new iterator containing only the elements that satisfy the function.
 func Filter[T any](iter CoreIterator[T], predicate func(T) bool) Iterator[T] {
 	filterNext := func(value T) (T, bool) {
@@ -166,7 +166,7 @@ func Filter[T any](iter CoreIterator[T], predicate func(T) bool) Iterator[T] {
 	return wrapFunc(iter, filterNext, func(sz IteratorSize) IteratorSize { return sz.Subset() })
 }
 
-// Filter2 applies a filter function of type `func(K, V) bool` over each key and value pair,
+// Filter2 applies a filter function of type func(K, V) bool over each key and value pair,
 // producing a new iterator containing only the elements that satisfy the function.
 func Filter2[K, V any](iter CoreIterator2[K, V], predicate func(K, V) bool) Iterator2[K, V] {
 	filterNext := func(key K, value V) (K, V, bool) {
@@ -176,7 +176,7 @@ func Filter2[K, V any](iter CoreIterator2[K, V], predicate func(K, V) bool) Iter
 }
 
 // FilterMap applies both transformation and filtering logic to an Iterator. The function
-// `mapping` is applied to each value of type T, producing either a new value of type U
+// mapping is applied to each value of type T, producing either a new value of type U
 // and a true boolean, or undefined value and a false boolean. Values are taken from
 // the value when the boolean is true to produce a new Iterator; returns when
 // the boolean is false are ignored.
@@ -185,8 +185,8 @@ func FilterMap[T, U any](iter CoreIterator[T], mapping func(T) (U, bool)) Iterat
 }
 
 // FilterMapOpt applies both transformation and filtering logic to an iterator. The
-// function `mapping` is applied to each element of type `T`, producing either an option
-// value of type `U` or an empty option. The result is an iterator over `U` drawn from
+// function mapping is applied to each element of type T, producing either an option
+// value of type U or an empty option. The result is an iterator over U drawn from
 // only the non-empty options returned.
 func FilterMapOpt[T any, U any](iter CoreIterator[T], mapping func(T) option.Option[U]) Iterator[U] {
 	filterMapNext := func(value T) (U, bool) {
@@ -196,7 +196,7 @@ func FilterMapOpt[T any, U any](iter CoreIterator[T], mapping func(T) option.Opt
 }
 
 // FilterMap2 applies both transformation and filtering logic to an Iterator2. The
-// function `mapping` is applied to each key and value pair, of type K and V respectively,
+// function mapping is applied to each key and value pair, of type K and V respectively,
 // producing either a new key and value pairs (of type X and Y) and a true boolean, or
 // undefined key and value and a false boolean. Values are taken from the keys and values
 // when the boolean is true to produce a new Iterator2.

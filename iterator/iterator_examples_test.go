@@ -7,6 +7,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/iterator"
+	"github.com/robdavid/genutil-go/maps"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
 )
@@ -63,6 +64,27 @@ func ExampleDefaultIterator_Filter() {
 	c := i.Collect()
 	fmt.Printf("%#v\n", c)
 	// Output: []int{2, 4}
+}
+
+func ExampleDefaultIterator_FilterMorph() {
+	// Function to filter on even values, doubling each selected value.
+	f := func(v int) (int, bool) { return v * 2, v%2 == 0 }
+	i := iterator.Of(0, 1, 2, 3, 4).FilterMorph(f)
+	c := i.Collect()
+	fmt.Printf("%#v\n", c)
+	// Output: []int{0, 4, 8}
+
+}
+
+func ExampleDefaultIterator2_FilterMorph2() {
+	// Function to filter on even values, doubling each selected value.
+	inputMap := map[int]int{0: 2, 1: 4, 2: 6, 3: 8}
+	itr := maps.Iter(inputMap).FilterMorph2(func(k, v int) (int, int, bool) {
+		return k + 1, v * 2, (k+v)%2 == 0
+	})
+	c := iterator.CollectMap(itr)
+	fmt.Printf("%#v\n", c)
+	// Output: map[int]int{1:4, 3:12}
 }
 
 func ExampleDefaultIterator_Take() {

@@ -132,7 +132,7 @@ type IteratorExtensions[T any] interface {
 	// Filter is a filtering method that creates a new iterator which contains a
 	// subset of elements contained in the current one. This function takes a
 	// predicate function p and only elements for which this function returns
-	// true should be included in the filtered iterator
+	// true should be included in the filtered iterator.
 	Filter(p func(T) bool) Iterator[T]
 
 	// Morph is a mapping function that creates a new iterator which contains
@@ -168,12 +168,53 @@ type IteratorExtensions[T any] interface {
 	// All returns true if p returns true for all the elements in the iterator.
 	All(p func(T) bool) bool
 
+	// Fold1 combines the elements of the iterator into a single value using an
+	// accumulation function. It takes an initial value init and an accumulation
+	// function f. The iterator must have at least one element, or this method will
+	// panic with [ErrEmptyIterator].  If there is only one element, this element be
+	// returned. Otherwise, the first two elements are fed into the accumulation
+	// function f. The result of this is combined with the next element to get the
+	// next result and so on until the iterator is consumed. The final result is
+	// returned. If the iterator is known to be of infinite size, this method will
+	// panic with [ErrSizeInfinite].
 	Fold1(f func(a, e T) T) T
 
+	// Fold combines the elements of the iterator into a single value using an
+	// accumulation function. It takes an initial value init and the accumulation
+	// function f. If the iterator is empty, init is returned. Otherwise the initial
+	// value is fed into the accumulation function f along with the first element
+	// from the iterator. The result is then fed back into f along with the second
+	// element, and so on until the iterator is consumed. The final result is the
+	// final value returned by the function. If the iterator is known to be of
+	// infinite size, this method will panic with [ErrSizeInfinite].
 	Fold(init T, f func(a, e T) T) T
 
+	// Intercalate1 is a variation on [Fold1] which combines the elements of the
+	// iterator into a single value using an accumulation function and an
+	// interspersed value. The iterator must have at least one element, otherwise it
+	// will panic with [ErrEmptyIterator]. The accumulated result is initially set
+	// to the first element, and is combined with subsequent elements as follows:
+	//
+	//	acc = f(f(acc,inter),e)
+	//
+	// where acc is he accumulated value, e is the next element and inter is the
+	// inter parameter. The final value of acc will be the value returned. If the
+	// iterator is known to be of infinite size, this function will panic with
+	// [ErrSizeInfinite].
 	Intercalate1(inter T, f func(a, e T) T) T
 
+	// Intercalate is a variation on [Fold] which combines the elements of the
+	// iterator into a single value using an accumulation function and an
+	// interspersed value. If the iterator has no elements, the empty parameter is
+	// returned. Otherwise, the accumulated result is initially set to the first
+	// element, and is combined with subsequent elements as follows:
+	//
+	//	acc = f(f(acc,inter),e)
+	//
+	// where acc is he accumulated value, e is the next element and inter is the
+	// inter parameter, and the final value of acc will be the value returned. If
+	// the iterator is known to be of infinite size, this function will panic with
+	// [ErrSizeInfinite].
 	Intercalate(empty T, inter T, f func(a, e T) T) T
 }
 

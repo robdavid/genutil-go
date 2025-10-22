@@ -100,13 +100,18 @@ func (ti *takeIterator2[K, V]) Seq2() iter.Seq2[K, V] {
 	}
 }
 
-// Take transforms an iterator into an iterator the returns the
-// first n elements of the original iterator. If there are less
-// than n elements available, they are all returned.
+// Take transforms a [CoreIterator] into an [Iterator] that returns at most n
+// elements of the original iterator. Note that any [Iterator] is also a
+// [CoreIterator]. If there are less than or exactly n elements available, the
+// returned iterator is equivalent to the input iterator.
 func Take[T any](n int, iter CoreIterator[T]) Iterator[T] {
 	return NewDefaultIterator(&takeIterator[T]{iterator: iter, max: n})
 }
 
+// Take2 transforms a [CoreIterator2] into an [Iterator2] that returns at most n
+// pairs of elements. Note that any [Iterator2] is also a [CoreIterator2]. If
+// there are less than or exactly n elements available, the returned iterator is
+// equivalent to the input iterator.
 func Take2[K any, V any](n int, iter CoreIterator2[K, V]) Iterator2[K, V] {
 	return NewDefaultIterator2(&takeIterator2[K, V]{takeIterator: takeIterator[V]{iterator: iter, max: n}, iterator2: iter})
 }
