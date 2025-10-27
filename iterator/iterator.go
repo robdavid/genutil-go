@@ -533,10 +533,18 @@ func PartitionResults[T any](iter CoreIterator[result.Result[T]]) ([]T, []error)
 // by the iterator. This function short circuits and does not
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns false.
-func All[T any](iter CoreIterator[T], predicate func(v T) bool) bool {
-	for v := range iter.Seq() {
-		if !predicate(v) {
-			return false
+func All[T any](itr CoreIterator[T], predicate func(v T) bool) bool {
+	if itr.SeqOK() {
+		for v := range itr.Seq() {
+			if !predicate(v) {
+				return false
+			}
+		}
+	} else {
+		for itr.Next() {
+			if !predicate(itr.Value()) {
+				return false
+			}
 		}
 	}
 	return true
@@ -546,10 +554,18 @@ func All[T any](iter CoreIterator[T], predicate func(v T) bool) bool {
 // by the iterator. This function short circuits and does not
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns true.
-func Any[T any](iter CoreIterator[T], predicate func(v T) bool) bool {
-	for v := range iter.Seq() {
-		if predicate(v) {
-			return true
+func Any[T any](itr CoreIterator[T], predicate func(v T) bool) bool {
+	if itr.SeqOK() {
+		for v := range itr.Seq() {
+			if predicate(v) {
+				return true
+			}
+		}
+	} else {
+		for itr.Next() {
+			if predicate(itr.Value()) {
+				return true
+			}
 		}
 	}
 	return false

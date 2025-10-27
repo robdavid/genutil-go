@@ -12,6 +12,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func ExampleOf() {
+	itr := iterator.Of("one", "two", "three")
+	fmt.Println(itr.Size().Size)
+	for e := range itr.Seq() {
+		fmt.Println(e)
+	}
+	// Output:
+	// 3
+	// one
+	// two
+	// three
+}
+
 func ExampleNew() {
 	// fib returns a native Go iterator (fibonacci sequence).
 	fib := func(yield func(int) bool) {

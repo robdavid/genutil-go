@@ -10,7 +10,7 @@ Iterators in this package have the following features:
 
   - Constructable from [iter.Seq] and [iter.Seq2] objects.
 
-  - Constructable over slices, maps and from explicit elements.
+  - Constructable over slices, maps and from literal elements.
 
   - Support for mutation of elements and underlying collections.
 
@@ -35,22 +35,26 @@ There are four main iterator types, encapsulated in four interfaces.
     collection (such as map). Note that only the value can be modified, not the
     key.
 
-These top level interfaces are composite definitions such that instances of any
-of them will also implement other interfaces:
+The above top level interfaces are composite definitions such that instances of any
+of them will also implement other key interfaces.
 
-  - [iterator.Iterator] contains [iterator.CoreIterator] and
-    [iterator.IteratorExtensions]. In turn, [iterator.CoreIterator] contains
-    [iterator.SimpleIterator].
-  - [iterator.Iterator2] contains [iterator.Iterator], [iterator.CoreIterator2]
-    and [iterator.Iterator2Extensions]. In turn, [iterator.CoreIterator2]
-    contains [iterator.CoreIterator].
-  - [iterator.MutableIterator] contains [iterator.Iterator], and
-    [iterator.CoreMutableIterator]. In turn, [iterator.CoreMutableIterator]
-    contains [iterator.CoreIterator].
-  - [iterator.MutableIterator2] contains [iterator.MutableIterator] and
-    [iterator.Iterator2], and [iterator.CoreMutableIterator2]. In turn,
-    [iterator.CoreMutableIterator2] contains [iterator.CoreMutableIterator].
+Any [iterator.Iterator][T] also implements:
+ - [iterator.CoreIterator][T]
+ - [iterator.IteratorExtensions][T]
+ - [iterator.SimpleIterator][T]
 
+Any [iterator.Iterator2][K,V] also implements:
+ - [iterator.Iterator][V]
+ - [iterator.CoreIterator2][K,V]
+ - [iterator.Iterator2Extensions][K,V]
+
+Any [iterator.MutableIterator][T] also implements:
+ - [iterator.Iterator][T]
+ - [iterator.CoreMutableIterator][T]
+
+Any [iterator.MutableIterator2][K,V] also implements:
+ - [iterator.MutableIterator][V]
+ - [iterator.Iterator2][K,V]
 
 # Construction
 
@@ -63,6 +67,7 @@ Out of the box methods exist to produce iterators:
     [github.com/robdavid/genutil-go/maps.IterMut].
   - Over number ranges via [iterator.Range], [iterator.IncRange],
     [iterator.RangyBy] or [iterator.IncRangeBy] functions.
+  - Over an explicit list of elements via the [iterator.Of] function.
 
 # User iterators
 
@@ -129,9 +134,90 @@ the iterator using the [iterator.SimpleIterator.Next] and
 /*
 It is also possible to collect all the elements in an iterator into a slice or a
 map.
- - An [iterator.CoreIterator] may be collected into a slice using on of
-   [iterator.DefaultIterator.Collect], [iterator.DefaultIterator.CollectInto] or
-   [iterator.DefaultIterator.CollectIntoCap].
- - An [iterator.CoreIterator2] may
-*/
+
+An [iterator.CoreIterator] may be collected into a slice using one of the
+following methods:
+ - [iterator.DefaultIterator.Collect]
+ - [iterator.DefaultIterator.CollectInto]
+ - [iterator.DefaultIterator.CollectIntoCap]
+
+An [iterator.CoreIterator2] may be collected into a slice of [iterator.KeyValue]
+elements via one of the following methods:
+ - [iterator.DefaultIterator.Collect2]
+ - [iterator.DefaultIterator.Collect2Into]
+ - [iterator.DefaultIterator.Collect2IntoCap]
+
+An [iterator.CoreIterator2] may be collected into a map via one of the following
+functions:
+ - [iterator.CollectMap]
+ - [iterator.CollectIntoMap]
+
+# Transformations
+
+Iterator types support a number of transformation methods and functions covering
+such things as filtering, mapping and folding over elements. These are defined
+in interface definitions [iterator.IteratorExtensions] and
+[iterator.Iterator2Extensions]. Default implementations are provided by
+[iterator.DefaultIterator] and [iterator.DefaultIterator2]. These are listed
+below.
+
+  - [iterator.DefaultIterator.All]
+  - [iterator.DefaultIterator.Any]
+  - [iterator.DefaultIterator.Chan]
+  - [iterator.DefaultIterator2.Chan2]
+  - [iterator.DefaultIterator.Collect]
+  - [iterator.DefaultIterator2.Collect2]
+  - [iterator.DefaultIterator2.Collect2Into]
+  - [iterator.DefaultIterator2.Collect2IntoCap]
+  - [iterator.DefaultIterator.CollectInto]
+  - [iterator.DefaultIterator.CollectIntoCap]
+  - [iterator.DefaultIterator.Enumerate]
+  - [iterator.DefaultIterator.Filter]
+  - [iterator.DefaultIterator2.Filter2]
+  - [iterator.DefaultIterator.FilterMorph]
+  - [iterator.DefaultIterator2.FilterMorph2]
+  - [iterator.DefaultIterator.Fold]
+  - [iterator.DefaultIterator.Fold1]
+  - [iterator.DefaultIterator.Intercalate]
+  - [iterator.DefaultIterator.Intercalate1]
+  - [iterator.DefaultIterator.Morph]
+  - [iterator.DefaultIterator2.Morph2]
+  - [iterator.DefaultIterator.Take]
+  - [iterator.DefaultIterator2.Take2]
+
+There are also corresponding functions in the iterator package, which include
+some additional or modified functions that can't be expressed as methods due to
+limitations of generics. All methods defined in [iterator.DefaultIterator] or
+[iterator.DefaultIterator2] delegate to one of these functions.
+
+  - [iterator.All]
+  - [iterator.Any]
+  - [iterator.Chan]
+  - [iterator.Chan2]
+  - [iterator.Take]
+  - [iterator.Collect]
+  - [iterator.Collect2]
+  - [iterator.Collect2Into]
+  - [iterator.Collect2IntoCap]
+  - [iterator.CollectInto]
+  - [iterator.CollectIntoCap]
+  - [iterator.CollectIntoMap]
+  - [iterator.CollectMap]
+  - [iterator.Enumerate]
+  - [iterator.Filter]
+  - [iterator.Filter2]
+  - [iterator.FilterMap]
+  - [iterator.FilterMap2]
+  - [iterator.Fold]
+  - [iterator.Fold1]
+  - [iterator.Intercalate]
+  - [iterator.Intercalate1]
+  - [iterator.Map]
+  - [iterator.Map2]
+  - [iterator.Seq]
+  - [iterator.Seq2]
+  - [iterator.Take]
+  - [iterator.Take2]
+
+**/
 package iterator
