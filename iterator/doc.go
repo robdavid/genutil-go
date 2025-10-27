@@ -35,6 +35,23 @@ There are four main iterator types, encapsulated in four interfaces.
     collection (such as map). Note that only the value can be modified, not the
     key.
 
+These top level interfaces are composite definitions such that instances of any
+of them will also implement other interfaces:
+
+  - [iterator.Iterator] contains [iterator.CoreIterator] and
+    [iterator.IteratorExtensions]. In turn, [iterator.CoreIterator] contains
+    [iterator.SimpleIterator].
+  - [iterator.Iterator2] contains [iterator.Iterator], [iterator.CoreIterator2]
+    and [iterator.Iterator2Extensions]. In turn, [iterator.CoreIterator2]
+    contains [iterator.CoreIterator].
+  - [iterator.MutableIterator] contains [iterator.Iterator], and
+    [iterator.CoreMutableIterator]. In turn, [iterator.CoreMutableIterator]
+    contains [iterator.CoreIterator].
+  - [iterator.MutableIterator2] contains [iterator.MutableIterator] and
+    [iterator.Iterator2], and [iterator.CoreMutableIterator2]. In turn,
+    [iterator.CoreMutableIterator2] contains [iterator.CoreMutableIterator].
+
+
 # Construction
 
 Out of the box methods exist to produce iterators:
@@ -108,5 +125,13 @@ the iterator using the [iterator.SimpleIterator.Next] and
 	// 2
 	// 3
 	// 4
+*/
+/*
+It is also possible to collect all the elements in an iterator into a slice or a
+map.
+ - An [iterator.CoreIterator] may be collected into a slice using on of
+   [iterator.DefaultIterator.Collect], [iterator.DefaultIterator.CollectInto] or
+   [iterator.DefaultIterator.CollectIntoCap].
+ - An [iterator.CoreIterator2] may
 */
 package iterator

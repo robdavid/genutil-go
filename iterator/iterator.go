@@ -38,8 +38,11 @@ func Seq2[K any, V any](i SimpleIterator[KeyValue[K, V]]) iter.Seq2[K, V] {
 	}
 }
 
-// DefaultIterator wraps a [CoreIterator] and provides the additional functions defined in [IteratorExtensions]
-// to provide a complete [Iterator] implementation.
+// DefaultIterator wraps a [CoreIterator] and provides default implementations
+// of the iterator methods defined in [IteratorExtensions] to provide a complete
+// [Iterator] implementation. All the extension methods are written purely in
+// terms of the methods of [CoreIterator], any typically delegate to the
+// function in the iterator package of the same name.
 type DefaultIterator[T any] struct {
 	CoreIterator[T]
 }
