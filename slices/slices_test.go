@@ -144,7 +144,7 @@ func TestFold(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := Fold(0, sliceIn, func(a int, t int) int { return a + t })
+	total := Fold(sliceIn, 0, func(a int, t int) int { return a + t })
 	assert.Equal(t, 55, total)
 }
 
@@ -153,7 +153,7 @@ func TestRef(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := FoldRef(0, sliceIn, func(a *int, t *int) { *a += *t })
+	total := FoldRef(sliceIn, 0, func(a *int, t *int) { *a += *t })
 	assert.Equal(t, 55, total)
 }
 
@@ -560,7 +560,7 @@ func TestMultipleParChunksSize(t *testing.T) {
 			diff := len(chunk) - ideal
 			assert.LessOrEqual(t, diff, ideal/2)
 		}
-		sum := Fold(0, chunks, func(n int, c []int) int { return n + len(c) })
+		sum := Fold(chunks, 0, func(n int, c []int) int { return n + len(c) })
 		assert.Equal(t, len(inslice), sum)
 	}
 }

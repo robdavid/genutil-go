@@ -19,7 +19,7 @@ var ErrInvalidNumCPU = errors.New("invalid number of CPUs")
 
 // Concatenates a list of list of items into a list of items
 func Concat[T any](ss ...[]T) (result []T) {
-	cap := Fold(0, ss, func(a int, s []T) int { return a + len(s) })
+	cap := Fold(ss, 0, func(a int, s []T) int { return a + len(s) })
 	result = make([]T, 0, cap)
 	for i := range ss {
 		result = append(result, ss[i]...)
@@ -617,7 +617,7 @@ func MapRefI[T any](slice []T, f func(*T) T) {
 // Applies a function f to an accumulator, with initial value
 // a, and a slice element, returning a new accumulator, for each element
 // in the slice s. The final accumulator value is returned.
-func Fold[A any, T any](a A, s []T, f func(A, T) A) A {
+func Fold[A any, T any](s []T, a A, f func(A, T) A) A {
 	for i := range s {
 		a = f(a, s[i])
 	}
@@ -627,7 +627,7 @@ func Fold[A any, T any](a A, s []T, f func(A, T) A) A {
 // Applies a function f to a reference to an accumulator, with initial value a,
 // and a reference to slice element, mutating the accumulator, for every element in the
 // slice s. The final value of the accumulator is returned.
-func FoldRef[A any, T any](a A, s []T, f func(*A, *T)) A {
+func FoldRef[A any, T any](s []T, a A, f func(*A, *T)) A {
 	result := a
 	for i := range s {
 		f(&result, &s[i])
