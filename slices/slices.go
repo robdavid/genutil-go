@@ -847,19 +847,19 @@ func Filled[T any](size int, value T) []T {
 	return slice
 }
 
-// Iter makes an Iterator[T] from slice []T, containing all the elements
+// Iter makes an [iterator.Iterator][T] from slice []T, containing all the elements
 // from the slice in order.
 func Iter[T any](slice []T) iterator.Iterator[T] {
 	return iterator.NewDefaultIterator(iterator.NewSliceCoreIterator(&slice))
 }
 
-// IterRef makes an Iterator[*T] from slice []T, containing references to all the elements
+// IterRef makes an [iterator.Iterator][*T] from slice []T, containing references to all the elements
 // in the slice in order.
 func IterRef[T any](slice []T) iterator.Iterator[*T] {
 	return iterator.NewDefaultIterator(iterator.NewSliceCoreIteratorRef(&slice))
 }
 
-// IterMut makes a MutableIterator[T] from slice reference *[]T, containing all the elements
+// IterMut makes an [iterator.MutableIterator][T] from slice reference *[]T, containing all the elements
 // from the slice in order.
 func IterMut[T any](slice *[]T) iterator.MutableIterator[T] {
 	return iterator.NewDefaultMutableIterator(iterator.NewSliceCoreIterator(slice))

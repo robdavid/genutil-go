@@ -230,7 +230,7 @@ func NewWithSize[T any](seq iter.Seq[T], size func() IteratorSize) Iterator[T] {
 	return NewDefaultIterator(NewSeqCoreIteratorWithSize(seq, size))
 }
 
-// NewFromSimple builds an Iterator from a SimpleIterator
+// NewFromSimple builds an Iterator from a SimpleIterator.
 func NewFromSimple[T any](simple SimpleIterator[T]) Iterator[T] {
 	return NewDefaultIterator(NewSimpleCoreIterator(simple))
 }
@@ -341,7 +341,7 @@ func New2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func() IteratorSize) 
 // MakeIterator creates a generic iterator from a simple iterator. Provides an implementation
 // of additional Iterator methods.
 //
-// Deprecated: use NewFromSimple
+// Deprecated: use [NewFromSimple]
 func MakeIterator[T any](base SimpleIterator[T]) Iterator[T] {
 	return DefaultIterator[T]{NewSimpleCoreIterator(base)}
 }

@@ -31,18 +31,18 @@ func NewSimpleCoreMutableIterator[T any](itr SimpleMutableIterator[T]) *SimpleCo
 }
 
 // NewSimpleCoreMutableIterator builds a [CoreMutableIterator] from a [SimpleMutableIterator] plus a function
-// that returns the number item remaining in the iterator.
+// that returns the number of items remaining in the iterator.
 func NewSimpleCoreMutableIteratorWithSize[T any](itr SimpleMutableIterator[T], size func() IteratorSize) *SimpleCoreMutableIterator[T] {
 	return &SimpleCoreMutableIterator[T]{SimpleMutableIterator: itr, size: size}
 }
 
-// NewFromSimpleMutable builds a [MutableIterator] from a [SimpleMutableIterator]
+// NewFromSimpleMutable builds a [MutableIterator] from a [SimpleMutableIterator].
 func NewFromSimpleMutable[T any](itr SimpleMutableIterator[T]) MutableIterator[T] {
 	return NewDefaultMutableIterator(NewSimpleCoreMutableIterator(itr))
 }
 
 // NewFromSimpleMutableWithSize builds a [MutableIterator] from a [SimpleMutableIterator] and a size
-// function that returns the remaining items in the iterator.
+// function that returns the number of items remaining items in the iterator.
 func NewFromSimpleMutableWithSize[T any](itr SimpleMutableIterator[T], size func() IteratorSize) MutableIterator[T] {
 	return NewDefaultMutableIterator(NewSimpleCoreMutableIteratorWithSize(itr, size))
 }

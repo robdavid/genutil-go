@@ -228,23 +228,53 @@ func ExampleNewFromSimpleWithSize() {
 	// [0 1 2 3 4 5 6 7 8 9]
 }
 
-// Extend counter to add [CoreIterator] methods
+// coreCounter is a CoreIterator implementation that produces an
+// infinite string of integers, starting from 0.
 type coreCounter struct {
-	counter
+	value   int  // value is the current value
+	count   int  // count is the next value
+	aborted bool // if true, the iterator is aborted
+}
+
+// Next sets value to the next count, increments the count, and
+// returns true, unless aborted. When aborted, it is a no-op.
+func (c *coreCounter) Next() bool {
+	if c.aborted {
+		return false
+	} else {
+		c.value = c.count
+		c.count++
+		return true
+	}
+}
+
+// Value returns the current value.
+func (c *coreCounter) Value() int {
+	return c.value
+}
+
+// Abort stops the iterator by setting the aborted flag.
+func (c *coreCounter) Abort() {
+	c.aborted = true
+}
+
+// Reset sets the counter back to 0.
+func (c *coreCounter) Reset() {
+	c.count = 0
 }
 
 // Seq implements the [CoreIterator] method Seq() by delegating to [iterator.Seq].
-func (c *counter) Seq() iter.Seq[int] {
+func (c *coreCounter) Seq() iter.Seq[int] {
 	return iterator.Seq(c)
 }
 
-// SeqOK implements the [CoreIterator] method SeqOK(), returning false since this
-// iterator is not backed by a [iter.Seq].
-func (c counter) SeqOK() bool { return false }
+// SeqOK returns false since this iterator is not backed by an [iter.Seq], and it's
+// slightly more efficient to use Next/Value to consume it.
+func (c coreCounter) SeqOK() bool { return false }
 
-// Size implements the [CoreIterator] method Size(), returning a value indicating
-// the size is infinite.
-func (c counter) Size() iterator.IteratorSize {
+// Size returns a value indicating this iterator does not terminate and returns
+// an infinite number of items.
+func (c coreCounter) Size() iterator.IteratorSize {
 	return iterator.SIZE_INFINITE
 }
 
@@ -336,4 +366,81 @@ func ExampleDefaultIterator_Intercalate() {
 	// "one"
 	// "one two"
 	// "one two three"
+}
+
+func ExampleRange() {
+	i := iterator.Range(0, 5)
+	for e := range i.Seq() {
+		fmt.Println(e)
+	}
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
+}
+
+func ExampleRange_descending() {
+	i := iterator.Range(5, 0)
+	for e := range i.Seq() {
+		fmt.Println(e)
+	}
+	// Output:
+	// 5
+	// 4
+	// 3
+	// 2
+	// 1
+}
+
+func ExampleRange_empty() {
+	c := iterator.Range(0, 0).Collect()
+	fmt.Printf("%#v", c)
+	// Output: []int{}
+}
+
+func ExampleIncRange() {
+	i := iterator.IncRange(0, 5)
+	for e := range i.Seq() {
+		fmt.Println(e)
+	}
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
+	// 5
+}
+
+func ExampleIncRange_single() {
+	i := iterator.IncRange(0, 0)
+	for e := range i.Seq() {
+		fmt.Println(e)
+	}
+	// Output:
+	// 0
+}
+
+func ExampleRangeBy() {
+	i := iterator.RangeBy(0, 5, 2)
+	for e := range i.Seq() {
+		fmt.Println(e)
+	}
+	// Output:
+	// 0
+	// 2
+	// 4
+}
+
+func ExampleIncRangeBy() {
+	i := iterator.IncRangeBy(0, 4, 2)
+	for e := range i.Seq() {
+		fmt.Println(e)
+	}
+	// Output:
+	// 0
+	// 2
+	// 4
 }

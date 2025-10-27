@@ -123,32 +123,35 @@ func newRangeIter[T ordered.Real, S ordered.Real](from, upto T, by S, inclusive 
 	return NewDefaultIterator(&itr)
 }
 
-// Range creates an iterator that ranges from `from` to
-// `upto` exclusive
+// Range creates an iterator that produces a sequence of numeric values that
+// range between from and upto exclusive. This sequence may be descending if
+// upto is less than from. If from == upto, an empty iterator is returned.
 func Range[T ordered.Real](from, upto T) Iterator[T] {
 	return newRangeIter(from, upto, functions.IfElse(upto < from, -1, 1), false)
 }
 
-// Range creates an iterator that ranges from `from` to
-// `upto` inclusive
+// Range creates an iterator that produces a sequence of numeric values that
+// range between from and upto inclusive. This sequence may be descending if
+// upto is less than from. If from == upto, an iterator yielding a single value
+// is returned.
 func IncRange[T ordered.Real](from, upto T) Iterator[T] {
 	return newRangeIter(from, upto, functions.IfElse(upto < from, -1, 1), true)
 }
 
-// RangeBy creates an iterator that ranges from `from` up to
-// `upto` exclusive, incrementing by `by` each step.
-// This can be negative (and `upto` should be less than `from`),
-// but it cannot be zero unless from == upto, in which case
-// an empty iterator is returned.
+// RangeBy creates an iterator that produces a sequence of numeric values that
+// range between from and upto exclusive, with a difference between each value
+// of by. The value of by can be negative, in which case upto should be less
+// than from, but it cannot be zero unless from == upto, in which case an empty
+// iterator is returned.
 func RangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] {
 	return newRangeIter(from, upto, by, false)
 }
 
-// RangeBy creates an iterator that ranges from `from` up to
-// `upto` inclusive, incrementing by `by` each step.
-// This can be negative (and `upto` should be less than `from`),
-// but it cannot be zero unless from == upto, in which case
-// an iterator with a single value is returned.
+// RangeBy creates an iterator that produces a sequence of numeric values that
+// range between from and upto inclusive, with a difference between each value
+// of by. The value of by can be negative, in which case upto should be less
+// than from, but it cannot be zero unless from == upto, in which case an
+// iterator yielding a single value is returned.
 func IncRangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] {
 	return newRangeIter(from, upto, by, true)
 }
