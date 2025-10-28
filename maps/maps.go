@@ -286,28 +286,80 @@ func FindUsingRef[K comparable, T any](m map[K]T, p func(*K, *T) bool) option.Op
 
 // Returns an iterator over the keys of a map.
 func IterKeys[K comparable, T any](m map[K]T) iterator.Iterator[K] {
-	return iterator.Generate(func(c iterator.Consumer[K]) {
-		for k := range m {
-			c.Yield(k)
-		}
-	})
+	size := len(m)
+	return iterator.NewWithSize(
+		func(yield func(K) bool) {
+			for k := range m {
+				size--
+				if !yield(k) {
+					break
+				}
+			}
+		},
+		func() iterator.IteratorSize {
+			return iterator.NewSize(size)
+		},
+	)
 }
 
 // Returns an iterator over the values of a map.
+//
+// Deprecated: Use Iter since iterator.Iterator2[K,T] is also an iterator.Iterator[K,T]
 func IterValues[K comparable, T any](m map[K]T) iterator.Iterator[T] {
-	return iterator.Generate(func(c iterator.Consumer[T]) {
-		for _, v := range m {
-			c.Yield(v)
-		}
-	})
+	return Iter(m)
 }
 
 // Returns an iterator over the keys and values of a map, returning each pair
-// as 2-tuple
-func IterItems[K comparable, T any](m map[K]T) iterator.Iterator[tuple.Tuple2[K, T]] {
-	return iterator.Generate(func(c iterator.Consumer[tuple.Tuple2[K, T]]) {
-		for k, v := range m {
-			c.Yield(tuple.Of2(k, v))
-		}
-	})
+// via an iterator.Iterator2.
+//
+// Deprecated: Use Iter since this function is an alias for that.
+func IterItems[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
+	return Iter(m)
+}
+
+// Returns an iterator over the keys and values of a map, returning each pair
+// via an iterator.Iterator2.
+func Iter[K comparable, T any](m map[K]T) iterator.Iterator2[K, T] {
+	size := len(m)
+	return iterator.New2WithSize(
+		func(yield func(K, T) bool) {
+			size = len(m)
+			for k, v := range m {
+				size--
+				if !yield(k, v) {
+					break
+				}
+			}
+		},
+		func() iterator.IteratorSize {
+			return iterator.NewSize(size)
+		},
+	)
+}
+
+func IterMut[K comparable, T any](m map[K]T) iterator.MutableIterator2[K, T] {
+	size := len(m)
+	var key K
+	core := iterator.NewSeqCoreMutableIterator2WithSize(
+		func(yield func(K, T) bool) {
+			var v T
+			size = len(m)
+			for key, v = range m {
+				size--
+				if !yield(key, v) {
+					break
+				}
+			}
+		},
+		func() {
+			delete(m, key)
+		},
+		func(v T) {
+			m[key] = v
+		},
+		func() iterator.IteratorSize {
+			return iterator.NewSize(size)
+		},
+	)
+	return iterator.NewDefaultMutableIterator2(core)
 }

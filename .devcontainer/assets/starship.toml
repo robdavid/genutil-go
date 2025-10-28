@@ -1,0 +1,22 @@
+[aws]
+format = "\n[$symbol($profile )(\\($region\\) )(\\[$duration\\] )]($style)"
+
+[directory]
+format = "📁 [$path]($style)[$read_only]($read_only_style) "
+truncation_length = 10
+truncation_symbol = "…"
+
+[hostname]
+format = "💻 [$hostname]($style) "
+ssh_only = false
+
+[nix_shell]
+symbol = "❄ "
+
+[time]
+disabled = false
+format = "🕑 [$time]($style) "
+
+[username]
+format = "👤 [$user]($style) "
+show_always = true

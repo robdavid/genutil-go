@@ -144,7 +144,7 @@ func TestFold(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := Fold(0, sliceIn, func(a int, t int) int { return a + t })
+	total := Fold(sliceIn, 0, func(a int, t int) int { return a + t })
 	assert.Equal(t, 55, total)
 }
 
@@ -153,7 +153,7 @@ func TestRef(t *testing.T) {
 	for i := range sliceIn {
 		sliceIn[i] = i + 1
 	}
-	total := FoldRef(0, sliceIn, func(a *int, t *int) { *a += *t })
+	total := FoldRef(sliceIn, 0, func(a *int, t *int) { *a += *t })
 	assert.Equal(t, 55, total)
 }
 
@@ -199,15 +199,15 @@ func TestFilter(t *testing.T) {
 
 func TestFilterMap(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	sliceOut := FilterMap(sliceIn, func(i int) option.Option[int] {
+	sliceOut := FilterMapOpt(sliceIn, func(i int) option.Option[int] {
 		return functions.IfElse(i%2 == 0, option.Value(i*3), option.Empty[int]())
 	})
 	assert.Equal(t, []int{6, 12, 18, 24}, sliceOut)
 }
 
-func TestFilterMapRef(t *testing.T) {
+func TestFilterMapRefOpt(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	sliceOut := FilterMapRef(sliceIn, func(i *int) option.Option[int] {
+	sliceOut := FilterMapRefOpt(sliceIn, func(i *int) option.Option[int] {
 		return functions.IfElse(*i%2 == 0, option.Value(*i*3), option.Empty[int]())
 	})
 	assert.Equal(t, []int{6, 12, 18, 24}, sliceOut)
@@ -560,7 +560,7 @@ func TestMultipleParChunksSize(t *testing.T) {
 			diff := len(chunk) - ideal
 			assert.LessOrEqual(t, diff, ideal/2)
 		}
-		sum := Fold(0, chunks, func(n int, c []int) int { return n + len(c) })
+		sum := Fold(chunks, 0, func(n int, c []int) int { return n + len(c) })
 		assert.Equal(t, len(inslice), sum)
 	}
 }
@@ -635,4 +635,48 @@ func TestNonIntegerReverseRange(t *testing.T) {
 func TestFilled(t *testing.T) {
 	f := Filled(5, byte('-'))
 	assert.Equal(t, []byte{'-', '-', '-', '-', '-'}, f)
+}
+
+func TestIterRef(t *testing.T) {
+	input := Range(0, 10)
+	for vp := range IterRef(input).Seq() {
+		*vp *= 2
+	}
+	expected := RangeBy(0, 20, 2)
+	assert.Equal(t, expected, input)
+}
+
+func TestIterMut(t *testing.T) {
+	slice := Range(0, 10)
+	itr := IterMut(&slice)
+	size := len(slice)
+	for v := range itr.Seq() {
+		size--
+		assert.Equal(t, size, itr.Size().Allocate())
+		assert.Equal(t, v, itr.Value())
+		if v&1 == 0 {
+			itr.Delete()
+			assert.Equal(t, 0, itr.Value())
+		} else {
+			itr.Set(v * 3)
+		}
+	}
+	expected := []int{3, 9, 15, 21, 27}
+	assert.Equal(t, expected, slice)
+}
+
+func TestIterMutSeqCollect(t *testing.T) {
+	slice := Range(0, 10)
+	itr := IterMut(&slice)
+	var collected []int
+	count := 0
+	for v := range itr.Seq() {
+		count++
+		if v == 5 {
+			collected = itr.Collect()
+		}
+	}
+	expected := []int{6, 7, 8, 9}
+	assert.Equal(t, expected, collected)
+	assert.Equal(t, 6, count)
 }

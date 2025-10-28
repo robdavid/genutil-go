@@ -2,11 +2,11 @@
 // that support the operators <, >, == etc.
 package ordered
 
-import "golang.org/x/exp/constraints"
+import "cmp"
 
 // Max returns the largest of one or more ordered values. Note the values can be strings as well
 // as numeric types.
-func Max[T constraints.Ordered](xs ...T) T {
+func Max[T cmp.Ordered](xs ...T) T {
 	if len(xs) == 0 {
 		panic(ErrEmptySlice)
 	}
@@ -19,9 +19,13 @@ func Max[T constraints.Ordered](xs ...T) T {
 	return max
 }
 
+func Max2[T cmp.Ordered](x1, x2 T) T {
+	return max(x1, x2)
+}
+
 // Max returns the smallest of one or more ordered values. Note the values can be strings as well
 // as numeric types.
-func Min[T constraints.Ordered](xs ...T) T {
+func Min[T cmp.Ordered](xs ...T) T {
 	if len(xs) == 0 {
 		panic(ErrEmptySlice)
 	}
@@ -32,4 +36,8 @@ func Min[T constraints.Ordered](xs ...T) T {
 		}
 	}
 	return min
+}
+
+func Min2[T cmp.Ordered](x1, x2 T) T {
+	return min(x1, x2)
 }

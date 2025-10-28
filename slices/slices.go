@@ -9,6 +9,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/internal/rangehelper"
+	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/ordered"
 )
@@ -18,7 +19,7 @@ var ErrInvalidNumCPU = errors.New("invalid number of CPUs")
 
 // Concatenates a list of list of items into a list of items
 func Concat[T any](ss ...[]T) (result []T) {
-	cap := Fold(0, ss, func(a int, s []T) int { return a + len(s) })
+	cap := Fold(ss, 0, func(a int, s []T) int { return a + len(s) })
 	result = make([]T, 0, cap)
 	for i := range ss {
 		result = append(result, ss[i]...)
@@ -616,7 +617,7 @@ func MapRefI[T any](slice []T, f func(*T) T) {
 // Applies a function f to an accumulator, with initial value
 // a, and a slice element, returning a new accumulator, for each element
 // in the slice s. The final accumulator value is returned.
-func Fold[A any, T any](a A, s []T, f func(A, T) A) A {
+func Fold[A any, T any](s []T, a A, f func(A, T) A) A {
 	for i := range s {
 		a = f(a, s[i])
 	}
@@ -626,7 +627,7 @@ func Fold[A any, T any](a A, s []T, f func(A, T) A) A {
 // Applies a function f to a reference to an accumulator, with initial value a,
 // and a reference to slice element, mutating the accumulator, for every element in the
 // slice s. The final value of the accumulator is returned.
-func FoldRef[A any, T any](a A, s []T, f func(*A, *T)) A {
+func FoldRef[A any, T any](s []T, a A, f func(*A, *T)) A {
 	result := a
 	for i := range s {
 		f(&result, &s[i])
@@ -660,11 +661,25 @@ func FilterRef[T any](s []T, f func(*T) bool) (result []T) {
 	return
 }
 
-// Combines Filter and Map functionality. The mapping function f is applied to each
-// element in the slice of type T, and returns an Option value of type U. If the option
-// is non-empty, the value of type U is appended to the result slice. Otherwise,
+// FilterMap Combines Filter and Map functionality. The mapping function f is applied
+// to each element in the slice of type T, and returns a value of type U and a boolean. If the
+// boolean is true, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMap[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
+func FilterMap[T any, U any](s []T, f func(T) (U, bool)) (result []U) {
+	result = make([]U, 0, len(s))
+	for _, v := range s {
+		if o, ok := f(v); ok {
+			result = append(result, o)
+		}
+	}
+	return
+}
+
+// FilterMapOpt Combines Filter and Map functionality. The mapping function f is applied
+// to each element in the slice of type T, and returns an Option value of type U. If the
+// option is non-empty, the value of type U is appended to the result slice. Otherwise,
+// the element is skipped.
+func FilterMapOpt[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for _, v := range s {
 		if o := f(v); o.HasValue() {
@@ -674,11 +689,25 @@ func FilterMap[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
 	return
 }
 
-// Combines Filter and Map functionality. The mapping function f is applied to a reference
+// FilterMapRef combines Filter and Map functionality. The mapping function f is applied to a reference
 // to each element in the slice of type T, and returns an Option value of type U. If the option
 // is non-empty, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMapRef[T any, U any](s []T, f func(*T) option.Option[U]) (result []U) {
+func FilterMapRef[T any, U any](s []T, f func(*T) (U, bool)) (result []U) {
+	result = make([]U, 0, len(s))
+	for i := range s {
+		if o, ok := f(&s[i]); ok {
+			result = append(result, o)
+		}
+	}
+	return
+}
+
+// FilterMapRefOpt combines Filter and Map functionality. The mapping function f is applied to a reference
+// to each element in the slice of type T, and returns an Option value of type U. If the option
+// is non-empty, the value of type U is appended to the result slice. Otherwise,
+// the element is skipped.
+func FilterMapRefOpt[T any, U any](s []T, f func(*T) option.Option[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for i := range s {
 		if o := f(&s[i]); o.HasValue() {
@@ -816,4 +845,28 @@ func Filled[T any](size int, value T) []T {
 	slice := make([]T, size)
 	Fill(slice, value)
 	return slice
+}
+
+// Iter makes an [iterator.Iterator][T] from slice []T, containing all the elements
+// from the slice in order.
+func Iter[T any](slice []T) iterator.Iterator[T] {
+	return iterator.NewDefaultIterator(iterator.NewSliceCoreIterator(&slice))
+}
+
+// IterRef makes an [iterator.Iterator][*T] from slice []T, containing references to all the elements
+// in the slice in order.
+func IterRef[T any](slice []T) iterator.Iterator[*T] {
+	return iterator.NewDefaultIterator(iterator.NewSliceCoreIteratorRef(&slice))
+}
+
+// IterMut makes an [iterator.MutableIterator][T] from slice reference *[]T, containing all the elements
+// from the slice in order.
+func IterMut[T any](slice *[]T) iterator.MutableIterator[T] {
+	return iterator.NewDefaultMutableIterator(iterator.NewSliceCoreIterator(slice))
+}
+
+// IterRefMut makes a MutableIterator[*T] from slice reference *[]T, containing references to all the elements
+// in the slice in order.
+func IterRefMut[T any](slice []T) iterator.MutableIterator[*T] {
+	return iterator.NewDefaultMutableIterator(iterator.NewSliceCoreIteratorRef(&slice))
 }

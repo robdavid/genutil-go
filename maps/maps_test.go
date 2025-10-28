@@ -3,6 +3,7 @@ package maps
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -231,6 +232,56 @@ func TestIterKeys(t *testing.T) {
 	assert.ElementsMatch(t, []string{"one", "two", "three"}, keys)
 }
 
+func TestIter(t *testing.T) {
+	mymap := map[string]int{
+		"one":   1,
+		"three": 3,
+		"two":   2,
+	}
+	items := Iter(mymap).Collect2()
+	assert.ElementsMatch(t, []iterator.KeyValue[string, int]{iterator.KVOf("one", 1), iterator.KVOf("two", 2), iterator.KVOf("three", 3)}, items)
+}
+
+func TestIterSize(t *testing.T) {
+	mymap := make(map[int]string)
+	const mapsize = 20
+	for n := range mapsize {
+		mymap[n] = strconv.Itoa(n)
+	}
+	itr := Iter(mymap)
+	count := mapsize
+	for range itr.Seq2() {
+		count--
+		assert.Equal(t, count, itr.Size().Size)
+	}
+	assert.Zero(t, itr.Size().Size)
+}
+
+func TestIterSimple(t *testing.T) {
+	mymap := make(map[int]int)
+	seen := make(map[int]bool)
+	const mapsize = 20
+	for n := range mapsize {
+		mymap[n] = n
+	}
+	itr := Iter(mymap)
+	count := mapsize
+	for itr.Next() {
+		count--
+		assert.Equal(t, count, itr.Size().Size)
+		seen[itr.Key()] = true
+		if count <= 5 {
+			break
+		}
+	}
+	assert.Equal(t, 5, itr.Size().Size)
+	remain := itr.Collect()
+	assert.Equal(t, 5, len(remain))
+	for _, r := range remain {
+		assert.False(t, seen[r])
+	}
+}
+
 func generateMap(size int) map[string]int {
 	mymap := make(map[string]int)
 	for j := 0; j < size; j++ {
@@ -311,4 +362,50 @@ func TestSortedItems(t *testing.T) {
 		tuple.Of2("key-4", 4),
 	}
 	assert.Equal(t, expected, items)
+}
+
+func TestIteratorMutations(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i * 2
+	}
+	iter := IterMut(m)
+	assert.Equal(t, len(m), iter.Size().Size)
+	for k, v := range iter.Seq2() {
+		if k%3 == 0 {
+			iter.Set(v / 2 * 3)
+		} else if k%2 == 0 {
+			iter.Delete()
+		}
+	}
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	actual := make([]int, 0, len(keys))
+	for _, k := range keys {
+		actual = append(actual, m[k])
+	}
+	expected := []int{0, 2, 9, 10, 18, 14, 27}
+	assert.Equal(t, expected, actual)
+}
+
+func TestIterMutNextCollect(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i
+	}
+	itr := IterMut(m)
+	var collected []int
+	count := 0
+	assert.True(t, itr.SeqOK())
+	for itr.Next() {
+		assert.False(t, itr.SeqOK())
+		count++
+		if count == 5 {
+			collected = itr.Collect()
+		}
+	}
+	assert.Equal(t, 5, len(collected))
 }

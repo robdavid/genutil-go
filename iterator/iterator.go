@@ -1,496 +1,512 @@
-// Iterators and generators
 package iterator
 
 import (
-	"fmt"
+	"errors"
+	"iter"
 
-	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
-	"github.com/robdavid/genutil-go/internal/rangehelper"
 	"github.com/robdavid/genutil-go/option"
-	"github.com/robdavid/genutil-go/ordered"
 )
 
-// The largest slice capacity we are prepared to allocate to collect
-// iterators of uncertain size.
-const maxUncertainAllocation = 100000
+var ErrSizeInfinite = errors.New("cannot consume an infinite iterator")
+var ErrInvalidIteratorSizeType = errors.New("invalid iterator size type")
+var ErrInvalidIteratorRange = errors.New("invalid iterator range")
+var ErrDeleteNotImplemented = errors.New("delete not implemented")
+var ErrEmptyIterator = errors.New("iterator is empty")
 
-// SimpleIterator supports a simple sequence of elements
-type SimpleIterator[T any] interface {
-	// Next sets the iterator's current value to be the first, and subsequent, iterator elements.
-	// False is returned only when there are no more elements (the current value remains unchanged)
-	Next() bool
-	// Value gets the current iterator value.
-	Value() T
-	// Abort stops the iterator; subsequent calls to Next() will return false.
-	Abort()
-}
-
-// SizedIterator is an extension of SimpleIterator that also holds some sizing information
-type SizedIterator[T any] interface {
-	SimpleIterator[T]
-	// Size is an estimate, where possible, of the number of elements remaining.
-	Size() IteratorSize
-}
-
-// Generic iterator
-type Iterator[T any] interface {
-	SizedIterator[T]
-	// Chan returns iterator as a channel.
-	Chan() <-chan T
-}
-
-// IteratorSize holds iterator sizing information
-type IteratorSize interface {
-	// Allocate returns a value for the size of slice required to hold all elements returned by the iterator.
-	// This may be an exact value, an estimated value or unknown (in which case 0 is returned)
-	Allocate() int
-	// Subset returns a new iterator size based on some unknown subset of iterator values.
-	Subset() IteratorSize
-}
-
-// Iterator sizing information; size is unknown
-type sizeUnknown struct{}
-
-func (sizeUnknown) Allocate() int        { return 0 }
-func (sizeUnknown) Subset() IteratorSize { return SizeUnknown }
-
-// SizeUnknown is a value implementing IteratorSize, representing an iterator of unknown size
-var SizeUnknown = sizeUnknown{}
-
-// IsSizeUnknown returns true if the given IteratorSize instance represents
-// an unknown size
-func IsSizeUnknown(size IteratorSize) bool {
-	return size == SizeUnknown
-}
-
-// SizeKnown holds Iterator sizing information where the size is known with certainty.
-type SizeKnown struct {
-	Size int
-}
-
-func (sk SizeKnown) Allocate() int        { return sk.Size }
-func (sk SizeKnown) Subset() IteratorSize { return SizeAtMost(sk) }
-
-// NewSize creates an `IteratorSize` implementation that has a fixed size of `n`.
-func NewSize(n int) IteratorSize { return SizeKnown{n} }
-
-// IsSizeKnown returns true if the iterator size is one whose actual size is known.
-func IsSizeKnown(size IteratorSize) bool {
-	_, ok := size.(SizeKnown)
-	return ok
-}
-
-// SizeAtMost holds Iterator sizing information where only an upper bound is known.
-type SizeAtMost struct {
-	Size int
-}
-
-func (sm SizeAtMost) Allocate() int {
-	alloc := sm.Size / 2
-	if alloc > maxUncertainAllocation {
-		alloc = maxUncertainAllocation
-	}
-	return alloc
-}
-func (sm SizeAtMost) Subset() IteratorSize { return sm }
-
-// NewSizeAtMost creates an `IteratorSize` implementation that has a size no more than n.
-func NewSizeAtMost(n int) IteratorSize {
-	return SizeAtMost{n}
-}
-
-// IsSizeAtMost returns true if the iterator size is one whose maximum size is known.
-func IsSizeAtMost(size IteratorSize) bool {
-	_, ok := size.(SizeAtMost)
-	return ok
-}
-
-// FuncNext is a function supporting a transforming operation by consuming
-// all or part of an iterator, returning the next value
-type FuncNext[T any, U any] func(Iterator[T]) (bool, U)
-
-func safeClose[T any](ch chan T) (ok bool) {
-	defer func() {
-		if recover() != nil {
-			ok = false
-		}
-	}()
-	close(ch)
-	return true
-}
-
-func safeSend[T any](ch chan<- T, val T) (ok bool) {
-	defer func() {
-		if recover() != nil {
-			ok = false
-		}
-	}()
-	ch <- val
-	return true
-}
-
-// Generic channel implementation. Produces a channel yielding
-// values from the iterator
-func iterChan[T any](iter SimpleIterator[T]) (out chan T) {
-	out = make(chan T)
-	go func() {
-		defer safeClose(out)
-		for iter.Next() {
-			if !safeSend(out, iter.Value()) {
+// Seq transforms any generic [SimpleIterator] into a native [iter.Seq] iterator.
+func Seq[T any](i SimpleIterator[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for i.Next() {
+			if !yield(i.Value()) {
+				i.Abort()
 				break
 			}
 		}
-	}()
-	return
+	}
 }
 
-type unknownSizeIterator[T any] struct {
-	SimpleIterator[T]
+// Seq2 transforms a [SimpleIterator] of [KeyValue] pairs into a native [iter.Seq2] iterator.
+func Seq2[K any, V any](i SimpleIterator[KeyValue[K, V]]) iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		for i.Next() {
+			if !yield(i.Value().Key, i.Value().Value) {
+				i.Abort()
+				break
+			}
+		}
+	}
 }
 
-func (usi unknownSizeIterator[T]) Size() IteratorSize {
-	return SizeUnknown
+// DefaultIterator wraps a [CoreIterator] and provides default implementations
+// of the iterator methods defined in [IteratorExtensions] to provide a complete
+// [Iterator] implementation. All the extension methods are written purely in
+// terms of the methods of [CoreIterator], any typically delegate to the
+// function in the iterator package of the same name.
+type DefaultIterator[T any] struct {
+	CoreIterator[T]
 }
 
-// MakeSizedIterator creates a sized iterator from a simple iterator; the iterator size will
-// be unknown.
-func MakeSizedIterator[T any](si SimpleIterator[T]) SizedIterator[T] {
-	return unknownSizeIterator[T]{si}
+// NewDefaultIterator builds an [Iterator] from a [CoreIterator] by adding the methods defined in
+// [IteratorExtensions].
+func NewDefaultIterator[T any](citr CoreIterator[T]) DefaultIterator[T] {
+	return DefaultIterator[T]{CoreIterator: citr}
 }
 
-type sizedIterator[T any] struct {
-	SimpleIterator[T]
-	size IteratorSize
+// Chan returns the iterator as a channel.  The iterator is consumed in a
+// goroutine which yields results to the channel.
+func (di DefaultIterator[T]) Chan() <-chan T {
+	return Chan(di)
 }
 
-func (si sizedIterator[T]) Size() IteratorSize {
-	return si.size
+// Collect collects all elements from the iterator into a slice.
+func (di DefaultIterator[T]) Collect() []T {
+	return Collect(di)
 }
 
-// MakeIteratorOfSize creates a sized iterator from a simple iterator; the iterator size will be the
-// size provided.
-func MakeIteratorOfSize[T any](si SimpleIterator[T], size IteratorSize) SizedIterator[T] {
-	return sizedIterator[T]{si, size}
+// CollectInto adds all elements from the iterator into an existing slice.
+func (di DefaultIterator[T]) CollectInto(slice *[]T) []T {
+	return CollectInto(di, slice)
 }
 
-type autoChannelIterator[T any] struct {
-	SizedIterator[T]
-	OutChan chan T
+// CollectIntoCap add elements from the iterator into an existing slice
+// until either the capacity of the slice is filled, or the iterator is
+// exhausted, which ever is first.
+func (di DefaultIterator[T]) CollectIntoCap(slice *[]T) []T {
+	return CollectIntoCap(di, slice)
+}
+
+// Enumerate returns an iterator that enumerates the elements of this
+// iterator, returning an Iterator2 of the index and the value.
+func (di DefaultIterator[T]) Enumerate() Iterator2[int, T] {
+	return Enumerate(di)
+}
+
+// Filter is a filtering method that creates a new iterator which contains a
+// subset of elements contained in the current one. This function takes a
+// predicate function p and only elements for which this function returns
+// true should be included in the filtered iterator.
+func (di DefaultIterator[T]) Filter(predicate func(T) bool) Iterator[T] {
+	return Filter(di, predicate)
+}
+
+// Morph is a mapping function that creates a new iterator which contains
+// the elements of the current iterator with the supplied function m applied
+// to each one. The type of the return value of m must be the same as that
+// of the elements of the current iterator. This is because of limitations
+// of Go generics. To apply a mapping that changes the type, see the
+// [Map] function.
+func (di DefaultIterator[T]) Morph(mapping func(T) T) Iterator[T] {
+	return Map(di, mapping)
+}
+
+// FilterMorph is a filtering and mapping method that creates a new iterator
+// from an existing one by simultaneously transforming and filtering each
+// iterator element. The method takes a mapping function f that transforms and
+// filters each element. It does this by taking an input element value and
+// returning a new element value and a boolean flag. Only elements for which
+// this flag is true are included in the new iterator. E.g.
+//
+//	itr := iterator.Of(0,1,2,3,4)
+//	itrMorph := itr.FilterMorph(func(v int) (int, bool) { return v*2, v%2 == 0})
+//	result := itrMorph.Collect() // []int{0,4,8}
+//
+// Note that this function is not able to map elements to values of a different
+// type due to limitations of Go generics. For a filter mapping function that
+// can change the type, see the [iterator.FilterMap] function.
+func (di DefaultIterator[T]) FilterMorph(mapping func(T) (T, bool)) Iterator[T] {
+	return FilterMap(di, mapping)
+}
+
+// Take returns a variant of the current iterator that which returns at most
+// n elements. If the current iterator has less than or exactly n elements,
+// the returned iterator is equivalent to the input iterator.
+func (di DefaultIterator[T]) Take(n int) Iterator[T] {
+	return Take(n, di)
+}
+
+// All returns true if p returns true for all the elements in the iterator.
+// This method short circuits and does not execute in constant time; the
+// iterator is aborted after the first value for which the predicate returns
+// false.
+func (di DefaultIterator[T]) All(predicate func(T) bool) bool {
+	return All(di, predicate)
+}
+
+// Any returns true if p returns true for at least one element in the iterator.
+// This method short circuits and does not execute in constant time; the
+// iterator is aborted after the first value for which the predicate returns
+// true.
+func (di DefaultIterator[T]) Any(predicate func(T) bool) bool {
+	return Any(di, predicate)
+}
+
+// Fold1 combines the elements of the iterator into a single value using an
+// accumulation function. It takes an initial value init and an accumulation
+// function f. The iterator must have at least one element, or this method will
+// panic with [ErrEmptyIterator].  If there is only one element, this element be
+// returned. Otherwise, the first two elements are fed into the accumulation
+// function f. The result of this is combined with the next element to get the
+// next result and so on until the iterator is consumed. The final result is
+// returned. If the iterator is known to be of infinite size, this method will
+// panic with [ErrSizeInfinite].
+func (di DefaultIterator[T]) Fold1(f func(a, e T) T) T {
+	return Fold1(di, f)
+}
+
+// Fold combines the elements of the iterator into a single value using an
+// accumulation function. It takes an initial value init and the accumulation
+// function f. If the iterator is empty, init is returned. Otherwise the initial
+// value is fed into the accumulation function f along with the first element
+// from the iterator. The result is then fed back into f along with the second
+// element, and so on until the iterator is consumed. The final result is the
+// final value returned by the function. If the iterator is known to be of
+// infinite size, this method will panic with [ErrSizeInfinite].
+func (di DefaultIterator[T]) Fold(init T, f func(a, e T) T) T {
+	return Fold(di, init, f)
+}
+
+// Intercalate is a variation on [Fold] which combines the elements of the
+// iterator into a single value using an accumulation function and an
+// interspersed value. If the iterator has no elements, the empty parameter is
+// returned. Otherwise, the accumulated result is initially set to the first
+// element, and is combined with subsequent elements as follows:
+//
+//	acc = f(f(acc,inter),e)
+//
+// where acc is he accumulated value, e is the next element and inter is the
+// inter parameter, and the final value of acc will be the value returned. If
+// the iterator is known to be of infinite size, this function will panic with
+// [ErrSizeInfinite].
+func (di DefaultIterator[T]) Intercalate(empty T, inter T, f func(a, e T) T) T {
+	return Intercalate(di, empty, inter, f)
+}
+
+// Intercalate1 is a variation on [Fold1] which combines the elements of the
+// iterator into a single value using an accumulation function and an
+// interspersed value. The iterator must have at least one element, otherwise it
+// will panic with [ErrEmptyIterator]. The accumulated result is initially set
+// to the first element, and is combined with subsequent elements as follows:
+//
+//	acc = f(f(acc,inter),e)
+//
+// where acc is he accumulated value, e is the next element and inter is the
+// inter parameter. The final value of acc will be the value returned. If the
+// iterator is known to be of infinite size, this function will panic with
+// [ErrSizeInfinite].
+func (di DefaultIterator[T]) Intercalate1(inter T, f func(a, e T) T) T {
+	return Intercalate1(di, inter, f)
+}
+
+// DefaultMutableIterator wraps a CoreMutableIterator together with a DefaultIterator to provide
+// and implementation of MutableIterator.
+type DefaultMutableIterator[T any] struct {
+	CoreMutableIterator[T]
+	DefaultIterator[T]
+}
+
+// NewDefaultMutableIterator builds a MutableIterator from a CoreMutableIterator by adding the methods
+// of IteratorExtensions.
+func NewDefaultMutableIterator[T any](citr CoreMutableIterator[T]) DefaultMutableIterator[T] {
+	return DefaultMutableIterator[T]{CoreMutableIterator: citr, DefaultIterator: DefaultIterator[T]{CoreIterator: citr}}
+}
+
+// DefaultMutableIterator2 wraps a CoreMutableIterator together with a DefaultIterator to provide
+// and implementation of MutableIterator.
+type DefaultMutableIterator2[K any, V any] struct {
+	CoreMutableIterator2[K, V]
+	DefaultIterator2[K, V]
+}
+
+func NewDefaultMutableIterator2[K any, V any](citr CoreMutableIterator2[K, V]) DefaultMutableIterator2[K, V] {
+	return DefaultMutableIterator2[K, V]{CoreMutableIterator2: citr, DefaultIterator2: NewDefaultIterator2(citr)}
+}
+
+// New builds an Iterator from a standard library [iter.Seq]
+func New[T any](seq iter.Seq[T]) Iterator[T] {
+	return NewDefaultIterator(NewSeqCoreIterator(seq))
+}
+
+// New builds an Iterator from a standard library iter.Seq plus a function that
+// returns the number of items left in the iterator.
+func NewWithSize[T any](seq iter.Seq[T], size func() IteratorSize) Iterator[T] {
+	return NewDefaultIterator(NewSeqCoreIteratorWithSize(seq, size))
+}
+
+// NewFromSimple builds an Iterator from a SimpleIterator.
+func NewFromSimple[T any](simple SimpleIterator[T]) Iterator[T] {
+	return NewDefaultIterator(NewSimpleCoreIterator(simple))
+}
+
+// NewFromSimpleWithSize builds an Iterator from a SimpleIterator plus a function that
+// returns the number of items left in the iterator.
+func NewFromSimpleWithSize[T any](simple SimpleIterator[T], size func() IteratorSize) Iterator[T] {
+	return NewDefaultIterator(NewSimpleCoreIteratorWithSize(simple, size))
+}
+
+// DefaultIterator2 is an [Iterator2] implementation which embeds [CoreIterator2] and [IteratorExtensions]
+// interfaces, and implements the methods of [IteratorExtensions2] in terms of [CoreIterator2]. It can be
+// constructed solely from a [CoreIterator2] implementation by the [NewDefaultIterator2] function.
+type DefaultIterator2[K any, V any] struct {
+	CoreIterator2[K, V]
+	IteratorExtensions[V]
+}
+
+// Collect2 collects all the element pairs from the iterator into a slice of
+// [KeyValue] objects.
+func (di2 DefaultIterator2[K, V]) Collect2() []KeyValue[K, V] {
+	return Collect2(di2.CoreIterator2)
+}
+
+// Collect2Into collects all the element pairs from the iterator into the
+// slice of [KeyValue] objects pointed to by s. The final slice is returned.
+func (di2 DefaultIterator2[K, V]) Collect2Into(s *[]KeyValue[K, V]) []KeyValue[K, V] {
+	return Collect2Into(di2.CoreIterator2, s)
+}
+
+// Collect2IntoCap collects all the element pairs from the iterator into the
+// slice of KeyValue objects pointed to by s, up to but not exceeding the
+// capacity of *s. The final slice is returned.
+func (di2 DefaultIterator2[K, V]) Collect2IntoCap(s *[]KeyValue[K, V]) []KeyValue[K, V] {
+	return Collect2IntoCap(di2.CoreIterator2, s)
+}
+
+// Chan2 returns the iterator as a channel of KeyValue objects. The iterator
+// is consumed in a goroutine which yields results to the channel.
+func (di2 DefaultIterator2[K, V]) Chan2() <-chan KeyValue[K, V] {
+	return Chan2(di2.CoreIterator2)
+}
+
+// Take2 returns a variant of the current iterator that which returns at
+// most n pairs of elements. If the current iterator has less than or
+// exactly n element pairs, the returned iterator is equivalent to the input
+// iterator.
+func (di2 DefaultIterator2[K, V]) Take2(n int) Iterator2[K, V] {
+	return Take2(n, di2.CoreIterator2)
+}
+
+// Filter2 is a filtering method that creates a new iterator which contains
+// a subset of element pairs contained by the current one. This function
+// takes a predicate function p and only element pairs for which this
+// function returns true should be included in the filtered iterator.
+func (di2 DefaultIterator2[K, V]) Filter2(f func(k K, v V) bool) Iterator2[K, V] {
+	return Filter2(di2, f)
+}
+
+// Morph2 is a mapping function that creates a new iterator which contains
+// pairs of elements of the current iterator with the supplied function m
+// applied to each key and value. The type of the return value and key of m
+// must be of the same type as the kay and value of the current iterator.
+// This is because of limitations of Go generics. To apply a mapping that
+// changes the type, see the [iterator.Map2] function.
+func (di2 DefaultIterator2[K, V]) Morph2(f func(k K, v V) (K, V)) Iterator2[K, V] {
+	return Map2(di2, f)
+}
+
+// FilterMorph2 is a filtering and mapping method that creates a new
+// iterator from an existing one by simultaneously transforming and
+// filtering each iterator element pair. The method takes a mapping function
+// f that transforms and filters each element pair. It does this by taking
+// an input element key and value and returning a new element key and value
+// and a boolean flag. Only elements for which this flag is true are
+// included in the new iterator.
+//
+// Note that this function is not able to map element keys or values to
+// different types due to limitations of Go generics. For a filter mapping
+// function that can map to different types, see the [iterator.FilterMap2]
+// function.
+func (di2 DefaultIterator2[K, V]) FilterMorph2(f func(K, V) (K, V, bool)) Iterator2[K, V] {
+	return FilterMap2(di2, f)
+}
+
+// NewDefaultIterator2 constructs an [Iterator2] by wrapping a [CoreIterator2]
+// with a [DefaultIterator2] to add the additional  [IteratorExtensions] and
+// [IteratorExtensions2] methods to provide the complete [Iterator2]
+// implementation
+func NewDefaultIterator2[K any, V any](core CoreIterator2[K, V]) DefaultIterator2[K, V] {
+	return DefaultIterator2[K, V]{
+		IteratorExtensions: NewDefaultIterator(core),
+		CoreIterator2:      core,
+	}
+}
+
+// New2 creates an Iterator2 from a standard library iter.Seq2. Iterator Size is unknown.
+func New2[K any, V any](seq2 iter.Seq2[K, V]) Iterator2[K, V] {
+	return NewDefaultIterator2(CoreIterator2[K, V](NewSeqCoreIterator2(seq2)))
+}
+
+// New2WithSize creates an Iterator2 from a standard library iter.Seq2 and a size function that
+// returns the remaining items in the iterator.
+func New2WithSize[K any, V any](seq2 iter.Seq2[K, V], size func() IteratorSize) Iterator2[K, V] {
+	return NewDefaultIterator2(NewSeqCoreIterator2WithSize(seq2, size))
 }
 
 // MakeIterator creates a generic iterator from a simple iterator. Provides an implementation
-// of a source of elements over a channel.
-func MakeIterator[T any](base SizedIterator[T]) Iterator[T] {
-	return &autoChannelIterator[T]{base, nil}
+// of additional Iterator methods.
+//
+// Deprecated: use [NewFromSimple]
+func MakeIterator[T any](base SimpleIterator[T]) Iterator[T] {
+	return DefaultIterator[T]{NewSimpleCoreIterator(base)}
 }
 
-// MakeIteratorFromSimple creates a generic iterator from a sized iterator, providing an implementation
-// of a source of elements over a channel. The size of the iterator will be unknown.
-func MakeIteratorFromSimple[T any](base SimpleIterator[T]) Iterator[T] {
-	return MakeIterator(MakeSizedIterator(base))
+func NewSliceCoreIteratorRef[T any](slice *[]T) CoreMutableIterator[*T] {
+	return &sliceIterRef[T]{sliceIter: sliceIter[T]{slice: slice, index: 0}}
 }
 
-// MakeIteratorOfSizeFromSimple creates a generic iterator from a sized iterator, providing an implementation
-// of a source of elements over a channel. The size of the iterator will be the size provided.
-func MakeIteratorOfSizeFromSimple[T any](base SimpleIterator[T], size IteratorSize) Iterator[T] {
-	return MakeIterator(MakeIteratorOfSize(base, size))
-}
-
-func (ei *autoChannelIterator[T]) Chan() <-chan T {
-	if ei.OutChan == nil {
-		ei.OutChan = iterChan[T](ei)
+// CollectInto collects all elements from an iterator into a slice a pointer to which is passed.
+// Elements are appended to any existing data in the slice. The slice referenced may be reallocated
+// as the append function is used to add elements to the slice. The slice may be a nil slice. For
+// convenience, the final slice is returned. If the iterator is known to have an infinite size, this
+// function will panic.
+func CollectInto[T any](iter CoreIterator[T], slice *[]T) []T {
+	if iter.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
 	}
-	return ei.OutChan
-}
-
-func (ei *autoChannelIterator[T]) Abort() {
-	ei.SizedIterator.Abort()
-	if ei.OutChan != nil {
-		safeClose(ei.OutChan)
-		ei.OutChan = nil
-	}
-}
-
-// mapIter wraps an iterator and adds a mapping function
-type mapIter[T, U any] struct {
-	base    Iterator[T]
-	mapping FuncNext[T, U]
-	value   option.Option[U]
-	outChan chan U
-	size    IteratorSize
-}
-
-func (i *mapIter[T, U]) Next() bool {
-	ok, value := i.mapping(i.base)
-	if !ok {
-		return false
+	if iter.SeqOK() {
+		for v := range iter.Seq() {
+			*slice = append(*slice, v)
+		}
 	} else {
-		i.value.Set(value)
-		return true
-	}
-}
-
-func (i *mapIter[T, U]) Value() U {
-	return i.value.GetOrZero()
-}
-
-func (i *mapIter[T, U]) Abort() {
-	if i.outChan != nil {
-		safeClose(i.outChan)
-		i.outChan = nil
-	}
-	i.base.Abort()
-}
-
-func (i *mapIter[T, U]) Chan() <-chan U {
-	if i.outChan == nil {
-		i.outChan = iterChan[U](i)
-	}
-	return i.outChan
-}
-
-func (i *mapIter[T, U]) Size() IteratorSize {
-	return i.size
-}
-
-// wrapFunc creates a new iterator from an existing operator and a function that consumes it, yielding
-// one element at a time.
-func wrapFunc[T any, U any](iterator Iterator[T], f FuncNext[T, U], size IteratorSize) Iterator[U] {
-	return &mapIter[T, U]{base: iterator, mapping: f, value: option.Empty[U](), size: size}
-}
-
-// Iterator over a slice
-type sliceIter[T any] struct {
-	slice []T
-	index int
-	value T
-}
-
-func (si *sliceIter[T]) Next() bool {
-	if si.index < len(si.slice) {
-		si.value = si.slice[si.index]
-		si.index++
-		return true
-	} else {
-		return false
-	}
-}
-
-func (si *sliceIter[T]) Value() T {
-	return si.value
-}
-
-func (si *sliceIter[T]) Abort() {
-	si.index = len(si.slice)
-}
-
-func (si *sliceIter[T]) Size() IteratorSize {
-	return SizeKnown{len(si.slice) - si.index}
-}
-
-// Slice makes an Iterator[T] from slice []T, containing all the elements
-// from the slice in order.
-func Slice[T any](slice []T) Iterator[T] {
-	var t T
-	return MakeIterator[T](&sliceIter[T]{slice, 0, t})
-}
-
-// Of makes an Iterator[T] containing the variadic arguments of type T
-func Of[T any](elements ...T) Iterator[T] {
-	return Slice(elements)
-}
-
-type rangeIter[T ordered.Real, S ordered.Real] struct {
-	index, to T
-	by        S
-	value     T
-	inclusive bool
-}
-
-func (ri *rangeIter[T, S]) Next() bool {
-	if !ri.inclusive && ri.index == ri.to {
-		return false
-	} else if ri.by < 0 {
-		if ri.index < ri.to {
-			return false
+		for iter.Next() {
+			*slice = append(*slice, iter.Value())
 		}
-	} else if ri.index > ri.to {
-		return false
-	}
-	ri.value = ri.index
-	ri.index += T(ri.by)
-	return true
-}
-
-func (ri *rangeIter[T, S]) Value() T {
-	return ri.value
-}
-
-func (ri *rangeIter[T, S]) Abort() {
-	if ri.inclusive {
-		ri.index = ri.to + T(ri.by)
-	} else {
-		ri.index = ri.to
-	}
-}
-
-func (ri *rangeIter[T, S]) Chan() <-chan T {
-	return iterChan[T](ri)
-}
-
-func (ri *rangeIter[T, S]) Size() IteratorSize {
-	var size int
-	if (ri.index > ri.to && ri.by > 0) || (ri.index < ri.to && ri.by < 0) {
-		size = 0
-	} else {
-		size, _ = rangehelper.RangeSize[T, S](ri.index, ri.to, ri.by, ri.inclusive)
-	}
-	return SizeKnown{size}
-}
-
-// Range creates an iterator that ranges from `from` to
-// `upto` exclusive
-func Range[T ordered.Real](from, upto T) Iterator[T] {
-	return &rangeIter[T, int]{from, upto, 1, 0, false}
-}
-
-// Range creates an iterator that ranges from `from` to
-// `upto` inclusive
-func IncRange[T ordered.Real](from, upto T) Iterator[T] {
-	return &rangeIter[T, int]{from, upto, 1, 0, true}
-}
-
-// RangeBy creates an iterator that ranges from `from` up to
-// `upto` exclusive, incrementing by `by` each step.
-// This can be negative (and `upto` should be less than `from`),
-// but it cannot be zero unless from == upto, in which case
-// an empty iterator is returned.
-func RangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] {
-	if by == 0 {
-		if from == upto {
-			return Empty[T]()
-		}
-		panic("Illegal range by zero")
-	}
-	return &rangeIter[T, S]{from, upto, by, 0, false}
-}
-
-// RangeBy creates an iterator that ranges from `from` up to
-// `upto` inclusive, incrementing by `by` each step.
-// This can be negative (and `upto` should be less than `from`),
-// but it cannot be zero unless from == upto, in which case
-// an empty iterator is returned.
-func IncRangeBy[T ordered.Real, S ordered.Real](from, upto T, by S) Iterator[T] {
-	if by == 0 {
-		if from != upto {
-			panic("Illegal range by zero")
-		}
-		return &rangeIter[T, S]{from, upto, 1, 0, true}
-	}
-	return &rangeIter[T, S]{from, upto, by, 0, true}
-}
-
-type emptyIter[T any] struct{}
-
-func (emptyIter[T]) Next() bool         { return false }
-func (emptyIter[T]) Value() T           { var zero T; return zero }
-func (emptyIter[T]) Size() IteratorSize { return SizeKnown{0} }
-func (emptyIter[T]) Abort()             {}
-func (emptyIter[T]) Chan() <-chan T {
-	c := make(chan T)
-	close(c)
-	return c
-}
-
-// Empty creates an iterator that returns no items.
-func Empty[T any]() Iterator[T] { return emptyIter[T]{} }
-
-// Map applies function `mapping` of type `func(T) U` to each value, producing
-// a new iterator over `U`.
-func Map[T any, U any](iter Iterator[T], mapping func(T) U) Iterator[U] {
-	mapNext := func(iterator Iterator[T]) (ok bool, value U) {
-		if ok = iterator.Next(); ok {
-			value = mapping(iterator.Value())
-		}
-		return
-	}
-	return wrapFunc(iter, mapNext, iter.Size())
-}
-
-// Filter applies a filter function `predicate` of type `func(T) bool`, producing
-// a new iterator containing only the elements than satisfy the function.
-func Filter[T any](iter Iterator[T], predicate func(T) bool) Iterator[T] {
-	filterNext := func(i Iterator[T]) (ok bool, value T) {
-		for {
-			if ok = i.Next(); ok {
-				if !predicate(i.Value()) {
-					continue
-				} else {
-					value = i.Value()
-				}
-			}
-			return
-		}
-	}
-	return wrapFunc(iter, filterNext, iter.Size().Subset())
-}
-
-// FilterMap applies both transformation and filtering logic to an iterator. The function `mapping` is
-// applied to each element of type `T`, producing either an option value of type `U` or an empty
-// option. The result is an iterator over `U` drawn from only the non-empty options
-// returned.
-func FilterMap[T any, U any](iter Iterator[T], mapping func(T) option.Option[U]) Iterator[U] {
-	filterMapNext := func(i Iterator[T]) (ok bool, value U) {
-		for {
-			if ok = i.Next(); ok {
-				if value, ok = mapping(i.Value()).ToRef().GetOK(); !ok {
-					continue
-				}
-			}
-			return
-		}
-	}
-	return wrapFunc(iter, filterMapNext, iter.Size().Subset())
-}
-
-// FilterValues takes an iterator of results and returns an iterator of the underlying
-// result value type for only those results that have no error.
-func FilterValues[T any](iter Iterator[result.Result[T]]) Iterator[T] {
-	return FilterMap(iter, func(res result.Result[T]) option.Option[T] {
-		if res.IsError() {
-			return option.Empty[T]()
-		} else {
-			return option.Value(res.Get())
-		}
-	})
-}
-
-// CollectInto collects all elements from an iterator into a pointer to a slice.
-// The slice referenced may be reallocated as the append function is used to add
-// elements to the slice. The slice may be a nil slice.
-func CollectInto[T any](iter Iterator[T], slice *[]T) []T {
-	for iter.Next() {
-		*slice = append(*slice, iter.Value())
 	}
 	return *slice
 }
 
-// Collect collects all elements from an iterator into a slice.
-func Collect[T any](iter Iterator[T]) []T {
+// CollectIntoCap appends elements from an iterator into a slice a pointer to which is passed, up to
+// a maximum of the capacity for the slice. Elements are not added beyond the capacity. Elements are
+// appended to any existing data in the slice. The slice may be a nil slice, in which case no
+// elements will be added. For convenience, tbe final slice is returned.
+func CollectIntoCap[T any](iter CoreIterator[T], slice *[]T) []T {
+	max := cap(*slice) - len(*slice)
+	if max > 0 {
+		if iter.SeqOK() {
+			for v := range iter.Seq() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, v)
+				max--
+			}
+		} else {
+			for iter.Next() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, iter.Value())
+				max--
+			}
+		}
+	}
+	return *slice
+}
+
+// Collect2Into collects all element pairs from an Iterator2 into a slice of KeyValue pairs, a
+// pointer to which is passed. Pairs are appended to any existing data in the slice. The slice
+// referenced may be reallocated as the append function is used to add pairs to the slice. The slice
+// may be a nil slice. For convenience, the final slice is returned. If the iterator is known to
+// have an infinite size, this function will panic.
+func Collect2Into[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
+	if iter.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
+	}
+	if iter.SeqOK() {
+		for k, v := range iter.Seq2() {
+			*slice = append(*slice, KVOf(k, v))
+		}
+	} else {
+		for iter.Next() {
+			*slice = append(*slice, KVOf(iter.Key(), iter.Value()))
+		}
+	}
+	return *slice
+}
+
+// Collect2IntoCap collects all element pairs from an Iterator2 into a slice of KeyValue pairs, a
+// pointer to which is passed. Pairs are appended to any existing data in the slice. The slice
+// referenced may be reallocated as the append function is used to add pairs to the slice. The slice
+// may be a nil slice. For convenience, the final slice is returned. If the iterator is known to
+// have an infinite size, this function will panic.
+func Collect2IntoCap[K any, V any](iter CoreIterator2[K, V], slice *[]KeyValue[K, V]) []KeyValue[K, V] {
+	if iter.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
+	}
+	max := cap(*slice) - len(*slice)
+	if max > 0 {
+		if iter.SeqOK() {
+			for k, v := range iter.Seq2() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, KVOf(k, v))
+				max--
+			}
+		} else {
+			for iter.Next() {
+				if max <= 0 {
+					break
+				}
+				*slice = append(*slice, KVOf(iter.Key(), iter.Value()))
+				max--
+			}
+		}
+	}
+	return *slice
+}
+
+// CollectIntoMap collects all element pairs from an Iterator2 into the map passed, populating it
+// with key and value pairs. All keys should be unique; any duplicate keys will result in only the
+// latest key/value pair with that key being preserved. The map may be nil, in which case a new map
+// will be created. The final map is returned. If the iterator is known to have an infinite size,
+// this function will panic.
+func CollectIntoMap[K comparable, V any](iter CoreIterator2[K, V], m map[K]V) map[K]V {
+	if iter.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
+	}
+	if m == nil {
+		m = make(map[K]V)
+	}
+	if iter.SeqOK() {
+		for k, v := range iter.Seq2() {
+			m[k] = v
+		}
+	} else {
+		for iter.Next() {
+			m[iter.Key()] = iter.Value()
+		}
+	}
+	return m
+}
+
+// Collect all elements from an iterator into a slice. If the iterator is known to be
+// of infinite size, this function will panic.
+func Collect[T any](iter CoreIterator[T]) []T {
 	result := make([]T, 0, iter.Size().Allocate())
-	return CollectInto[T](iter, &result)
+	return CollectInto(iter, &result)
+}
+
+// Collect2 collects all elements from an Iterator2 into a slice of KeyValue pairs. If the iterator
+// is known to be of infinite size, this function will panic.
+func Collect2[K any, V any](itr CoreIterator2[K, V]) []KeyValue[K, V] {
+	result := make([]KeyValue[K, V], 0, itr.Size().Allocate())
+	return Collect2Into(itr, &result)
+}
+
+// CollectMap collects all elements from an Iterator2 into a map of key and value pairs. All keys
+// should be unique; any duplicate keys will result in only the latest key/value pair with that key
+// being preserved. If the iterator is known to be of infinite size, this function will panic.
+func CollectMap[K comparable, V any](itr CoreIterator2[K, V]) map[K]V {
+	return CollectIntoMap(itr, nil)
 }
 
 // CollectResults collects all elements from an iterator of results into a result of slice of the iterator's underlying type
-// If the iterator returns an error result at any point, this call will terminate and return that error in the
-// result, along with the elements collected thus far.
-func CollectResults[T any](iter Iterator[result.Result[T]]) ([]T, error) {
+// If the iterator returns an error result at any point, this call will terminate and return that error, along with the elements
+// collected thus far.
+func CollectResults[T any](iter CoreIterator[result.Result[T]]) ([]T, error) {
 	collectResult := make([]T, 0, iter.Size().Allocate())
-	for iter.Next() {
-		res := iter.Value()
+	for res := range iter.Seq() {
 		if res.IsError() {
-			iter.Abort()
 			return collectResult, res.GetErr()
 		}
 		collectResult = append(collectResult, res.Get())
@@ -500,11 +516,11 @@ func CollectResults[T any](iter Iterator[result.Result[T]]) ([]T, error) {
 
 // PartitionResults collects the elements from an iterator of result types into two slices, one of
 // successful (nil error) values, and the other of error values.
-func PartitionResults[T any](iter Iterator[result.Result[T]]) ([]T, []error) {
+func PartitionResults[T any](iter CoreIterator[result.Result[T]]) ([]T, []error) {
 	values := make([]T, 0, iter.Size().Allocate())
 	var errs []error
-	for iter.Next() {
-		if res := iter.Value(); res.IsError() {
+	for res := range iter.Seq() {
+		if res.IsError() {
 			errs = append(errs, res.GetErr())
 		} else {
 			values = append(values, res.Must())
@@ -513,220 +529,149 @@ func PartitionResults[T any](iter Iterator[result.Result[T]]) ([]T, []error) {
 	return values, errs
 }
 
-// All returns true if `predicate` returns true for every value returned
+// All returns true if predicate returns true for every value returned
 // by the iterator. This function short circuits and does not
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns false.
-func All[T any](iter Iterator[T], predicate func(v T) bool) bool {
-	for iter.Next() {
-		if !predicate(iter.Value()) {
-			iter.Abort()
-			return false
+func All[T any](itr CoreIterator[T], predicate func(v T) bool) bool {
+	if itr.SeqOK() {
+		for v := range itr.Seq() {
+			if !predicate(v) {
+				return false
+			}
+		}
+	} else {
+		for itr.Next() {
+			if !predicate(itr.Value()) {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-// Any returns true if `predicate` returns true for any value returned
+// Any returns true if predicate returns true for any value returned
 // by the iterator. This function short circuits and does not
 // execute in constant time; the iterator is aborted after the
 // first value for which the predicate returns true.
-func Any[T any](iter Iterator[T], predicate func(v T) bool) bool {
-	for iter.Next() {
-		if predicate(iter.Value()) {
-			iter.Abort()
-			return true
+func Any[T any](itr CoreIterator[T], predicate func(v T) bool) bool {
+	if itr.SeqOK() {
+		for v := range itr.Seq() {
+			if predicate(v) {
+				return true
+			}
+		}
+	} else {
+		for itr.Next() {
+			if predicate(itr.Value()) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-// An iterator that obtains values (or an error) from
-// a channel
-type genIter[T any] struct {
-	source chan T
-	value  T
-}
-
-func (pi *genIter[T]) Next() bool {
-	var ok bool
-	pi.value, ok = <-pi.source
-	return ok
-}
-
-func (pi *genIter[T]) Value() T {
-	return pi.value
-}
-
-func (pi *genIter[T]) Chan() <-chan T {
-	return pi.source
-}
-
-func (pi *genIter[T]) Abort() {
-	safeClose(pi.source)
-}
-
-func (pi *genIter[T]) Size() IteratorSize {
-	return SizeUnknown
-}
-
-// AbortGenerator is a panic type that will be raised if a Generator function is to be
-// aborted.
-type AbortGenerator struct{}
-
-// Consumer is a type, an instance of which is passed to a Generator generator
-// function. Values from the function can be yielded to the generator
-// via the Yield method (or an error via the YieldError method).
-type Consumer[T any] struct {
-	sink chan T
-}
-
-// Yield yields the next value to the generator
-func (y Consumer[T]) Yield(t T) {
-	if !safeSend(y.sink, t) {
-		panic(AbortGenerator{})
+// Fold combines the elements of an iterator into a single value using an
+// accumulation function. It takes an iterator, an initial value init and an
+// accumulation function f. If the iterator is empty, init is returned.
+// Otherwise the initial value is fed into the accumulation function f along
+// with the first element from the iterator. The result is then fed back into f
+// along with the second element, and so on. The final result is the final value
+// returned by the function. If the iterator is known to be of infinite size,
+// this function will panic with [ErrSizeInfinite].
+func Fold[U any, T any](itr CoreIterator[T], init U, f func(a U, e T) U) U {
+	if itr.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
 	}
-}
-
-// ResultConsumer is a variation on `Consumer` which is used to yield only result types. It adds
-// dedicated methods to yield non-error values and errors.
-type ResultConsumer[T any] Consumer[result.Result[T]]
-
-// Yield yields the next result to the result consumer
-func (yr *ResultConsumer[T]) Yield(value result.Result[T]) {
-	(*Consumer[result.Result[T]])(yr).Yield(value)
-}
-
-// YieldValue yields the next successful value to the consumer
-func (yr *ResultConsumer[T]) YieldValue(value T) {
-	yr.Yield(result.Value(value))
-}
-
-// YieldError yields an error to the consumer
-func (yr *ResultConsumer[T]) YieldError(err error) {
-	yr.Yield(result.Error[T](err))
-}
-
-// GeneratorPanic is an error type indicating that a generator iterator function has panicked
-type GeneratorPanic struct {
-	panic any
-}
-
-func (pp GeneratorPanic) Error() string {
-	return fmt.Sprintf("panic in generator: %#v", pp.panic)
-}
-
-func (pp GeneratorPanic) Unwrap() error {
-	if err, ok := pp.panic.(error); ok {
-		return err
+	acc := init
+	if itr.SeqOK() {
+		for e := range itr.Seq() {
+			acc = f(acc, e)
+		}
 	} else {
-		return nil
+		for itr.Next() {
+			acc = f(acc, itr.Value())
+		}
 	}
+	return acc
 }
 
-// Generator is a function taking a Consumer. The function is expected to yield values to the consumer.
-type Generator[T any] func(Consumer[T])
-
-func runGenerator[T any](c Consumer[T], activity Generator[T]) {
-	defer safeClose(c.sink)
-	defer func() {
-		if p := recover(); p != nil {
-			if _, abort := p.(AbortGenerator); !abort {
-				panic(p)
+// Fold1 combines the elements of an iterator into a single value using an
+// accumulation function. It takes an iterator, an initial value init and an
+// accumulation function f. The iterator must have at least one element, or this
+// function will panic with [ErrEmptyIterator].  If there is only one element,
+// this element be returned. Otherwise, the first two elements are fed into the
+// accumulation function f. The result of this is combined with the next element
+// to get the next result and so on until the iterator is consumed. The final
+// result is returned. If the iterator is known to be of infinite size, this
+// function will panic with [ErrSizeInfinite].
+func Fold1[T any](itr CoreIterator[T], f func(a, e T) T) T {
+	if itr.Size().IsInfinite() {
+		panic(ErrSizeInfinite)
+	}
+	if itr.SeqOK() {
+		acc := option.Empty[T]()
+		for e := range itr.Seq() {
+			if acc.HasValue() {
+				acc.Set(f(acc.Get(), e))
+			} else {
+				acc.Set(e)
 			}
 		}
-	}()
-	activity(c)
-}
-
-// ResultGenerator is a function taking a ResultConsumer object to which results may be yielded.
-// If a non-nil error is returned, it will be yielded as an error result.
-type ResultGenerator[T any] func(ResultConsumer[T]) error
-
-func runResultGenerator[T any](c ResultConsumer[T], activity ResultGenerator[T]) {
-	defer safeClose(c.sink)
-	defer func() {
-		if p := recover(); p != nil {
-			if _, abort := p.(AbortGenerator); !abort {
-				c.YieldError(GeneratorPanic{p})
-			}
+		if acc.IsEmpty() {
+			panic(ErrEmptyIterator)
 		}
-	}()
-	defer eh.Handle(func(err error) { c.YieldError(err) })
-	eh.Check(activity(c))
-}
-
-/*
-Generate creates an Iterator from a Generator function. A Consumer is created and passed to the function.
-The function is run in a separate goroutine, and its yielded values are sent over a channel
-to the iterator where they may be consumed in an iterative way by calls to Next() and Value().
-Alternatively, the channel itself is available via the Chan() method.
-A call to Abort() will cause the channel to close and no further elements will be produced by
-Next() or a read of the channel. Any attempt to subsequently yield a value in the generator
-will cause it to terminate, via an AbortGenerator panic.
-*/
-func Generate[T any](generator Generator[T]) Iterator[T] {
-	ch := make(chan T)
-	yield := Consumer[T]{ch}
-	go runGenerator(yield, generator)
-	return &genIter[T]{source: ch}
-}
-
-// GenerateResults is a variation on Generate that produces an iterator of result types. If the
-// generator function panics, an error result of type GeneratorPanic is produced prior to closing
-// the consumer channel.
-func GenerateResults[T any](generator ResultGenerator[T]) Iterator[result.Result[T]] {
-	ch := make(chan result.Result[T])
-	yield := ResultConsumer[T](Consumer[result.Result[T]]{ch})
-	go runResultGenerator(yield, generator)
-	return &genIter[result.Result[T]]{source: ch}
-}
-
-// Iterators over iterators
-type takeIterator[T any] struct {
-	count, max int
-	aborted    bool
-	iterator   Iterator[T]
-}
-
-func (ti *takeIterator[T]) Value() T {
-	return ti.iterator.Value()
-}
-
-func (ti *takeIterator[T]) Abort() {
-	if !ti.aborted {
-		ti.iterator.Abort()
-	}
-	ti.aborted = true
-}
-
-func (ti *takeIterator[T]) Next() bool {
-	if ti.count < ti.max {
-		ti.count++
-		next := ti.iterator.Next()
-		if next && ti.count == ti.max {
-			ti.Abort()
-		}
-		return next
+		return acc.Get()
 	} else {
-		return false
+		if !itr.Next() {
+			panic(ErrEmptyIterator)
+		}
+		acc := itr.Value()
+		for itr.Next() {
+			acc = f(acc, itr.Value())
+		}
+		return acc
 	}
 }
 
-func (ti *takeIterator[T]) Size() IteratorSize {
-	switch s := ti.iterator.Size().(type) {
-	case SizeKnown:
-		return NewSize(ordered.Min(s.Size, ti.max))
-	case SizeAtMost:
-		return NewSizeAtMost(ordered.Min(s.Size, ti.max))
-	default:
-		return NewSizeAtMost(ti.max)
-	}
+// Intercalate1 is a variation on [Fold1] which combines the elements of an
+// iterator into a single value using an accumulation function and an
+// interspersed value. The iterator must have at least one element, otherwise it
+// will panic with [ErrEmptyIterator]. The accumulated result is initially set
+// to the first element, and is combined with subsequent elements as follows:
+//
+//	acc = f(f(acc,inter),e)
+//
+// where acc is he accumulated value, e is the next element and inter is the
+// inter parameter. The final value of acc will be the value returned. If the
+// iterator is known to be of infinite size, this function will panic with
+// [ErrSizeInfinite].
+func Intercalate1[T any](itr CoreIterator[T], inter T, f func(a, e T) T) T {
+	interFold := func(a, e T) T { return f(f(a, inter), e) }
+	return Fold1(itr, interFold)
 }
 
-// Take transforms an iterator into an iterator the returns the
-// first n elements of the original iterator. If there are less
-// than n elements available, they are all returned.
-func Take[T any](n int, iter Iterator[T]) Iterator[T] {
-	return MakeIterator[T](&takeIterator[T]{0, n, false, iter})
+// Intercalate is a variation on [Fold] which combines the elements of an
+// iterator into a single value using an accumulation function and an
+// interspersed value. If the iterator has no elements, the empty parameter is
+// returned. Otherwise, the accumulated result is initially set to the first
+// element, and is combined with subsequent elements as follows:
+//
+//	acc = f(f(acc,inter),e)
+//
+// where acc is he accumulated value, e is the next element and inter is the
+// inter parameter, and the final value of acc will be the value returned. If
+// the iterator is known to be of infinite size, this function will panic with
+// [ErrSizeInfinite].
+func Intercalate[T any](itr CoreIterator[T], empty T, inter T, f func(a, e T) T) T {
+	first := true
+	interFold := func(a, e T) T {
+		if first {
+			first = false
+			return e
+		} else {
+			return f(f(a, inter), e)
+		}
+	}
+	return Fold(itr, empty, interFold)
 }

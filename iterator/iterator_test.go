@@ -1,129 +1,386 @@
-package iterator
+package iterator_test
 
 import (
 	"fmt"
+	"iter"
+	"sort"
+	"strconv"
+	"strings"
 	"testing"
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
+	"github.com/robdavid/genutil-go/functions"
+	"github.com/robdavid/genutil-go/iterator"
+	"github.com/robdavid/genutil-go/maps"
+	"github.com/robdavid/genutil-go/ordered"
+	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/constraints"
 )
 
+func TestSimpleSequence(t *testing.T) {
+	itr := iterator.Of(2, 4, 6, 8)
+	c := itr.Collect()
+	assert.Equal(t, []int{2, 4, 6, 8}, c)
+}
+
+func TestMapMutations(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i * 2
+	}
+	for k := range m {
+		if k%3 == 0 {
+			m[k] = k * 3
+		} else if k%2 == 0 {
+			delete(m, k)
+		}
+	}
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	actual := make([]int, 0, len(keys))
+	for _, k := range keys {
+		actual = append(actual, m[k])
+	}
+	expected := []int{0, 2, 9, 10, 18, 14, 27}
+	assert.Equal(t, expected, actual)
+}
 func TestCollectInto(t *testing.T) {
-	iter := Range(0, 5)
+	iter := iterator.Range(0, 5)
 	var output []int = nil
-	CollectInto(iter, &output)
-	iter2 := Range(10, 15)
-	CollectInto(iter2, &output)
+	iter.CollectInto(&output)
+	iter2 := iterator.Range(10, 15)
+	iter2.CollectInto(&output)
 	expected := []int{0, 1, 2, 3, 4, 10, 11, 12, 13, 14}
 	assert.Equal(t, expected, output)
 }
 
 func TestInclusiveCollectInto(t *testing.T) {
-	iter := IncRange(0, 5)
+	iter := iterator.IncRange(0, 5)
 	var output []int = nil
-	CollectInto(iter, &output)
-	iter2 := IncRange(10, 15)
-	CollectInto(iter2, &output)
+	iter.CollectInto(&output)
+	iter2 := iterator.IncRange(10, 15)
+	iter2.CollectInto(&output)
 	expected := []int{0, 1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15}
 	assert.Equal(t, expected, output)
 }
 
+func TestSeqCollect2(t *testing.T) {
+	collected := iterator.Of(3, 4, 5, 6).Enumerate().Collect2()
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 3}, {1, 4}, {2, 5}, {3, 6}}, collected)
+}
+
+func TestSeqCollect2Into(t *testing.T) {
+	var collected []iterator.KeyValue[int, int]
+	iterator.Of(3, 4, 5, 6).Enumerate().Collect2Into(&collected)
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 3}, {1, 4}, {2, 5}, {3, 6}}, collected)
+}
+
+func TestSeqCollect2IntoCap(t *testing.T) {
+	collected := make([]iterator.KeyValue[int, int], 0, 3)
+	iterator.Of(3, 4, 5, 6).Enumerate().Collect2IntoCap(&collected)
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 3}, {1, 4}, {2, 5}}, collected)
+}
+
+func TestSeqCollect2IntoCapNoSeq(t *testing.T) {
+	collected := make([]iterator.KeyValue[int, int], 0, 3)
+	iterator.Of(3, 4, 5, 6).Enumerate().Take2(4).Collect2IntoCap(&collected)
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 3}, {1, 4}, {2, 5}}, collected)
+}
+
 func TestFloatingRange(t *testing.T) {
-	iter := Range(0.0, 5.0)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 5, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
+	iter := iterator.Range(0.0, 5.0)
+	assert.True(t, iter.Size().IsKnownToBe(5))
+	assert.Equal(t, 5, iter.Size().Allocate())
+	output := iterator.Collect(iter)
 	expected := []float64{0.0, 1.0, 2.0, 3.0, 4.0}
 	assert.Equal(t, expected, output)
 }
 
-func TestFloatingRangeBy(t *testing.T) {
-	iter := RangeBy(0.0, 5.0, 0.5)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
-	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}
+func TestReverseFloatingRange(t *testing.T) {
+	iter := iterator.Range(5.0, 0.0)
+	assert.True(t, iter.Size().IsKnown())
+	assert.Equal(t, 5, iter.Size().Allocate())
+	output := iterator.Collect(iter)
+	expected := []float64{5.0, 4.0, 3.0, 2.0, 1.0}
 	assert.Equal(t, expected, output)
 }
 
+func TestFloatingRangeBy(t *testing.T) {
+	iter := iterator.RangeBy(0.0, 5.0, 0.5)
+	assert.True(t, iter.Size().IsKnownToBe(10))
+	assert.Equal(t, 10, iter.Size().Allocate())
+	output := iterator.Collect(iter)
+	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}
+	assert.Equal(t, expected, output)
+	assert.Equal(t, 10, cap(output))
+}
+
 func TestInclusiveFloatingRangeBy(t *testing.T) {
-	iter := IncRangeBy(0.0, 5.0, 0.5)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 11, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
+	iter := iterator.IncRangeBy(0.0, 5.0, 0.5)
+	assert.True(t, iter.Size().IsKnownToBe(11))
+	assert.Equal(t, 11, iter.Size().Allocate())
+	output := iterator.Collect(iter)
 	expected := []float64{0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0}
 	assert.Equal(t, expected, output)
 }
 
 func TestFloatingRangeDesc(t *testing.T) {
-	iter := RangeBy(5.0, 0.0, -0.5)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 10, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
+	iter := iterator.RangeBy(5.0, 0.0, -0.5)
+	assert.True(t, iter.Size().IsKnownToBe(10))
+	assert.Equal(t, 10, iter.Size().Allocate())
+	output := iterator.Collect(iter)
 	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5}
 	assert.Equal(t, expected, output)
 }
 
 func TestInclusiveFloatingRangeDesc(t *testing.T) {
-	iter := IncRangeBy(5.0, 0.0, -0.5)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 11, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
+	iter := iterator.IncRangeBy(5.0, 0.0, -0.5)
+	assert.True(t, iter.Size().IsKnownToBe(11))
+	assert.Equal(t, 11, iter.Size().Allocate())
+	output := iterator.Collect(iter)
 	expected := []float64{5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.0}
 	assert.Equal(t, expected, output)
 }
 
 func TestInvalidRange(t *testing.T) {
-	iter := RangeBy(5.0, 0.0, 0.5)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 0, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
-	assert.Empty(t, output)
+	defer func() {
+		r := recover()
+		require.NotNil(t, r)
+		assert.ErrorIs(t, r.(error), iterator.ErrInvalidIteratorRange)
+	}()
+	iterator.RangeBy(5.0, 0.0, 0.5)
 }
 
 func TestZeroRange(t *testing.T) {
-	iter := RangeBy(1, 1, 0)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 0, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
+	iter := iterator.RangeBy(1, 1, 0)
+	assert.True(t, iter.Size().IsKnownToBe(0))
+	assert.Equal(t, 0, iter.Size().Allocate())
+	output := iterator.Collect(iter)
 	assert.Empty(t, output)
 }
 
 func TestInclusiveZeroRange(t *testing.T) {
-	iter := IncRangeBy(1, 1, 0)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	assert.Equal(t, 1, iter.Size().(SizeKnown).Size)
-	output := Collect(iter)
+	iter := iterator.IncRangeBy(1, 1, 0)
+	assert.True(t, iter.Size().IsKnownToBe(1))
+	assert.Equal(t, 1, iter.Size().Allocate())
+	output := iterator.Collect(iter)
 	assert.Equal(t, []int{1}, output)
 }
 
 func TestSliceIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
-	iter := Slice(input)
-	assert.True(t, IsSizeKnown(iter.Size()))
-	output := Collect(iter)
+	iter := iterator.Slice(input)
+	assert.True(t, iter.Size().IsKnownToBe(4))
+	output := iterator.Collect(iter)
 	assert.Equal(t, input, output)
+}
+
+func TestMutSliceIter(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	input := []int{1, 2, 3, 4}
+	iter := iterator.MutSlice(&input)
+	iter.Delete() // Delete before Next should be no-op
+	assert.True(iter.Size().IsKnownToBe(4))
+	assert.Equal(4, iter.Size().Size)
+	require.True(iter.Next())
+	require.True(iter.Next())
+	assert.Equal(2, iter.Value())
+	iter.Delete()
+	assert.Equal(0, iter.Value()) // Zero value after delete
+	require.True(iter.Next())
+	assert.Equal(3, iter.Value())
+	iter.Reset()
+	assert.Equal(3, iter.Size().Size)
+	output := iterator.Collect(iter)
+	assert.Equal([]int{1, 3, 4}, output)
+}
+
+func TestMutSliceSeq(t *testing.T) {
+	assert := assert.New(t)
+	input := []int{1, 2, 3, 4}
+	iter := iterator.MutSlice(&input)
+	for n := range iter.Seq() {
+		if n == 2 {
+			iter.Delete()
+		}
+	}
+	iter.Reset()
+	output := iterator.Collect(iter)
+	assert.Equal([]int{1, 3, 4}, output)
+}
+
+func TestMutSliceSeq2(t *testing.T) {
+	assert := assert.New(t)
+	input := []int{1, 2, 3, 4}
+	iter := iterator.MutSlice(&input)
+	seen := make(map[int]bool)
+	for i, n := range iter.Enumerate().Seq2() {
+		assert.False(seen[i])
+		seen[i] = true
+		if i == 1 && n == 2 {
+			iter.Delete()
+		}
+	}
+	iter.Reset()
+	output := iterator.Collect(iter)
+	assert.Equal([]int{1, 3, 4}, output)
+}
+
+func TestSliceIterRef(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	// Using slices method to test iterator code.
+	// Remove when slices code moves to slices package.
+	iter := slices.IterRef(input)
+	output := make([]int, 0, len(input))
+	for p := range iter.Seq() {
+		output = append(output, *p)
+		*p *= 2
+		assert.Equal(t, *p, *iter.Value())
+	}
+	assert.Equal(t, []int{1, 2, 3, 4}, output)
+	assert.Equal(t, []int{2, 4, 6, 8}, input)
+}
+
+func TestSliceIterRefMut(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	// Using slices method to test iterator code.
+	// Remove when slices code moves to slices package.
+	iter := slices.IterRefMut(input)
+	output := make([]int, 0, len(input))
+	for p := range iter.Seq() {
+		output = append(output, *p)
+		*p *= 2
+		assert.Equal(t, *p, *iter.Value())
+		pone := *p + 1
+		iter.Set(&pone)
+	}
+	assert.Equal(t, []int{1, 2, 3, 4}, output)
+	assert.Equal(t, []int{3, 5, 7, 9}, input)
+}
+
+func TestTake(t *testing.T) {
+	input := slices.Range(0, 10)
+	iter := iterator.Take(4, iterator.Slice(input))
+	assert.True(t, iter.Size().IsKnownToBe(4))
+	assert.Equal(t, 4, iter.Size().Allocate())
+	output := iterator.Collect(iter)
+	assert.Equal(t, slices.Range(0, 4), output)
+}
+
+func TestTakeReset(t *testing.T) {
+	input := slices.Range(0, 10)
+	iter := iterator.Take(4, iterator.Slice(input))
+	output := iter.Collect()
+	assert.Equal(t, slices.Range(0, 4), output)
+	assert.Empty(t, iter.Collect())
+	iter.Reset()
+	output = iter.Collect()
+	assert.Equal(t, slices.Range(0, 4), output)
+}
+
+func TestTakeAbort(t *testing.T) {
+	base := iterator.Range(0, 10)
+	iter := base.Take(6)
+	collect := make([]int, 0, 10)
+	for v := range iter.Seq() {
+		collect = append(collect, v)
+		if v == 4 {
+			iter.Abort() // Abort aborts the underlying iterator
+		}
+	}
+	assert.Equal(t, slices.Range(0, 5), collect)
+	rest := iter.Collect()
+	assert.Empty(t, rest)
+	baseRest := base.Collect()
+	assert.Empty(t, baseRest)
+}
+
+func TestTakeNext(t *testing.T) {
+	assert := assert.New(t)
+	input := slices.Range(0, 10)
+	sliceIter := iterator.Slice(input)
+	iter := iterator.Take(4, sliceIter)
+	assert.True(iter.Next())
+	assert.True(iter.Size().IsKnownToBe(3))
+	assert.Equal(3, iter.Size().Allocate())
+	output := iterator.Collect(iter)
+	assert.Equal(slices.Range(1, 4), output)
+	assert.True(sliceIter.Size().IsKnownToBe(6))
+	assert.Equal(6, sliceIter.Size().Allocate())
+	remain := iterator.Collect(sliceIter)
+	assert.Equal(slices.Range(4, 10), remain)
+	assert.Equal(6, cap(remain))
 }
 
 func TestTakeMore(t *testing.T) {
 	input := []int{1, 2, 3, 4}
-	iter := Take(10, Slice(input))
-	assert.True(t, IsSizeKnown(iter.Size()))
-	output := Collect(iter)
+	iter := iterator.Take(10, iterator.Slice(input))
+	assert.True(t, iter.Size().IsKnownToBe(4))
+	assert.Equal(t, 4, iter.Size().Allocate())
+	output := iterator.Collect(iter)
 	assert.Equal(t, input, output)
+}
+
+func TestTake2(t *testing.T) {
+	iter := iterator.Range(9, -1).Enumerate().Take2(4)
+	assert.True(t, iter.Size().IsKnownToBe(4))
+	assert.Equal(t, 4, iter.Size().Allocate())
+	output := iterator.Collect2(iter)
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 9}, {1, 8}, {2, 7}, {3, 6}}, output)
+}
+
+func TestTake2Seq2(t *testing.T) {
+	iter := iterator.Range(9, -1).Enumerate().Take2(4)
+	assert.True(t, iter.Size().IsKnown())
+	collectMap := make(map[int]int)
+	for k, v := range iter.Seq2() {
+		collectMap[k] = v
+	}
+	assert.Equal(t, 4, len(collectMap))
+	for k, v := range collectMap {
+		assert.Equal(t, v, 9-k)
+	}
 }
 
 func TestSliceIterString(t *testing.T) {
 	input := []string{"one", "two", "three", "four"}
-	iter := Slice(input)
-	output := Collect(iter)
+	iter := iterator.Slice(input)
+	output := iterator.Collect(iter)
 	assert.Equal(t, input, output)
+}
+
+func TestSliceMutIterRef(t *testing.T) {
+	input := []string{"one", "two", "three", "four"}
+	iter := iterator.MutSlice(&input)
+	for iter.Next() {
+		iter.Set(strings.ToUpper(iter.Value()))
+	}
+	expected := []string{"ONE", "TWO", "THREE", "FOUR"}
+	assert.Equal(t, expected, input)
+}
+
+func TestSliceMutIterDelete(t *testing.T) {
+	input := []string{"one", "two", "three", "four"}
+	iter := iterator.MutSlice(&input)
+	for iter.Next() {
+		if iter.Value() == "two" {
+			iter.Delete()
+		}
+	}
+	expected := []string{"one", "three", "four"}
+	assert.Equal(t, expected, input)
 }
 
 func TestSliceIterChan(t *testing.T) {
 	input := []int{1, 2, 3, 4}
-	iter := Slice(input)
+	iter := iterator.Slice(input)
 	i := 1
 	for v := range iter.Chan() {
 		assert.Equal(t, v, i)
@@ -131,26 +388,86 @@ func TestSliceIterChan(t *testing.T) {
 	}
 }
 
-func TestRange(t *testing.T) {
-	r := Range(0, 10)
-	seq := Collect(r)
-	assert.Equal(t, 10, len(seq))
-	for i, v := range seq {
-		assert.Equal(t, i, v)
+func TestSliceIterChan2(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := iterator.Slice(input).Enumerate()
+	i := 1
+	for kv := range iter.Chan2() {
+		assert.Equal(t, kv.Key, i-1)
+		assert.Equal(t, kv.Value, i)
+		i++
 	}
+}
+
+func TestSliceIterSeq(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := iterator.Slice(input)
+	i := 1
+	for v := range iter.Seq() {
+		assert.Equal(t, v, i)
+		i++
+	}
+}
+
+func TestSeqIterMix(t *testing.T) {
+	assert := assert.New(t)
+	itr := iterator.Range(0, 10)
+	var first []int
+	for v := range iterator.Take(5, itr).Seq() {
+		first = append(first, v)
+	}
+	assert.Equal(slices.Range(0, 5), first)
+	second := iterator.Collect(itr)
+	assert.Equal(slices.Range(5, 10), second)
+	assert.Equal(5, cap(second))
+}
+
+func TestRange(t *testing.T) {
+	r := iterator.Range(0, 10)
+	seq := iterator.Collect(r)
+	assert.Equal(t, slices.Range(0, 10), seq)
+}
+
+func TestRangeSingularInclusiveSeq(t *testing.T) {
+	r := iterator.IncRange(0, 0)
+	output := make([]int, 0)
+	for v := range r.Seq() {
+		output = append(output, v)
+	}
+	assert.Equal(t, []int{0}, output)
+}
+
+func TestRangeReset(t *testing.T) {
+	r := iterator.Range(0, 10)
+	assert.Equal(t, slices.Range(0, 10), r.Collect())
+	assert.Empty(t, r.Collect())
+	r.Reset()
+	assert.Equal(t, slices.Range(0, 10), r.Collect())
 }
 
 func TestInclusiveRange(t *testing.T) {
-	r := IncRange(0, 10)
-	seq := Collect(r)
-	assert.Equal(t, 11, len(seq))
-	for i, v := range seq {
-		assert.Equal(t, i, v)
-	}
+	r := iterator.IncRange(0, 10)
+	assert.Equal(t, slices.Range(0, 11), r.Collect())
+}
+
+func TestInclusiveRangeReset(t *testing.T) {
+	r := iterator.IncRange(0, 10)
+	assert.Equal(t, slices.Range(0, 11), r.Collect())
+	assert.Empty(t, r.Collect())
+	r.Reset()
+	assert.Equal(t, slices.Range(0, 11), r.Collect())
+}
+
+func TestReverseRangeReset(t *testing.T) {
+	r := iterator.Range(10, 0)
+	assert.Equal(t, slices.Range(10, 0), r.Collect())
+	assert.Empty(t, r.Collect())
+	r.Reset()
+	assert.Equal(t, slices.Range(10, 0), r.Collect())
 }
 
 func TestRangeChan(t *testing.T) {
-	r := Range(0, 10)
+	r := iterator.Range(0, 10)
 	i := 0
 	for v := range r.Chan() {
 		assert.Equal(t, i, v)
@@ -159,8 +476,28 @@ func TestRangeChan(t *testing.T) {
 	assert.Equal(t, 10, i)
 }
 
+func TestRangeSeq(t *testing.T) {
+	r := iterator.Range(0, 10)
+	i := 0
+	for v := range r.Seq() {
+		assert.Equal(t, i, v)
+		i += 1
+	}
+	assert.Equal(t, 10, i)
+}
+
+func TestReverseRangeSeq(t *testing.T) {
+	r := iterator.Range(10, 0)
+	i := 10
+	for v := range r.Seq() {
+		assert.Equal(t, i, v)
+		i -= 1
+	}
+	assert.Equal(t, 0, i)
+}
+
 func TestInclusiveRangeChan(t *testing.T) {
-	r := IncRange(0, 10)
+	r := iterator.IncRange(0, 10)
 	i := 0
 	for v := range r.Chan() {
 		assert.Equal(t, i, v)
@@ -169,39 +506,60 @@ func TestInclusiveRangeChan(t *testing.T) {
 	assert.Equal(t, 11, i)
 }
 
+func TestInclusiveRangeSeq(t *testing.T) {
+	r := iterator.IncRange(0, 10)
+	i := 0
+	for v := range r.Seq() {
+		assert.Equal(t, i, v)
+		i += 1
+		assert.Equal(t, 11-i, r.Size().Size)
+	}
+	assert.Equal(t, 11, i)
+}
+
 func TestRangeFor(t *testing.T) {
-	r := Range(0, 10)
+	r := iterator.Range(0, 10)
 	i := 0
 	for r.Next() {
 		assert.Equal(t, i, r.Value())
 		i += 1
+		assert.Equal(t, 10-i, r.Size().Size)
 	}
 }
 
 func TestEmptyRange(t *testing.T) {
-	r := Range(10, 9)
-	seq := Collect(r)
+	r := iterator.Range(10, 10)
+	seq := iterator.Collect(r)
 	assert.Empty(t, seq)
 }
 
+func TestEmptySeq(t *testing.T) {
+	e := iterator.Empty[int]()
+	for range e.Seq() {
+		assert.Fail(t, "empty iterator should produce no values")
+	}
+	slice := iterator.Collect(e)
+	assert.Empty(t, slice)
+}
+
 func TestNegativeRange(t *testing.T) {
-	r := RangeBy(9, -1, -1)
-	assert.True(t, IsSizeKnown(r.Size()))
-	assert.Equal(t, 10, r.Size().(SizeKnown).Size)
-	seq := Collect(r)
+	r := iterator.RangeBy(9, -1, -1)
+	assert.True(t, r.Size().IsKnownToBe(10))
+	assert.Equal(t, 10, r.Size().Allocate())
+	seq := iterator.Collect(r)
 	expected := []int{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
 	assert.Equal(t, expected, seq)
 }
 
 func TestEmptyNegativeRange(t *testing.T) {
-	r := RangeBy(0, 10, -1)
-	seq := Collect(r)
+	r := iterator.RangeBy(10, 10, -1)
+	seq := iterator.Collect(r)
 	assert.Empty(t, seq)
 }
 
 func TestRangeBy(t *testing.T) {
-	r := RangeBy(0, 9, 3)
-	seq := Collect(r)
+	r := iterator.RangeBy(0, 9, 3)
+	seq := iterator.Collect(r)
 	assert.Equal(t, 3, len(seq))
 	for i, v := range seq {
 		assert.Equal(t, i*3, v)
@@ -209,17 +567,38 @@ func TestRangeBy(t *testing.T) {
 }
 
 func TestInclusiveRangeBy(t *testing.T) {
-	r := IncRangeBy(0, 9, 3)
-	seq := Collect(r)
+	r := iterator.IncRangeBy(0, 9, 3)
+	seq := iterator.Collect(r)
 	assert.Equal(t, 4, len(seq))
 	for i, v := range seq {
 		assert.Equal(t, i*3, v)
 	}
 }
 
+func TestEnumeratedRange(t *testing.T) {
+	e := iterator.Range(10, 20).Enumerate()
+	i := 0
+	for e.Next() {
+		assert.Equal(t, i, e.Key())
+		assert.Equal(t, i+10, e.Value())
+		i++
+	}
+}
+
+func TestEnumeratedRangeSeq(t *testing.T) {
+	e := iterator.Range(10, 20).Enumerate()
+	i := 0
+	for n, v := range e.Seq2() {
+		assert.Equal(t, i, n)
+		assert.Equal(t, i+10, v)
+		assert.Equal(t, i, e.Key())
+		i++
+	}
+}
+
 func TestSliceIterChanAbort(t *testing.T) {
 	input := []int{1, 2, 3, 4}
-	iter := Slice(input)
+	iter := iterator.Slice(input)
 	i := 1
 	for v := range iter.Chan() {
 		assert.Equal(t, v, i)
@@ -231,19 +610,183 @@ func TestSliceIterChanAbort(t *testing.T) {
 	assert.Equal(t, i, 3)
 }
 
+func TestSliceIterSeqAbort(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := iterator.Slice(input)
+	i := 1
+	for v := range iter.Seq() {
+		assert.Equal(t, v, i)
+		i++
+		if i == 3 {
+			iter.Abort()
+		}
+	}
+	assert.Equal(t, i, 3)
+}
+
+func TestSliceIterSeqBreak(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	iter := iterator.Slice(input)
+	i := 1
+	for v := range iter.Seq() {
+		assert.Equal(t, v, i)
+		i++
+		if i == 3 {
+			break
+		}
+	}
+	assert.Equal(t, i, 3)
+	assert.False(t, iter.Next())
+}
+
 func TestMapIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6, 8}
-	actual := Collect(Map(Slice(input), func(n int) int { return n * 2 }))
+	actual := iterator.Collect(iterator.Map(iterator.Slice(input), func(n int) int { return n * 2 }))
+	assert.Equal(t, expected, actual)
+}
+
+func TestMapIterChan(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	mi := iterator.Map(iterator.Slice(input), func(n int) int { return n * 2 })
+	actual := make([]int, 0, mi.Size().Allocate())
+	for v := range mi.Chan() {
+		actual = append(actual, v)
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestMapIterSeq(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4, 6, 8}
+	mi := iterator.Map(iterator.Slice(input), func(n int) int { return n * 2 })
+	actual := make([]int, 0, mi.Size().Allocate())
+	size := len(input)
+	assert.Equal(t, size, mi.Size().Size)
+	for v := range mi.Seq() {
+		actual = append(actual, v)
+		size--
+		assert.Equal(t, size, mi.Size().Size)
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestMap2Iter(t *testing.T) {
+	input := map[string]int{"one": 1, "two": 2, "three": 3, "four": 4}
+	expected := map[int]string{1: "one", 2: "two", 3: "three", 4: "four"}
+	swapKVIter := iterator.Map2(maps.Iter(input), func(key string, value int) (int, string) { return value, key })
+	actual := iterator.CollectMap(swapKVIter)
+	assert.Equal(t, expected, actual)
+	values := swapKVIter.Collect()
+	expectedValues := maps.Keys(input)
+	slices.Sort(values)
+	slices.Sort(expectedValues)
+	assert.Equal(t, expectedValues, values)
+}
+
+func TestMap2IterNext(t *testing.T) {
+	input := map[string]int{"one": 1, "two": 2, "three": 3, "four": 4}
+	expected := map[int]string{1: "one", 2: "two", 3: "three", 4: "four"}
+	swapKVIter := iterator.Map2(maps.Iter(input), func(key string, value int) (int, string) { return value, key })
+	actual := make(map[int]string)
+	for swapKVIter.Next() {
+		actual[swapKVIter.Key()] = swapKVIter.Value()
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestFilterMap(t *testing.T) {
+	input := iterator.Range(0, 10)
+	filtered := iterator.FilterMap(input, func(n int) (string, bool) {
+		return strconv.Itoa(n), n&1 == 0
+	})
+	actual := filtered.Collect()
+	assert.Equal(t, []string{"0", "2", "4", "6", "8"}, actual)
+}
+
+func TestFilerMorph(t *testing.T) {
+	const size = 10
+	testSlice := iterator.Range(0, size)
+	filterIter := testSlice.FilterMorph(func(v int) (int, bool) {
+		return v * 2, v%2 == 0
+	})
+	expectedSlice := slices.RangeBy(0, size*2, 4) // 0,4,8,12,16
+	actualSlice := iterator.Collect(filterIter)
+	assert.Equal(t, expectedSlice, actualSlice)
+}
+
+func TestFilterMorph2Example(t *testing.T) {
+	inputMap := map[int]int{0: 2, 1: 4, 2: 6, 3: 8}
+	itr := maps.Iter(inputMap).FilterMorph2(func(k, v int) (int, int, bool) { return k + 1, v * 2, (k+v)%2 == 0 })
+	output := iterator.CollectMap(itr)
+	assert.Equal(t, map[int]int{1: 4, 3: 12}, output)
+}
+
+func TestFilerMorph2(t *testing.T) {
+	const keys = 10
+	testMap := iterator.CollectMap(iterator.New2(func(yield func(int, int) bool) {
+		for key := range keys {
+			if !yield(key, key*3) {
+				break
+			}
+		}
+	}))
+	filterIter := maps.Iter(testMap).FilterMorph2(func(k, v int) (int, int, bool) {
+		if (k+v)&1 == 0 {
+			return k, k * 2, true
+		} else {
+			return 0, 0, false
+		}
+	})
+	expectedMap := make(map[int]int)
+	for k := range keys {
+		if (k+k*3)&1 == 0 {
+			expectedMap[k] = k * 2
+		}
+	}
+	actualMap := iterator.CollectMap(filterIter)
+	expectedKeys := maps.Keys(expectedMap)
+	actualKeys := maps.Keys(actualMap)
+	slices.Sort(expectedKeys)
+	slices.Sort(actualKeys)
+	assert.Equal(t, expectedKeys, actualKeys)
+	for _, key := range actualKeys {
+		assert.Equal(t, expectedMap[key], actualMap[key])
+	}
+}
+
+func TestMapIterChanAbort(t *testing.T) {
+	input := []int{1, 2, 3, 4}
+	expected := []int{2, 4}
+	mi := iterator.Map(iterator.Slice(input), func(n int) int { return n * 2 })
+	actual := make([]int, 0, mi.Size().Allocate())
+	i := 0
+	for v := range mi.Chan() {
+		actual = append(actual, v)
+		i++
+		if i == 2 {
+			mi.Abort()
+		}
+	}
 	assert.Equal(t, expected, actual)
 }
 
 func TestFilter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4}
-	iter := Filter(Slice(input), func(n int) bool { return n&1 == 0 })
-	assert.True(t, IsSizeAtMost(iter.Size()))
-	actual := Collect(iter)
+	iter := iterator.Slice(input).Filter(func(n int) bool { return n&1 == 0 })
+	assert.True(t, iter.Size().IsMaxKnown())
+	actual := iterator.Collect(iter)
+	assert.Equal(t, expected, actual)
+}
+
+func TestFilter2(t *testing.T) {
+	input := map[int]int{1: 3, 2: 6, 3: 9, 4: 12, 5: 15, 6: 18, 7: 21, 8: 24, 9: 27}
+	expected := map[int]int{1: 3, 3: 9, 5: 15, 7: 21, 9: 27}
+	itr := maps.Iter(input).Filter2(func(x, y int) bool { return (x*y)&1 == 1 })
+	assert.True(t, itr.Size().IsMaxKnown())
+	actual := iterator.CollectMap(itr)
 	assert.Equal(t, expected, actual)
 }
 
@@ -251,7 +794,7 @@ func TestDoMapIter(t *testing.T) {
 	input := []int{1, 2, 3, 4}
 	expected := []int{2, 4, 6}
 	expectedErr := "Value 4 too large"
-	actual, err := CollectResults(Map(Slice(input), func(n int) result.Result[int] {
+	actual, err := iterator.CollectResults(iterator.Map(iterator.Slice(input), func(n int) result.Result[int] {
 		if n < 4 {
 			return result.Value(n * 2)
 		} else {
@@ -263,55 +806,309 @@ func TestDoMapIter(t *testing.T) {
 }
 
 func TestGenerator(t *testing.T) {
-	gen := Generate(func(c Consumer[int]) {
+	gen := iterator.Generate(func(c iterator.Consumer[int]) {
 		for i := 0; i < 10; i++ {
 			c.Yield(i)
 		}
 	})
-	actual := Collect(gen)
-	expected := Collect(Range(0, 10))
+	actual := iterator.Collect(gen)
+	expected := iterator.Collect(iterator.Range(0, 10))
 	assert.Equal(t, expected, actual)
 }
 
-func fib() Iterator[int] {
-	return Generate(func(c Consumer[int]) {
+func TestFromSeq(t *testing.T) {
+	seq := func(yield func(int) bool) {
+		for i := range 5 {
+			if !yield(i) {
+				break
+			}
+		}
+	}
+	itr := iterator.New(seq)
+	slice := iterator.Collect(itr)
+	assert.Equal(t, slices.Range(0, 5), slice)
+}
+
+func TestFromSeqToChan(t *testing.T) {
+	seq := func(yield func(int) bool) {
+		for i := range 5 {
+			if !yield(i) {
+				break
+			}
+		}
+	}
+	itr := iterator.New(seq)
+	slice := make([]int, 0, 5)
+	for i := range itr.Chan() {
+		slice = append(slice, i)
+	}
+	assert.Equal(t, slices.Range(0, 5), slice)
+}
+
+func TestFromSeqReset(t *testing.T) {
+	seq := func(yield func(int) bool) {
+		for i := range 5 {
+			if !yield(i) {
+				break
+			}
+		}
+	}
+	itr := iterator.New(seq)
+	assert.Equal(t, slices.Range(0, 5), itr.Collect())
+	assert.Empty(t, itr.Collect())
+	itr.Reset()
+	assert.Equal(t, slices.Range(0, 5), itr.Collect())
+}
+
+func fibGen() iterator.Iterator[int] {
+	return iterator.Generate(func(c iterator.Consumer[int]) {
 		tail := [2]int{0, 1}
-		c.Yield(tail[0])
-		c.Yield(tail[1])
 		for {
-			next := tail[0] + tail[1]
-			c.Yield(next)
-			tail[0] = tail[1]
-			tail[1] = next
+			c.Yield(tail[1])
+			tail[0], tail[1] = tail[1], tail[0]+tail[1]
 		}
 	})
 }
 
+func fibPureSeq(yield func(int) bool) {
+	tail := [2]int{0, 1}
+	for {
+		if !yield(tail[1]) {
+			return
+		}
+		tail[0], tail[1] = tail[1], tail[0]+tail[1]
+	}
+}
+
+func fibSeq() iterator.Iterator[int] {
+	return iterator.NewWithSize(fibPureSeq, iterator.NewSizeInfinite)
+}
+
+type simpleFib [2]int
+
+func newSimpleFib() *simpleFib {
+	return &simpleFib{0, 1}
+}
+
+func (sf *simpleFib) Next() bool {
+	if sf[0]+sf[1] == 0 {
+		return false
+	}
+	sf[0], sf[1] = sf[1], sf[0]+sf[1]
+	return true
+}
+
+func (sf *simpleFib) Value() int {
+	return sf[0]
+}
+
+func (sf *simpleFib) Abort() {
+	*sf = simpleFib{0, 0}
+}
+
+func (sf *simpleFib) Reset() {
+	*sf = simpleFib{0, 1}
+}
+
+func newFromSimpleFib() iterator.Iterator[int] {
+	return iterator.NewFromSimpleWithSize(newSimpleFib(), iterator.NewSizeInfinite)
+}
+
 func TestGenerateFib(t *testing.T) {
-	result := Collect(Take(10, fib()))
-	var expected = []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
+	result := iterator.Collect(iterator.Take(10, fibGen()))
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
 	assert.Equal(t, expected, result)
 }
 
 func TestGenerateFibChan(t *testing.T) {
 	var result []int
-	var expected = []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
-	for e := range Take(10, fib()).Chan() {
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	for e := range iterator.Take(10, fibGen()).Chan() {
 		result = append(result, e)
 	}
 	assert.Equal(t, expected, result)
 }
 
-func BenchmarkGenerateFib(b *testing.B) {
-	iter := Take(b.N, fib())
+func TestCollectSimpleFib(t *testing.T) {
+	var result []int
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	for e := range iterator.Take(10, newFromSimpleFib()).Chan() {
+		result = append(result, e)
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestGenerateSimpleFibChan(t *testing.T) {
+	var result []int
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	for e := range iterator.Take(10, newFromSimpleFib()).Chan() {
+		result = append(result, e)
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestFibSeqPull(t *testing.T) {
+	var result []int
+	var expected = []int{1, 2, 3, 5, 8, 13, 21, 34, 55}
+	fib := fibSeq()
+	assert.True(t, fib.Next())
+	assert.Equal(t, 1, fib.Value())
+	for n := range fib.Seq() {
+		result = append(result, n)
+		if n >= 55 {
+			break
+		}
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestFibInf(t *testing.T) {
+	const size = 10
+	var expected = []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	fib := fibSeq().Take(size)
+	assert.Equal(t, size, fib.Size().Size)
+	assert.Equal(t, expected, fib.Collect())
+}
+
+func TestCollectFibInf(t *testing.T) {
+	defer func() {
+		p := recover()
+		assert.NotNil(t, p)
+		assert.ErrorIs(t, p.(error), iterator.ErrSizeInfinite)
+	}()
+	fibSeq().Collect()
+	assert.Fail(t, "Expected panic did not occur")
+}
+
+func TestCollectFibInfMax(t *testing.T) {
+	s := make([]int, 0, 5)
+	i := fibSeq()
+	i.CollectIntoCap(&s)
+	assert.Equal(t, []int{1, 1, 2, 3, 5}, s)
+}
+
+func TestCollectIntoCapNonSeq(t *testing.T) {
+	i := iterator.NewFromSimple(&counter{}).Take(5)
+	s := make([]int, 0, 4)
+	i.CollectIntoCap(&s)
+	assert.Equal(t, []int{0, 1, 2, 3}, s)
+}
+
+func TestFibSize(t *testing.T) {
+	fib := fibSeq()
+	assert.True(t, fib.Size().IsInfinite())
+	filt := fib.Filter(func(n int) bool { return n&1 == 0 })
+	assert.True(t, filt.Size().IsInfinite())
+	take := fib.Take(20)
+	assert.True(t, take.Size().IsKnownToBe(20))
+	take2 := fib.Take(20)
+	assert.True(t, take2.Size().IsKnownToBe(20))
+	filt2 := take2.Filter(func(n int) bool { return n&1 == 0 })
+	assert.True(t, filt2.Size().IsMaxKnownToBe(20))
+	assert.Equal(t, []int{2, 8, 34, 144, 610, 2584}, filt2.Collect())
+}
+
+func BenchmarkGenerateSimpleFib(b *testing.B) {
+	iter := newFromSimpleFib()
 	var sum uint64 = 0
+	var count int
+	for range b.N {
+		iter.Next()
+		sum += uint64(iter.Value())
+		count++
+	}
+	assert.Equal(b, b.N, count)
+}
+
+func BenchmarkGenerateFib(b *testing.B) {
+	iter := fibGen()
+	var sum uint64 = 0
+	var count int
+	for range b.N {
+		iter.Next()
+		sum += uint64(iter.Value())
+		count++
+	}
+	assert.Equal(b, b.N, count)
+}
+
+func BenchmarkGenerateTakeFib(b *testing.B) {
+	iter := iterator.Take(b.N, fibGen())
+	var sum uint64 = 0
+	var count int
 	for iter.Next() {
 		sum += uint64(iter.Value())
+		count++
+	}
+	assert.Equal(b, b.N, count)
+}
+
+func BenchmarkGenerateTakeFibSeq(b *testing.B) {
+	iter := iterator.Take(b.N, fibSeq())
+	var sum uint64 = 0
+	for v := range iter.Seq() {
+		sum += uint64(v)
 	}
 }
 
+func BenchmarkGenerateMorphFibSeq(b *testing.B) {
+	iter := fibSeq().Morph(func(n int) int { return n * 2 })
+	var sum uint64 = 0
+	i := 0
+	for v := range iter.Seq() {
+		if i >= b.N {
+			break
+		}
+		sum += uint64(v)
+		i++
+	}
+}
+
+func BenchmarkGenerateFibSeq(b *testing.B) {
+	iter := fibSeq()
+	var sum uint64 = 0
+	i := 0
+	for v := range iter.Seq() {
+		if i >= b.N {
+			break
+		}
+		sum += uint64(v)
+		i++
+	}
+}
+
+func BenchmarkGenerateFibSeqPure(b *testing.B) {
+	iter := fibPureSeq
+	var sum uint64 = 0
+	i := 0
+	for v := range iter {
+		if i >= b.N {
+			break
+		}
+		sum += uint64(v)
+		i++
+	}
+}
+
+func BenchmarkGenerateFibSeqPull(b *testing.B) {
+	itr := fibPureSeq
+	next, stop := iter.Pull(itr)
+	defer stop()
+	var sum uint64 = 0
+	var count int
+	for range b.N {
+		if v, ok := next(); !ok {
+			break
+		} else {
+			sum += uint64(v)
+			count++
+		}
+	}
+	assert.Equal(b, b.N, count)
+}
+
 func BenchmarkGenerateFib2(b *testing.B) {
-	iter := fib()
+	iter := fibGen()
 	defer iter.Abort()
 	var sum uint64 = 0
 	for i := 0; i < b.N && iter.Next(); i++ {
@@ -321,7 +1118,7 @@ func BenchmarkGenerateFib2(b *testing.B) {
 
 func BenchmarkGenerateFibChan(b *testing.B) {
 	var sum uint64 = 0
-	for v := range Take(b.N, fib()).Chan() {
+	for v := range iterator.Take(b.N, fibGen()).Chan() {
 		sum += uint64(v)
 	}
 }
@@ -329,7 +1126,7 @@ func BenchmarkGenerateFibChan(b *testing.B) {
 func BenchmarkGenerateFibChan2(b *testing.B) {
 	var sum uint64 = 0
 	i := 0
-	iter := fib()
+	iter := fibGen()
 	for v := range iter.Chan() {
 		sum += uint64(v)
 		i++
@@ -339,73 +1136,303 @@ func BenchmarkGenerateFibChan2(b *testing.B) {
 	}
 }
 
-type SimpleFib [2]int
-
-func NewSimpleFib() SimpleIterator[int] {
-	return &SimpleFib{0, 1}
-}
-
-func (sf *SimpleFib) Value() int {
-	return sf[0]
-}
-
-func (sf *SimpleFib) Next() bool {
-	if sf[1] == 0 {
-		return false
-	} else {
-		*sf = SimpleFib{sf[1], sf[0] + sf[1]}
-		return true
+func repeatSeq[T any](r int, v T) func(func(T) bool) {
+	return func(yield func(T) bool) {
+		for range r {
+			if !yield(v) {
+				break
+			}
+		}
 	}
 }
 
-func (sf *SimpleFib) Abort() {
-	sf[1] = 0
+var repeatSeqInt func(int, int) func(func(int) bool) = repeatSeq[int]
+
+func repeatSeqIter[T any](r int, v T) iterator.Iterator[T] {
+	return iterator.New(repeatSeq(r, v))
 }
 
-func NewFib() Iterator[int] {
-	return MakeIteratorFromSimple[int](NewSimpleFib())
+type repeatSimpleIter[T any] struct {
+	index, repetitions int
+	value              T
 }
 
-func TestSimpleFib(t *testing.T) {
-	fib := NewFib()
-	seq := Collect(Take(10, fib))
-	expected := []int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
-	assert.Equal(t, expected, seq)
+func (rsi *repeatSimpleIter[T]) Next() bool {
+	if rsi.index < rsi.repetitions {
+		rsi.index++
+		return true
+	} else {
+		return false
+	}
 }
 
-type iterSlice[T any] struct {
-	slice []T
-	index int
+func (rsi *repeatSimpleIter[T]) Value() T {
+	return rsi.value
 }
 
-func (is *iterSlice[T]) Next() bool {
-	is.index++
-	return is.index < len(is.slice)
+func (rsi *repeatSimpleIter[T]) Abort() {
+	rsi.index = rsi.repetitions
 }
 
-func (is *iterSlice[T]) Value() T {
-	return is.slice[is.index]
+func (rsi *repeatSimpleIter[T]) Reset() {
+	rsi.index = 0
 }
 
-func (is *iterSlice[T]) Abort() {
-	is.index = len(is.slice)
+func repeatIter[T any](r int, v T) iterator.Iterator[T] {
+	rsi := &repeatSimpleIter[T]{repetitions: r, value: v}
+	return iterator.NewFromSimpleWithSize(rsi, func() iterator.IteratorSize { return iterator.NewSize(rsi.repetitions - rsi.index) })
 }
 
-func TestMakeSizedIterator(t *testing.T) {
-	slice := []string{"red", "orange", "hello"}
-	simpleIter := &iterSlice[string]{slice, -1}
-	actual := Collect(MakeIteratorOfSizeFromSimple[string](simpleIter, NewSize(len(slice))))
-	assert.Equal(t, slice, actual)
+func BenchmarkBaseSeq(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeq(b.N, value)
+	for v := range seqIter {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBaseSeqNonopt(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeqInt(b.N, value)
+	for v := range seqIter {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBaseSeqIter(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeqIter(b.N, value)
+	for v := range seqIter.Seq() {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBaseSimple(b *testing.B) {
+	var sum uint64
+	const value = 3
+	itr := repeatIter(b.N, value)
+	for itr.Next() {
+		sum += uint64(itr.Value())
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkSeqSimple(b *testing.B) {
+	var sum uint64
+	const value = 3
+	itr := repeatIter(b.N, value)
+	for v := range itr.Seq() {
+		sum += uint64(v)
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func BenchmarkBSimpleSeq(b *testing.B) {
+	var sum uint64
+	const value = 3
+	seqIter := repeatSeqIter(b.N, value)
+	for seqIter.Next() {
+		sum += uint64(seqIter.Value())
+	}
+	assert.Equal(b, value*uint64(b.N), sum)
+}
+
+func rangeSum(from, to int) uint64 {
+	return (uint64(to-from) * (uint64(from) + uint64(to-1))) / 2
+}
+
+func BenchmarkSeqRange(b *testing.B) {
+	var sum uint64
+	for v := range iterator.Range(0, b.N).Seq() {
+		sum += uint64(v)
+	}
+	assert.Equal(b, rangeSum(0, b.N), sum)
+}
+
+func BenchmarkSimpleRange(b *testing.B) {
+	var sum uint64
+	for itr := iterator.Range(0, b.N); itr.Next(); {
+		sum += uint64(itr.Value())
+	}
+	assert.Equal(b, rangeSum(0, b.N), sum)
+}
+
+func BenchmarkSeqFromSimpleRange(b *testing.B) {
+	var sum uint64
+	for v := range iterator.Seq(iterator.Range(0, b.N)) {
+		sum += uint64(v)
+	}
+	assert.Equal(b, rangeSum(0, b.N), sum)
+}
+
+func TestSimpleFibSeq2(t *testing.T) {
+	assert := assert.New(t)
+	seq2 := newFromSimpleFib().Enumerate().Seq2()
+loop:
+	for k, v := range seq2 {
+		switch k {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
+	}
+}
+
+func TestSimpleFibKVSeq2(t *testing.T) {
+	assert := assert.New(t)
+	seq2 := iterator.Seq2(iterator.AsKV(newFromSimpleFib().Enumerate()))
+loop:
+	for k, v := range seq2 {
+		switch k {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
+	}
+}
+
+func TestSimpleFibChan2(t *testing.T) {
+	assert := assert.New(t)
+	chan2 := newFromSimpleFib().Enumerate().Chan2()
+loop:
+	for kv := range chan2 {
+		k := kv.Key
+		v := kv.Value
+		switch k {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
+
+	}
+}
+
+func TestSimpleRepeatSize(t *testing.T) {
+	const size = 10
+	const value = 101
+	itr := repeatIter(size, value)
+	assert.Equal(t, size, itr.Size().Size)
+	c := itr.Collect()
+	assert.Equal(t, size, len(c))
+	assert.Equal(t, size, cap(c))
+	for _, v := range c {
+		assert.Equal(t, value, v)
+	}
+}
+
+func TestSimpleCollectToMap(t *testing.T) {
+	const size = 10
+	const value = 101
+	itr := repeatIter(size, value).Enumerate()
+	c := iterator.CollectMap(itr)
+	assert.Equal(t, size, len(c))
+	keys := slices.Sorted(maps.Keys(c))
+	for _, v := range c {
+		assert.Equal(t, value, v)
+	}
+	assert.Equal(t, slices.Range(0, size), keys)
+}
+
+func newSimpleMutableSliceIter[T any](slice []T) iterator.MutableIterator[T] {
+	core := iterator.NewSliceCoreIterator(&slice)
+	return iterator.NewFromSimpleMutableWithSize(core, core.Size)
+}
+
+func TestSimpleMutableSize(t *testing.T) {
+	const size = 10
+	slice := slices.Range(0, size)
+	itr := newSimpleMutableSliceIter(slice)
+	assert.Equal(t, size, itr.Size().Size)
+	c := itr.Collect()
+	assert.Equal(t, size, cap(c))
+	assert.Equal(t, slice, c)
+}
+
+func TestAsKV(t *testing.T) {
+	assert := assert.New(t)
+	kvi := iterator.AsKV(newFromSimpleFib().Enumerate())
+loop:
+	for kv := range kvi.Seq() {
+		v := kv.Value
+		switch kv.Key {
+		case 0:
+			assert.Equal(1, v)
+		case 1:
+			assert.Equal(1, v)
+		case 2:
+			assert.Equal(2, v)
+		case 3:
+			assert.Equal(3, v)
+		case 4:
+			assert.Equal(5, v)
+		case 5:
+			assert.Equal(8, v)
+		default:
+			break loop
+		}
+	}
+}
+
+func TestCollectKV(t *testing.T) {
+	const size = 10
+	itr := iterator.AsKV(iterator.Range(size, size*2).Enumerate())
+	assert.Equal(t, size, itr.Size().Size)
+	c := itr.Collect()
+	expected := make([]iterator.KeyValue[int, int], size)
+	for i := range size {
+		expected[i] = iterator.KVOf(i, i+size)
+	}
+	assert.Equal(t, expected, c)
+	assert.Equal(t, size, cap(c))
 }
 
 func TestGeneratorChan(t *testing.T) {
-	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+	gen := iterator.Generate(func(c iterator.Consumer[int]) {
+		for i := range 10 {
 			c.Yield(i)
 		}
 	})
 	actual := make([]int, 10)
-	expected := Collect(Range(0, 10))
+	expected := iterator.Collect(iterator.Range(0, 10))
 	p := 0
 	for i := range gen.Chan() {
 		actual[p] = i
@@ -415,32 +1442,34 @@ func TestGeneratorChan(t *testing.T) {
 }
 
 func TestGeneratorChanAbort(t *testing.T) {
-	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+	const size = 10
+	gen := iterator.Generate(func(c iterator.Consumer[int]) {
+		for i := range size + 1 {
 			c.Yield(i)
 		}
 	})
-	actual := make([]int, 5)
-	expected := Collect(Range(0, 5))
+	actual := make([]int, size)
+	expected := iterator.Collect(iterator.Range(0, size))
 	p := 0
 	for i := range gen.Chan() {
 		actual[p] = i
 		p++
 		if p >= len(actual) {
 			gen.Abort()
+			break
 		}
 	}
 	assert.Equal(t, expected, actual)
 }
 
 func TestGeneratorIterAbort(t *testing.T) {
-	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+	gen := iterator.Generate(func(c iterator.Consumer[int]) {
+		for i := range 10 {
 			c.Yield(i)
 		}
 	})
 	actual := make([]int, 5)
-	expected := Collect(Range(0, 5))
+	expected := iterator.Collect(iterator.Range(0, 5))
 	p := 0
 	for gen.Next() {
 		actual[p] = gen.Value()
@@ -453,12 +1482,12 @@ func TestGeneratorIterAbort(t *testing.T) {
 }
 
 func TestGeneratorMap(t *testing.T) {
-	gen := Generate(func(c Consumer[int]) {
-		for i := 0; i < 10; i++ {
+	gen := iterator.Generate(func(c iterator.Consumer[int]) {
+		for i := range 10 {
 			c.Yield(i)
 		}
 	})
-	actual := Collect(Map(gen, func(x int) int { return x * 3 }))
+	actual := iterator.Collect(iterator.Map(gen, func(x int) int { return x * 3 }))
 	expected := make([]int, 10)
 	for i := range expected {
 		expected[i] = i * 3
@@ -467,14 +1496,14 @@ func TestGeneratorMap(t *testing.T) {
 }
 
 func TestGeneratorError(t *testing.T) {
-	gen := Generate(func(c Consumer[result.Result[int]]) {
-		for i := 0; i < 10; i++ {
+	gen := iterator.Generate(func(c iterator.Consumer[result.Result[int]]) {
+		for i := range 10 {
 			c.Yield(result.Value(i))
 		}
 		c.Yield(result.Error[int](fmt.Errorf("iterator failed")))
 	})
-	actual, err := CollectResults(gen)
-	expected := Collect(Range(0, 10))
+	actual, err := iterator.CollectResults(gen)
+	expected := iterator.Collect(iterator.Range(0, 10))
 	for i := range expected {
 		expected[i] = i
 	}
@@ -485,13 +1514,13 @@ func TestGeneratorError(t *testing.T) {
 // A result generator will yield an error if the generator
 // function returns an error.
 func TestGeneratorResultError(t *testing.T) {
-	gen := GenerateResults(func(c ResultConsumer[int]) error {
-		for i := 0; i < 10; i++ {
+	gen := iterator.GenerateResults(func(c iterator.ResultConsumer[int]) error {
+		for i := range 10 {
 			c.YieldValue(i)
 		}
 		return fmt.Errorf("iterator failed")
 	})
-	actual, err := CollectResults(gen)
+	actual, err := iterator.CollectResults(gen)
 	expected := make([]int, 10)
 	for i := range expected {
 		expected[i] = i
@@ -511,14 +1540,14 @@ func TestGeneratorResultTry(t *testing.T) {
 			return x, nil
 		}
 	}
-	gen := GenerateResults(func(c ResultConsumer[int]) error {
-		for i := 0; i < 10; i++ {
+	gen := iterator.GenerateResults(func(c iterator.ResultConsumer[int]) error {
+		for i := range 10 {
 			c.YieldValue(eh.Try(validate(i)))
 		}
 		return nil
 	})
-	actual, err := CollectResults(gen)
-	expected := Collect(Range(0, 7))
+	actual, err := iterator.CollectResults(gen)
+	expected := iterator.Collect(iterator.Range(0, 7))
 	assert.Equal(t, expected, actual)
 	assert.EqualError(t, err, "I don't like 7")
 }
@@ -533,13 +1562,13 @@ func TestFilterSuccess(t *testing.T) {
 			return x, nil
 		}
 	}
-	gen := GenerateResults(func(c ResultConsumer[int]) error {
+	gen := iterator.GenerateResults(func(c iterator.ResultConsumer[int]) error {
 		for i := 0; i < 10; i++ {
 			c.Yield(result.From(validate(i)))
 		}
 		return nil
 	})
-	actual := Collect(FilterValues(gen))
+	actual := iterator.Collect(iterator.FilterValues(gen))
 	expected := []int{0, 1, 2, 3, 4, 5, 6, 8, 9}
 	assert.Equal(t, expected, actual)
 }
@@ -554,8 +1583,8 @@ func TestPartitionResults(t *testing.T) {
 			return x, nil
 		}
 	}
-	gen := Map(Range(0, 10), func(i int) result.Result[int] { return result.From(validate(i)) })
-	actual, errs := PartitionResults(gen)
+	gen := iterator.Map(iterator.Range(0, 10), func(i int) result.Result[int] { return result.From(validate(i)) })
+	actual, errs := iterator.PartitionResults(gen)
 	expected := []int{0, 1, 2, 4, 5, 6, 8, 9}
 	expectedErrs := []error{fmt.Errorf("I don't like 3"), fmt.Errorf("I don't like 7")}
 	assert.Equal(t, expected, actual)
@@ -564,22 +1593,235 @@ func TestPartitionResults(t *testing.T) {
 
 func TestAll(t *testing.T) {
 	trueInput := []rune("---------")
-	assert.True(t, All(Slice(trueInput), func(r rune) bool {
+	assert.True(t, iterator.All(iterator.Slice(trueInput), func(r rune) bool {
 		return r == '-'
 	}))
 	falseInput := []rune("-----!----")
-	assert.False(t, All(Slice(falseInput), func(r rune) bool {
+	assert.False(t, iterator.All(iterator.Slice(falseInput), func(r rune) bool {
+		return r == '-'
+	}))
+}
+
+func TestAllMethod(t *testing.T) {
+	trueInput := []rune("---------")
+	assert.True(t, iterator.Slice(trueInput).All(func(r rune) bool {
+		return r == '-'
+	}))
+	falseInput := []rune("-----!----")
+	assert.False(t, iterator.Slice(falseInput).All(func(r rune) bool {
 		return r == '-'
 	}))
 }
 
 func TestAny(t *testing.T) {
 	trueInput := []rune("-----!----")
-	assert.True(t, Any(Slice(trueInput), func(r rune) bool {
+	assert.True(t, iterator.Any(iterator.Slice(trueInput), func(r rune) bool {
 		return r == '!'
 	}))
 	falseInput := []rune("---------")
-	assert.False(t, Any(Slice(falseInput), func(r rune) bool {
+	assert.False(t, iterator.Any(iterator.Slice(falseInput), func(r rune) bool {
 		return r == '!'
 	}))
+}
+
+func TestAnyMethod(t *testing.T) {
+	trueInput := []rune("-----!----")
+	assert.True(t, iterator.Slice(trueInput).Any(func(r rune) bool {
+		return r == '!'
+	}))
+	falseInput := []rune("---------")
+	assert.False(t, iterator.Slice(falseInput).Any(func(r rune) bool {
+		return r == '!'
+	}))
+}
+
+func testSeqIter2(from, to int, mapping func(int) int) iterator.Iterator2[int, int] {
+	size := to - from
+	core := iterator.NewSeqCoreIterator2WithSize(
+		func(yield func(int, int) bool) {
+			size = to - from
+			for n := from; n < to; n++ {
+				size--
+				if !yield(n, mapping(n)) {
+					break
+				}
+			}
+		},
+		func() iterator.IteratorSize {
+			return iterator.NewSize(size)
+		},
+	)
+	return iterator.NewDefaultIterator2(core)
+}
+
+func TestIterator2Seq2(t *testing.T) {
+	const size = 10
+	itr := testSeqIter2(0, size, func(n int) int { return n + size })
+	count := 0
+	for k, v := range itr.Seq2() {
+		assert.Equal(t, count, k)
+		assert.Equal(t, count+size, v)
+		count++
+		assert.Equal(t, size-count, itr.Size().Size)
+	}
+}
+
+func TestIterator2Seq(t *testing.T) {
+	const size = 10
+	itr := testSeqIter2(0, size, func(n int) int { return n + size })
+	count := 0
+	for v := range itr.Seq() {
+		assert.Equal(t, count+size, v)
+		count++
+		assert.Equal(t, size-count, itr.Size().Size)
+	}
+}
+
+func TestIterator2Pull(t *testing.T) {
+	const size = 10
+	itr := testSeqIter2(0, size, func(n int) int { return n + size })
+	count := 0
+	for itr.Next() {
+		assert.Equal(t, count, itr.Key())
+		assert.Equal(t, count+size, itr.Value())
+		count++
+		assert.Equal(t, size-count, itr.Size().Size)
+	}
+}
+
+func TestIterator2PullAndCollect2(t *testing.T) {
+	const size = 10
+	itr := testSeqIter2(0, size, func(n int) int { return n + size })
+	count := 0
+	for count < size/2 && itr.Next() {
+		count++
+	}
+	coll := itr.Collect2()
+	assert.Equal(t, size/2, len(coll))
+	for i, pair := range coll {
+		assert.Equal(t, i+size/2, pair.Key)
+		assert.Equal(t, i+size*3/2, pair.Value)
+	}
+}
+
+func TestIterator2PullAndCollect(t *testing.T) {
+	const size = 10
+	itr := testSeqIter2(0, size, func(n int) int { return n + size })
+	count := 0
+	for count < size/2 && itr.Next() {
+		count++
+	}
+	coll := itr.Collect()
+	assert.Equal(t, size/2, len(coll))
+	for i, value := range coll {
+		assert.Equal(t, i+size*3/2, value)
+	}
+}
+
+func TestMapMutNextCollect(t *testing.T) {
+	m := make(map[int]int)
+	for i := range 10 {
+		m[i] = i
+	}
+	itr := maps.IterMut(m)
+	var collected []int
+	count := 0
+	assert.True(t, itr.SeqOK())
+	for itr.Next() {
+		assert.False(t, itr.SeqOK())
+		count++
+		if count == 5 {
+			collected = itr.Collect()
+		}
+	}
+	assert.Equal(t, 5, len(collected))
+}
+
+func TestMapMutSetDelete(t *testing.T) {
+	const size = 10
+	m := make(map[int]int)
+	for i := range size {
+		m[i] = i
+	}
+	itr := maps.IterMut(m)
+	for k := range itr.Seq2() {
+		if k < 3 {
+			itr.Delete()
+		} else {
+			itr.Set(k * 2)
+		}
+	}
+	assert.Equal(t, size-3, len(m))
+	for k := 3; k < size; k++ {
+		assert.Equal(t, k*2, m[k])
+	}
+}
+
+func TestSumByFoldMethod(t *testing.T) {
+	s := iterator.IncRange(1, 5).Fold(0, functions.Sum)
+	assert.Equal(t, 15, s)
+}
+
+func TestSumByFoldString(t *testing.T) {
+	s := iterator.Of("Generics", "can", "bend", "space").Fold1(functions.Sum)
+	assert.Equal(t, "Genericscanbendspace", s)
+}
+
+func TestIntercalate1String(t *testing.T) {
+	s := iterator.Of("Hello", "generics", "world").Intercalate1("/", functions.Sum)
+	assert.Equal(t, "Hello/generics/world", s)
+}
+
+func TestIntercalateString(t *testing.T) {
+	inputs := []string{"Hello", "generics", "world"}
+	for l := range len(inputs) + 1 {
+		input := inputs[:l]
+		s := slices.Iter(input).Intercalate("", "/", functions.Sum)
+		expect := strings.Join(input, "/")
+		assert.Equal(t, expect, s)
+	}
+}
+
+func TestIntercalateByFold(t *testing.T) {
+	interf := func(a, e string) string {
+		if a == "" {
+			return e
+		} else {
+			return a + "/" + e
+		}
+	}
+	s := iterator.Of("Hello", "generics", "world").Fold("", interf)
+	assert.Equal(t, "Hello/generics/world", s)
+}
+
+func TestIntercalateByFoldNonSeq(t *testing.T) {
+	i := iterator.Range(0, 5)
+	assert.False(t, i.SeqOK())
+	n := i.Intercalate1(2, functions.Sum)
+	assert.Equal(t, 18, n)
+}
+
+func rangeSeq[T constraints.Ordered](f, t, b T) func(func(T) bool) {
+	return func(yield func(T) bool) {
+		for v := f; v < t; v += b {
+			if !yield(v) {
+				break
+			}
+		}
+	}
+}
+
+func TestMaxByFoldMethodNoSeq(t *testing.T) {
+	i := iterator.IncRange(1, 5)
+	assert.False(t, i.SeqOK())
+	s := i.Fold1(ordered.Max2)
+	assert.Equal(t, 5, s)
+}
+
+func TestMaxByFoldMethodSeq(t *testing.T) {
+	c := iterator.New(rangeSeq(0, 5, 1))
+	assert.True(t, c.SeqOK())
+	app := func(ns []int, n int) []int { return append(ns, n) }
+	acc := iterator.Fold(c, nil, app)
+	assert.Equal(t, slices.Range(0, 5), acc)
 }
