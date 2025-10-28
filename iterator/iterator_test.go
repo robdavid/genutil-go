@@ -87,6 +87,12 @@ func TestSeqCollect2IntoCap(t *testing.T) {
 	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 3}, {1, 4}, {2, 5}}, collected)
 }
 
+func TestSeqCollect2IntoCapNoSeq(t *testing.T) {
+	collected := make([]iterator.KeyValue[int, int], 0, 3)
+	iterator.Of(3, 4, 5, 6).Enumerate().Take2(4).Collect2IntoCap(&collected)
+	assert.Equal(t, []iterator.KeyValue[int, int]{{0, 3}, {1, 4}, {2, 5}}, collected)
+}
+
 func TestFloatingRange(t *testing.T) {
 	iter := iterator.Range(0.0, 5.0)
 	assert.True(t, iter.Size().IsKnownToBe(5))
@@ -979,6 +985,13 @@ func TestCollectFibInfMax(t *testing.T) {
 	i := fibSeq()
 	i.CollectIntoCap(&s)
 	assert.Equal(t, []int{1, 1, 2, 3, 5}, s)
+}
+
+func TestCollectIntoCapNonSeq(t *testing.T) {
+	i := iterator.NewFromSimple(&counter{}).Take(5)
+	s := make([]int, 0, 4)
+	i.CollectIntoCap(&s)
+	assert.Equal(t, []int{0, 1, 2, 3}, s)
 }
 
 func TestFibSize(t *testing.T) {
