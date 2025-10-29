@@ -6,7 +6,8 @@
                 "golang.go",
                 "streetsidesoftware.code-spell-checker",
                 "streetsidesoftware.code-spell-checker-british-english",
-                "streetsidesoftware.code-spell-checker-british-english-ise"
+                "streetsidesoftware.code-spell-checker-british-english-ise",
+                "yzhang.markdown-all-in-one"
             ]
         }
     },
