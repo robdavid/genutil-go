@@ -27,9 +27,12 @@ func Product[T Numeric](a, b T) T {
 	return a * b
 }
 
-type Enum[T any] struct {
-	Index int
-	Value T
+// AbsInt returns the absolute (non-negative) value of an integer.
+func AbsInt[T constraints.Integer](n T) T {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
 
 // Returns a pointer to a variable whose value is initialized to v.

@@ -25,3 +25,12 @@ func ExampleRef() {
 	fmt.Println(*hp)
 	// Output: hello
 }
+
+func ExampleAbsInt() {
+	var num int16 = -8192
+	fmt.Println(functions.AbsInt(num))
+	fmt.Println(functions.AbsInt(-num))
+	// Output:
+	// 8192
+	// 8192
+}
