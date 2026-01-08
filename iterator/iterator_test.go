@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/robdavid/genutil-go/errors/handler"
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/robdavid/genutil-go/functions"
@@ -1824,4 +1825,20 @@ func TestMaxByFoldMethodSeq(t *testing.T) {
 	app := func(ns []int, n int) []int { return append(ns, n) }
 	acc := iterator.Fold(c, nil, app)
 	assert.Equal(t, slices.Range(0, 5), acc)
+}
+
+func TestErroringIterator(t *testing.T) {
+	parseInt := func(str string) int {
+		return handler.Try(strconv.Atoi(str))
+	}
+	mapToInt := func(strs ...string) (values []int, err error) {
+		defer handler.Catch(&err)
+		values = iterator.Map(slices.Iter(strs), parseInt).Collect()
+		return
+	}
+	result, err := mapToInt("1", "12", "123")
+	require.NoError(t, err)
+	assert.Equal(t, []int{1, 12, 123}, result)
+	_, err = mapToInt("potato")
+	require.Error(t, err)
 }
