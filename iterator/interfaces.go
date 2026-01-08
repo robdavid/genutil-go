@@ -281,19 +281,20 @@ type Iterator2Extensions[K any, V any] interface {
 // Top level iterator types
 
 // Iterator is a generic iterator type, facilitating iteration over single
-// elements of a generic type plus some utility methods. It consists of methods
-// from [CoreIterator], plus the ones from [IteratorExtensions].
+// elements of generic type T. This type also includes some utility methods. It
+// consists of core iterator methods from [CoreIterator] plus utility methods
+// from [IteratorExtensions].
 type Iterator[T any] interface {
 	CoreIterator[T]
 	IteratorExtensions[T]
 }
 
 // MutableIterator is a generic iterator type, facilitating iteration over
-// single elements of a generic type that also supports mutation of the
-// underlying value. Elements can be modified in place or removed from their
+// single elements of generic type T, that also supports mutation of the
+// underlying values. Elements can be modified in place or removed from their
 // underlying collection. This type also includes some utility methods. It
-// consists of methods from [CoreMutableIterator], plus the ones from
-// [IteratorExtensions].
+// consists of core mutable iterator methods from [CoreMutableIterator], plus
+// utility methods from [IteratorExtensions].
 type MutableIterator[T any] interface {
 	CoreMutableIterator[T]
 	IteratorExtensions[T]
@@ -302,8 +303,9 @@ type MutableIterator[T any] interface {
 // Iterator2 is a generic iterator type, facilitating iteration over pairs of
 // elements of different generic types. One of these is the "value", and the
 // other is the "key" which may be something like a map key or slice index. It
-// also has some utility methods. It consists of methods from [CoreIterator2],
-// [IteratorExtensions] and [Iterator2Extensions].
+// also has some utility methods. It consists of core iterator methods from
+// [CoreIterator2], plus utility methods from [IteratorExtensions] and
+// [Iterator2Extensions].
 type Iterator2[K any, V any] interface {
 	CoreIterator2[K, V]
 	IteratorExtensions[V]
@@ -314,9 +316,10 @@ type Iterator2[K any, V any] interface {
 // pairs of elements of different generic types. One of these is the "value",
 // and the other is the "key" which may be something like a map key or slice
 // index. Two mutation operations are supported; the modification of the the
-// "value" element, and removal of the element pair from the underlying
-// collection. It also has some utility methods. It consists of methods from
-// [CoreIterator2], [IteratorExtensions] and [Iterator2Extensions].
+// current "value" element, and removal of the current element pair from the
+// underlying collection. It also has some utility methods. It consists of core
+// iterator methods from [CoreIterator2] amd utility methods from
+// [IteratorExtensions] and [Iterator2Extensions].
 type MutableIterator2[K any, V any] interface {
 	CoreMutableIterator2[K, V]
 	IteratorExtensions[V]
