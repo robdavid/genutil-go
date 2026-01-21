@@ -675,3 +675,22 @@ func Intercalate[T any](itr CoreIterator[T], empty T, inter T, f func(a, e T) T)
 	}
 	return Fold(itr, empty, interFold)
 }
+
+func Cycle[T any](itr CoreIterator[T]) Iterator[T] {
+	seq := func(yield func(T) bool) {
+		for {
+			hasItems := false
+			for item := range itr.Seq() {
+				if !yield(item) {
+					break
+				}
+				hasItems = true
+			}
+			if !hasItems {
+				break
+			}
+			itr.Reset()
+		}
+	}
+	return New(seq)
+}
