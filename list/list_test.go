@@ -3,39 +3,40 @@ package list_test
 import (
 	"testing"
 
-	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/list"
-	"github.com/robdavid/genutil-go/option"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestEmpty(t *testing.T) {
 	empty := list.New[int]()
 	assert.Equal(t, 0, empty.Size())
 	assert.True(t, empty.IsEmpty())
-	assert.True(t, empty.Prev().IsEmpty())
-	assert.True(t, empty.Next().IsEmpty())
-	assert.True(t, empty.First().IsEmpty())
-	assert.True(t, empty.Last().IsEmpty())
-	assert.True(t, empty.Get().ToRef().IsEmpty())
+	assert.Empty(t, empty.Iter().Collect())
+	assert.Empty(t, empty.RevIter().Collect())
+	assert.Empty(t, empty.IterNode().Collect())
+	assert.Empty(t, empty.RevIterNode().Collect())
+}
+
+func TestOf(t *testing.T) {
+	var lst list.List[int]
+	lst = list.Of(1, 2, 3, 4)
+	expected := []int{1, 2, 3, 4}
+	assert.Equal(t, expected, lst.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
 }
 
 func TestAppend(t *testing.T) {
 	const size = 10
 	list := list.New[int]()
-	for n := range iterator.Range(0, 10).Seq() {
+	for n := range iterator.Range(0, size).Seq() {
 		list.Append(n)
 	}
 	assert.Equal(t, size, list.Size())
-	l := list
-	for i := range size {
-		assert.Equal(t, option.Value(i), l.Get())
-		l = l.Next()
-		require.Equal(t, i == size-1, l.IsEmpty())
-	}
+	expected := slices.Range(0, size)
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
 }
 
 func TestAppendSlice(t *testing.T) {
@@ -44,32 +45,99 @@ func TestAppendSlice(t *testing.T) {
 	slice := slices.Range(0, size)
 	list.Append(slice...)
 	assert.Equal(t, size, list.Size())
-	l := list
-	for i := range size {
-		assert.Equal(t, option.Value(i), l.Get())
-		l = l.Next()
-		require.Equal(t, i == size-1, l.IsEmpty())
+	expected := slices.Range(0, size)
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestPrepend(t *testing.T) {
+	const size = 10
+	list := list.New[int]()
+	for n := range iterator.IncRange(size-1, 0).Seq() {
+		list.Prepend(n)
 	}
-	collected := list.Iter().Collect()
-	assert.Equal(t, slice, collected)
+	assert.Equal(t, size, list.Size())
+	expected := slices.Range(0, size)
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestPrependSlice(t *testing.T) {
+	const size = 10
+	list := list.New[int]()
+	slice := slices.Range(0, size)
+	list.Prepend(slice...)
+	assert.Equal(t, size, list.Size())
+	expected := slices.Range(0, size)
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
 }
 
 func TestInsert(t *testing.T) {
-	const size = 10
-	list := list.New[int]()
-	for n := range iterator.Range(0, 10).Seq() {
-		list.Insert(n)
-	}
-	assert.Equal(t, size, list.Size())
-	l := list
-	for i := range size {
-		n, ok := l.Get().GetOK()
-		require.True(t, ok)
-		assert.Equal(t, size-1-i, n)
-		l = l.Next()
-		require.Equal(t, i == size-1, l.IsEmpty())
-	}
+	list := list.Of(1, 2, 4, 5)
+	list.Insert(list.At(2), 3)
+	expected := []int{1, 2, 3, 4, 5}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
 }
+
+func TestInsertStart(t *testing.T) {
+	list := list.Of(1, 2, 3, 4)
+	list.Insert(list.At(0), 0)
+	expected := []int{0, 1, 2, 3, 4}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestInsertEnd(t *testing.T) {
+	list := list.Of(1, 2, 3, 5)
+	list.Insert(list.At(-1), 4)
+	expected := []int{1, 2, 3, 4, 5}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestInsertAfter(t *testing.T) {
+	list := list.Of(1, 2, 3, 5)
+	list.InsertAfter(list.At(2), 4)
+	expected := []int{1, 2, 3, 4, 5}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestInsertNothingAfter(t *testing.T) {
+	list := list.Of(1, 2, 3, 4, 5)
+	list.InsertAfter(list.At(2))
+	expected := []int{1, 2, 3, 4, 5}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestInsertSliceAfter(t *testing.T) {
+	list := list.Of(1, 5)
+	list.InsertAfter(list.First(), 2, 3, 4)
+	expected := []int{1, 2, 3, 4, 5}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestInsertAfterStart(t *testing.T) {
+	list := list.Of(1, 3, 4, 5)
+	list.InsertAfter(list.First(), 2)
+	expected := []int{1, 2, 3, 4, 5}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestInsertAfterEnd(t *testing.T) {
+	list := list.Of(1, 2, 3, 4)
+	list.InsertAfter(list.Last(), 5)
+	expected := []int{1, 2, 3, 4, 5}
+	assert.Equal(t, expected, list.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+/*
 
 func TestInsertSlice(t *testing.T) {
 	const size = 10
@@ -246,4 +314,45 @@ func TestFrom(t *testing.T) {
 	input := slices.Range(0, size)
 	lst := list.Of(input...)
 	assert.Equal(t, input, lst.Iter().Collect())
+}
+
+*/
+
+func TestDelete(t *testing.T) {
+	const size = 10
+	input := slices.Range(0, size)
+	lst := list.Of(input...)
+	for node := range lst.SeqNode() {
+		if node.Get()%2 != 0 {
+			lst.Delete(node)
+		}
+	}
+	expected := slices.RangeBy(0, size, 2)
+	assert.Equal(t, expected, lst.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
+}
+
+func TestDeleteSingleton(t *testing.T) {
+	lst := list.Of(1)
+	lst.Delete(lst.First())
+	assert.True(t, lst.IsEmpty())
+	assert.Equal(t, 0, lst.Size())
+}
+
+func TestDeleteFirst(t *testing.T) {
+	const size = 10
+	lst := list.Of(slices.Range(0, size)...)
+	lst.Delete(lst.First())
+	expected := slices.Range(1, size)
+	assert.Equal(t, expected, lst.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
+}
+
+func TestDeleteLast(t *testing.T) {
+	const size = 10
+	lst := list.Of(slices.Range(0, size)...)
+	lst.Delete(lst.Last())
+	expected := slices.Range(0, size-1)
+	assert.Equal(t, expected, lst.Iter().Collect())
+	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
 }
