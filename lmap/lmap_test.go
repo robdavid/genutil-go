@@ -57,6 +57,14 @@ func TestInsertOrder(t *testing.T) {
 	}
 }
 
+func TestValuesOrder(t *testing.T) {
+	lm := lmap.Make[string, int]()
+	for i, key := range stringKeys {
+		lm.Put(key, i)
+	}
+	assert.Equal(t, slices.Range(0, len(stringKeys)), lm.IterValues().Collect())
+}
+
 func TestInsertDelete(t *testing.T) {
 	lm := lmap.Make[string, int]()
 	for i, key := range stringKeys {

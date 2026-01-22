@@ -123,10 +123,30 @@ func (lm LinkedMap[K, V]) SeqKeys() iter.Seq[K] {
 }
 
 // Seq2 returns an [iter.Seq2][K,V] iterator over the key-value pairs in the map.
+//
+// Deprecated: use [Seq]
 func (lm LinkedMap[K, V]) Seq2() iter.Seq2[K, V] {
+	return lm.Seq()
+}
+
+// Seq returns an [iter.Seq2][K,V] iterator over the key-value pairs in the map.
+func (lm LinkedMap[K, V]) Seq() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for key := range lm.SeqKeys() {
-			yield(key, lm.Get(key))
+			if !yield(key, lm.Get(key)) {
+				break
+			}
+		}
+	}
+}
+
+// Seq returns an [iter.Seq][K,V] iterator over the values in the map.
+func (lm LinkedMap[K, V]) SeqValues() iter.Seq[V] {
+	return func(yield func(V) bool) {
+		for key := range lm.SeqKeys() {
+			if !yield(lm.kv[key].value) {
+				break
+			}
 		}
 	}
 }
@@ -138,7 +158,12 @@ func (lm LinkedMap[K, V]) IterKeys() iterator.Iterator[K] {
 
 // Iter returns an [iterator.Iterator2][K,V] over the key-value pairs in the map.
 func (lm LinkedMap[K, V]) Iter() iterator.Iterator2[K, V] {
-	return iterator.New2(lm.Seq2())
+	return iterator.New2(lm.Seq())
+}
+
+// IterKeys returns an [iterator.Iterator][V] over the values in the map.
+func (lm LinkedMap[K, V]) IterValues() iterator.Iterator[V] {
+	return iterator.New(lm.SeqValues())
 }
 
 // Delete removes the key from the map and returns the associated value and whether the key was present.
