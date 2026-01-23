@@ -26,7 +26,7 @@ type LinkedMap[K comparable, V any] = *linkedMap[K, V]
 func New[K comparable, V any]() LinkedMap[K, V] {
 	lm := &linkedMap[K, V]{
 		kv:   make(map[K]value[K, V]),
-		keys: list.New[K](),
+		keys: list.Make[K](),
 	}
 	return lm
 }
