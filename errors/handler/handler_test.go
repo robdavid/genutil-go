@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func readFileTest(fname string) (content []byte, err error) {
@@ -195,7 +194,7 @@ func recurseErrorReturn(depth int) (err error) {
 	}
 }
 
-// BenchmarkRewindTime times how long it takes to unwind a 1000
+// BenchmarkRewindTime times how long it takes to unwind a
 // deep stack of recursive functions with each frame calling
 // the next via Check() and having a handler like:
 //
@@ -203,24 +202,26 @@ func recurseErrorReturn(depth int) (err error) {
 //
 // when the deepest call raises an error.
 func BenchmarkRewindTime(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		err := recurseErrorCatch(1000)
-		assert.Error(b, err, "Hit bottom")
+	err := recurseErrorCatch(b.N)
+	if err.Error() != "Hit bottom" {
+		b.Fail()
 	}
 }
 
 // BenchmarkNoErrorReturnTime times how long it takes to return from
-// a 1000 deep stack of recursive functions with each frame calling
+// a deep stack of recursive functions with each frame calling
 // the next via Try() and having a handler like:
 //
 //	defer Catch(&err)
 //
 // when the deepest call returns a value without an error.
 func BenchmarkNoErrorReturnTime(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		total, err := recurseNoErrorCatch(1000)
-		assert.Equal(b, 1000, total)
-		assert.NoError(b, err)
+	total, err := recurseNoErrorCatch(b.N)
+	if err != nil {
+		b.Error(err)
+	}
+	if total != b.N {
+		b.Errorf("Wanted %d, got %d", b.N, total)
 	}
 }
 
@@ -232,51 +233,57 @@ func BenchmarkNoErrorReturnTime(b *testing.B) {
 //
 // when the deepest call raises an error.
 func BenchmarkCatchOnce(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		err := recurseErrorCatchOnce(0, 1000)
-		assert.EqualError(b, err, "Hit bottom")
+	err := recurseErrorCatchOnce(0, b.N)
+	if err.Error() != "Hit bottom" {
+		b.Fail()
 	}
 }
 
-// BenchmarkReturnTime times how long it takes to unwind a 1000
+// BenchmarkReturnTime times how long it takes to unwind a
 // deep stack of recursive functions which employs traditional
 // error handling, when the deepest call returns an error.
 func BenchmarkReturnTime(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		err := recurseErrorReturn(1000)
-		assert.EqualError(b, err, "Hit bottom")
+	err := recurseErrorReturn(b.N)
+	if err.Error() != "Hit bottom" {
+		b.Fail()
 	}
 }
 
 // BenchmarkNoErrorCatch times how long it takes to process
-// a loop of 1000 successful Try() calls in a function with
+// a loop of successful Try() calls in a function with
 // a deferred error handler.
 func BenchmarkNoErrorCatch(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		count, err := loopNoErrorCatch(1000)
-		require.Equal(b, count, 1000)
-		require.Nil(b, err)
+	count, err := loopNoErrorCatch(b.N)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if count != b.N {
+		b.Errorf("Wanted %d, got %d", b.N, count)
 	}
 }
 
 // BenchmarkNoErrorNoCatch times how long it takes to process
-// a loop of 1000 successful Try() calls in a function with
+// a loop of successful Try() calls in a function with
 // no error handler.
 func BenchmarkNoErrorNoCatch(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		count, err := loopNoErrorNoCatch(1000)
-		require.Equal(b, count, 1000)
-		require.Nil(b, err)
+	count, err := loopNoErrorNoCatch(b.N)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if count != b.N {
+		b.Errorf("Wanted %d, got %d", b.N, count)
 	}
 }
 
 // BenchmarkNoError times how long it takes to process
-// a loop of 1000 successful function calls using
+// a loop of successful function calls using
 // traditional error testing only.
 func BenchmarkNoError(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		count, err := loopNoError(1000)
-		require.Equal(b, count, 1000)
-		require.Nil(b, err)
+	count, err := loopNoError(b.N)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if count != b.N {
+		b.Errorf("Wanted %d, got %d", b.N, count)
 	}
 }

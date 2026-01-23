@@ -10,7 +10,7 @@ import (
 )
 
 func TestEmpty(t *testing.T) {
-	empty := list.New[int]()
+	var empty list.List[int]
 	assert.Equal(t, 0, empty.Size())
 	assert.True(t, empty.IsEmpty())
 	assert.Empty(t, empty.Iter().Collect())
@@ -135,6 +135,81 @@ func TestInsertAfterEnd(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5}
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestSize(t *testing.T) {
+	const insSize = 10
+	const iterations = 20
+	const deletions = 50
+	var lst list.List[int]
+	insSlice := slices.Range(0, insSize)
+	lst.Append(insSlice...)
+	for range iterations {
+		lst.Insert(lst.At(lst.Size()/2), insSlice...)
+		lst.InsertAfter(lst.At(lst.Size()/2), insSlice...)
+	}
+	for range deletions {
+		lst.Delete(lst.At(lst.Size() / 2))
+	}
+	expectedSize := insSize*(iterations*2+1) - deletions
+	assert.Equal(t, expectedSize, lst.Size())
+}
+
+func BenchmarkIter(b *testing.B) {
+	var lst list.List[int]
+	for i := range b.N {
+		lst.Append(i)
+	}
+	b.ResetTimer()
+	n := 0
+	for i := range lst.Iter().Seq() {
+		n += i
+	}
+	if n != (b.N*(b.N-1))/2 {
+		b.Fail()
+	}
+}
+
+func BenchmarkIterCollect(b *testing.B) {
+	var lst list.List[int]
+	for i := range b.N {
+		lst.Append(i)
+	}
+	b.ResetTimer()
+	c := lst.Iter().Collect()
+	if len(c) != b.N || c[0] != 0 || c[b.N-1] != b.N-1 {
+		b.Fail()
+	}
+}
+
+func BenchmarkSeq(b *testing.B) {
+	var lst list.List[int]
+	for i := range b.N {
+		lst.Append(i)
+	}
+	b.ResetTimer()
+	n := 0
+	for i := range lst.Seq() {
+		n += i
+	}
+	if n != (b.N*(b.N-1))/2 {
+		b.Fail()
+	}
+}
+
+func BenchmarkSeqCollect(b *testing.B) {
+	var lst list.List[int]
+	for i := range b.N {
+		lst.Append(i)
+	}
+	b.ResetTimer()
+	var c []int
+	for v := range lst.Seq() {
+		c = append(c, v)
+	}
+	if len(c) != b.N || c[0] != 0 || c[b.N-1] != b.N-1 {
+		b.Fail()
+	}
 }
 
 /*

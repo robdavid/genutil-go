@@ -1,11 +1,14 @@
 package list
 
 import (
+	"errors"
 	"iter"
 
 	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/option"
 )
+
+var ErrIndexError = errors.New("index out of bounds")
 
 type Node[T any] struct {
 	value T
@@ -17,20 +20,16 @@ type Node[T any] struct {
 // may be at the beginning, the end, or any point in between. The list can be traversed in either
 // direction. The list may be empty, in which case it references nothing.
 
-type list[T any] struct {
+type List[T any] struct {
 	first, last *Node[T]
+	size        int
 }
 
-type List[T any] = *list[T]
-
-// type List[T any] struct {
-// 	first **Node[T]
-// 	last  **Node[T]
-// }
+// type List[T any] = *list[T]
 
 // New creates a new empty list
 func New[T any]() List[T] {
-	return &list[T]{nil, nil}
+	return List[T]{nil, nil, 0}
 }
 
 // Of creates a new list whose elements are taken from the variadic args of the function
@@ -41,16 +40,35 @@ func Of[T any](slice ...T) List[T] {
 	return lst
 }
 
-// Size returns the number of elements in the list by iterating through the list
-func (l *list[T]) Size() int {
+func (lst List[T]) Size() int {
+	return lst.size
+}
+
+// Count returns the number of elements found by iterating forwards from the node.
+func (node *Node[T]) Count() int {
 	total := 0
-	for n := l.first; n != nil; n = n.next {
+	for n := node; n != nil; n = n.next {
 		total++
 	}
 	return total
 }
 
-func (lst *list[T]) Append(slice ...T) {
+// RevCount returns the number of elements found by iterating backwards from the node.
+func (node *Node[T]) RevCount() int {
+	total := 0
+	for n := node; n != nil; n = n.prev {
+		total++
+	}
+	return total
+}
+
+func (lst *List[T]) Clear() {
+	lst.first = nil
+	lst.last = nil
+	lst.size = 0
+}
+
+func (lst *List[T]) Append(slice ...T) {
 	start, end := Chain(slice...)
 	if lst.first == nil {
 		lst.first = start
@@ -60,9 +78,10 @@ func (lst *list[T]) Append(slice ...T) {
 		start.prev = lst.last
 		lst.last = end
 	}
+	lst.size += len(slice)
 }
 
-func (lst *list[T]) Prepend(slice ...T) {
+func (lst *List[T]) Prepend(slice ...T) {
 	start, end := Chain(slice...)
 	if lst.first == nil {
 		lst.first = start
@@ -72,6 +91,7 @@ func (lst *list[T]) Prepend(slice ...T) {
 		end.next = lst.first
 		lst.first = start
 	}
+	lst.size += len(slice)
 }
 
 // Seq returns a native iter.Seq iterator over element values moving forwards in the list.
@@ -118,19 +138,19 @@ func (node *Node[T]) RevSeqNode() iter.Seq[*Node[T]] {
 	}
 }
 
-func (lst *list[T]) Seq() iter.Seq[T] {
+func (lst List[T]) Seq() iter.Seq[T] {
 	return lst.first.Seq()
 }
 
-func (lst *list[T]) RevSeq() iter.Seq[T] {
+func (lst List[T]) RevSeq() iter.Seq[T] {
 	return lst.last.RevSeq()
 }
 
-func (lst *list[T]) SeqNode() iter.Seq[*Node[T]] {
+func (lst List[T]) SeqNode() iter.Seq[*Node[T]] {
 	return lst.first.SeqNode()
 }
 
-func (lst *list[T]) RevSeqNode() iter.Seq[*Node[T]] {
+func (lst List[T]) RevSeqNode() iter.Seq[*Node[T]] {
 	return lst.last.RevSeqNode()
 }
 
@@ -150,20 +170,44 @@ func (node *Node[T]) RevIterNode() iterator.Iterator[*Node[T]] {
 	return iterator.New(node.RevSeqNode())
 }
 
-func (lst *list[T]) Iter() iterator.Iterator[T] {
-	return iterator.New(lst.Seq())
+func NodeToValue[T any](node *Node[T]) T { return node.value }
+
+func (lst List[T]) Iter() iterator.Iterator[T] {
+	return iterator.Map(lst.IterNode(), NodeToValue)
 }
 
-func (lst *list[T]) IterNode() iterator.Iterator[*Node[T]] {
-	return iterator.New(lst.SeqNode())
+func (lst List[T]) IterNode() iterator.Iterator[*Node[T]] {
+	remain := lst.size
+	return iterator.NewWithSize(
+		func(yield func(*Node[T]) bool) {
+			for n := lst.first; n != nil; n = n.next {
+				if !yield(n) {
+					break
+				}
+				remain--
+			}
+		},
+		func() iterator.IteratorSize { return iterator.NewSize(remain) },
+	)
 }
 
-func (lst *list[T]) RevIter() iterator.Iterator[T] {
-	return iterator.New(lst.RevSeq())
+func (lst List[T]) RevIter() iterator.Iterator[T] {
+	return iterator.Map(lst.RevIterNode(), NodeToValue)
 }
 
-func (lst *list[T]) RevIterNode() iterator.Iterator[*Node[T]] {
-	return iterator.New(lst.RevSeqNode())
+func (lst List[T]) RevIterNode() iterator.Iterator[*Node[T]] {
+	remain := lst.size
+	return iterator.NewWithSize(
+		func(yield func(*Node[T]) bool) {
+			for n := lst.last; n != nil; n = n.prev {
+				if !yield(n) {
+					break
+				}
+				remain--
+			}
+		},
+		func() iterator.IteratorSize { return iterator.NewSize(remain) },
+	)
 }
 
 /*
@@ -193,7 +237,7 @@ func As[U ~struct{ List[T] }, T any](l List[T]) U {
 */
 
 // IsEmpty returns true if the list is empty
-func (lst *list[T]) IsEmpty() bool {
+func (lst List[T]) IsEmpty() bool {
 	return lst.first == nil
 }
 
@@ -234,7 +278,7 @@ func (node *Node[T]) Get() T {
 
 // GetFirst returns the element at the head of the given list. If the list is empty, an empty
 // option is returned; otherwise it will hold the element's value.
-func (lst *list[T]) GetFirst() option.Option[T] {
+func (lst List[T]) GetFirst() option.Option[T] {
 	if lst.first == nil {
 		return option.Empty[T]()
 	} else {
@@ -242,7 +286,7 @@ func (lst *list[T]) GetFirst() option.Option[T] {
 	}
 }
 
-func (lst *list[T]) GetLast() option.Option[T] {
+func (lst List[T]) GetLast() option.Option[T] {
 	if lst.first == nil {
 		return option.Empty[T]()
 	} else {
@@ -250,16 +294,17 @@ func (lst *list[T]) GetLast() option.Option[T] {
 	}
 }
 
-func (lst *list[T]) First() *Node[T] {
+func (lst List[T]) First() *Node[T] {
 	return lst.first
 }
 
-func (lst *list[T]) Last() *Node[T] {
+func (lst List[T]) Last() *Node[T] {
 	return lst.last
 }
 
 // At returns the node n elements away from the current node; n may be negative as
-// well as positive. If this moves beyond the limits of the list, nil is returned
+// well as positive. If this moves beyond the limits of the list, it will panic with
+// [ErrIndexError].
 func (node *Node[T]) At(n int) *Node[T] {
 	for n != 0 && node != nil {
 		if n < 0 {
@@ -270,12 +315,15 @@ func (node *Node[T]) At(n int) *Node[T] {
 			n--
 		}
 	}
+	if node == nil {
+		panic(ErrIndexError)
+	}
 	return node
 }
 
 // GetAt returns the element n elements away from the start or the end of the list; n may be negative as well as
 // positive, or zero (the first element). If negative, it counts as an offset from the end of the list plus one.
-func (lst *list[T]) Get(n int) option.Option[T] {
+func (lst List[T]) Get(n int) option.Option[T] {
 	node := lst.At(n)
 	if node == nil {
 		return option.Empty[T]()
@@ -284,7 +332,7 @@ func (lst *list[T]) Get(n int) option.Option[T] {
 	}
 }
 
-func (lst *list[T]) At(n int) *Node[T] {
+func (lst List[T]) At(n int) *Node[T] {
 	if n < 0 {
 		return lst.last.At(n + 1)
 	} else {
@@ -292,9 +340,13 @@ func (lst *list[T]) At(n int) *Node[T] {
 	}
 }
 
+func (lst *List[T]) Set(n int, value T) {
+	lst.At(n).Set(value)
+}
+
 // Insert inserts new elements before the given node, moving the original element to following
 // position.
-func (lst *list[T]) Insert(node *Node[T], values ...T) {
+func (lst *List[T]) Insert(node *Node[T], values ...T) {
 	start, end := Chain(values...)
 	if start == nil || end == nil {
 		return
@@ -310,11 +362,12 @@ func (lst *list[T]) Insert(node *Node[T], values ...T) {
 	}
 	end.next = node
 	node.prev = end
+	lst.size += len(values)
 }
 
 // Insert inserts new elements after the given node, moving the previously following elements to after
 // the inserted ones.
-func (lst *list[T]) InsertAfter(node *Node[T], values ...T) {
+func (lst *List[T]) InsertAfter(node *Node[T], values ...T) {
 	start, end := Chain(values...)
 	if start == nil || end == nil {
 		return
@@ -330,6 +383,7 @@ func (lst *list[T]) InsertAfter(node *Node[T], values ...T) {
 	}
 	start.prev = node
 	node.next = start
+	lst.size += len(values)
 }
 
 // Ref returns a reference to the element at the current node. It returns nil if
@@ -355,7 +409,7 @@ func (node *Node[T]) Set(value T) bool {
 
 // Delete removes a node from the list. If there is only one element in the list, the
 // result will be the empty list.
-func (lst *list[T]) Delete(node *Node[T]) {
+func (lst *List[T]) Delete(node *Node[T]) {
 	if node == nil {
 		return
 	}
@@ -373,6 +427,7 @@ func (lst *list[T]) Delete(node *Node[T]) {
 	} else {
 		node.next.prev = node.prev
 	}
+	lst.size--
 }
 
 // Chain links the provided into a series of nodes, returning the first and last nodes.
