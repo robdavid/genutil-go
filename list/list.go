@@ -116,6 +116,11 @@ func Make[T any]() List[T] {
 	return List[T]{nil, nil, 0}
 }
 
+// New returns a pointer to a new empty list
+func New[T any]() *List[T] {
+	return &List[T]{nil, nil, 0}
+}
+
 // Of creates a new list whose elements are taken from the variadic args of the function
 func Of[T any](slice ...T) List[T] {
 	lst := Make[T]()
@@ -216,10 +221,12 @@ func (lst List[T]) IterNode() iterator.Iterator[*Node[T]] {
 	)
 }
 
+// RevIter returns an iterator over element values moving backwards through the list
 func (lst List[T]) RevIter() iterator.Iterator[T] {
 	return iterator.Map(lst.RevIterNode(), NodeToValue)
 }
 
+// RevIter returns an iterator over element nodes moving backwards through the list
 func (lst List[T]) RevIterNode() iterator.Iterator[*Node[T]] {
 	remain := lst.size
 	return iterator.NewWithSize(
@@ -368,10 +375,12 @@ func (lst List[T]) GetLast() option.Option[T] {
 	}
 }
 
+// First returns the first node of the list.
 func (lst List[T]) First() *Node[T] {
 	return lst.first
 }
 
+// Last returns the last node of the list.
 func (lst List[T]) Last() *Node[T] {
 	return lst.last
 }
