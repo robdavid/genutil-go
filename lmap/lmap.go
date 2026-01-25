@@ -16,11 +16,14 @@ func makeValue[K comparable, V any](k *list.Node[K], v V) value[K, V] {
 	return value[K, V]{k, v}
 }
 
+// LinkedMap is map combined with linked list of keys which maintains a consistent
+// key order. Keys are placed in the order they are first inserted.
 type LinkedMap[K comparable, V any] struct {
 	kv   map[K]value[K, V]
 	keys list.List[K]
 }
 
+// Make creates a new LinkedMap instance.
 func Make[K comparable, V any]() LinkedMap[K, V] {
 	return LinkedMap[K, V]{
 		kv:   make(map[K]value[K, V]),
@@ -28,29 +31,33 @@ func Make[K comparable, V any]() LinkedMap[K, V] {
 	}
 }
 
+// Size returns the number of elements in the map.
 func (lm LinkedMap[K, V]) Size() int {
 	return len(lm.kv)
 }
 
+// IsEmpty returns true if there are no elements in the map.
 func (lm LinkedMap[K, V]) IsEmpty() bool {
 	return len(lm.kv) == 0
 }
 
+// Put places a key and value pair into the map, either adding it as a new
+// entry if the key is not already in the map, or replacing an existing one.
 func (lm *LinkedMap[K, V]) Put(k K, v V) {
-	if lm.kv == nil {
-		lm.kv = make(map[K]value[K, V])
-		//lm.keys = list.New[K]()
-		lm.keys.Append(k)
-		lm.kv[k] = makeValue(lm.keys.Last(), v)
-	} else if current, ok := lm.kv[k]; ok {
+	if current, ok := lm.kv[k]; ok {
 		current.value = v
 		lm.kv[k] = current
 	} else {
+		if lm.kv == nil {
+			lm.kv = make(map[K]value[K, V])
+		}
 		lm.keys.Append(k)
 		lm.kv[k] = makeValue(lm.keys.Last(), v)
 	}
 }
 
+// Get returns the value in the map stored for key k. If key k is not present,
+// the zero value of type V is returned.
 func (lm LinkedMap[K, V]) Get(k K) V {
 	return lm.kv[k].value
 }
