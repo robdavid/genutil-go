@@ -129,8 +129,8 @@ func Of[T any](slice ...T) List[T] {
 	return lst
 }
 
-// Size returns the number of elements in the list
-func (lst List[T]) Size() int {
+// Len returns the number of elements in the list
+func (lst List[T]) Len() int {
 	return lst.size
 }
 

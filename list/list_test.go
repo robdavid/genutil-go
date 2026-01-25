@@ -11,7 +11,7 @@ import (
 
 func TestEmpty(t *testing.T) {
 	var empty list.List[int]
-	assert.Equal(t, 0, empty.Size())
+	assert.Equal(t, 0, empty.Len())
 	assert.True(t, empty.IsEmpty())
 	assert.Empty(t, empty.Iter().Collect())
 	assert.Empty(t, empty.RevIter().Collect())
@@ -29,13 +29,28 @@ func TestOf(t *testing.T) {
 	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
 }
 
+func TestNew(t *testing.T) {
+	lst := list.New[int]()
+	assert.NotNil(t, lst)
+	assert.True(t, lst.IsEmpty())
+	assert.Equal(t, 0, lst.Len())
+}
+
+func TestClear(t *testing.T) {
+	var lst list.List[int]
+	lst = list.Of(1, 2, 3, 4)
+	lst.Clear()
+	assert.True(t, lst.IsEmpty())
+	assert.Equal(t, 0, lst.Len())
+}
+
 func TestAppend(t *testing.T) {
 	const size = 10
 	list := list.Make[int]()
 	for n := range iterator.Range(0, size).Seq() {
 		list.Append(n)
 	}
-	assert.Equal(t, size, list.Size())
+	assert.Equal(t, size, list.Len())
 	expected := slices.Range(0, size)
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
@@ -46,7 +61,7 @@ func TestAppendSlice(t *testing.T) {
 	list := list.Make[int]()
 	slice := slices.Range(0, size)
 	list.Append(slice...)
-	assert.Equal(t, size, list.Size())
+	assert.Equal(t, size, list.Len())
 	expected := slices.Range(0, size)
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
@@ -58,7 +73,7 @@ func TestPrepend(t *testing.T) {
 	for n := range iterator.IncRange(size-1, 0).Seq() {
 		list.Prepend(n)
 	}
-	assert.Equal(t, size, list.Size())
+	assert.Equal(t, size, list.Len())
 	expected := slices.Range(0, size)
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
@@ -69,7 +84,7 @@ func TestPrependSlice(t *testing.T) {
 	list := list.Make[int]()
 	slice := slices.Range(0, size)
 	list.Prepend(slice...)
-	assert.Equal(t, size, list.Size())
+	assert.Equal(t, size, list.Len())
 	expected := slices.Range(0, size)
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
@@ -157,7 +172,7 @@ func TestFromSeq(t *testing.T) {
 	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
 }
 
-func TestSizeAndCount(t *testing.T) {
+func TestLenAndCount(t *testing.T) {
 	const insSize = 10
 	const iterations = 20
 	const deletions = 50
@@ -165,16 +180,16 @@ func TestSizeAndCount(t *testing.T) {
 	insSlice := slices.Range(0, insSize)
 	lst.Append(insSlice...)
 	for range iterations {
-		lst.Insert(lst.At(lst.Size()/2), insSlice...)
-		lst.InsertAfter(lst.At(lst.Size()/2), insSlice...)
+		lst.Insert(lst.At(lst.Len()/2), insSlice...)
+		lst.InsertAfter(lst.At(lst.Len()/2), insSlice...)
 	}
 	for range deletions {
-		lst.Delete(lst.At(lst.Size() / 2))
+		lst.Delete(lst.At(lst.Len() / 2))
 	}
-	expectedSize := insSize*(iterations*2+1) - deletions
-	assert.Equal(t, expectedSize, lst.Size())
-	assert.Equal(t, expectedSize, lst.First().Count())
-	assert.Equal(t, expectedSize, lst.Last().RevCount())
+	expectedLen := insSize*(iterations*2+1) - deletions
+	assert.Equal(t, expectedLen, lst.Len())
+	assert.Equal(t, expectedLen, lst.First().Count())
+	assert.Equal(t, expectedLen, lst.Last().RevCount())
 }
 
 func TestFirstLast(t *testing.T) {
@@ -184,15 +199,33 @@ func TestFirstLast(t *testing.T) {
 	assert.Equal(t, size-1, lst.GetLast().Get())
 }
 
-func TestGet(t *testing.T) {
+func TestListAtPanic(t *testing.T) {
+	lst := list.Of(1, 2, 3)
+	assert.PanicsWithValue(t, list.ErrIndexError, func() { lst.At(10) })
+	assert.PanicsWithValue(t, list.ErrIndexError, func() { lst.At(-10) })
+}
+
+func TestWalkNodes(t *testing.T) {
 	const size = 10
 	lst := list.From(iterator.Range(0, size))
-	for i := range size {
-		assert.Equal(t, i, lst.Get(i))
+	forward := make([]int, 0, size)
+	for n := lst.First(); n != nil; n = n.Next() {
+		forward = append(forward, n.Get())
 	}
-	for i := 1; i <= size; i++ {
-		assert.Equal(t, size-i, lst.Get(-i))
+	assert.Equal(t, slices.Range(0, size), forward)
+	backward := make([]int, 0, size)
+	var mid *list.Node[int]
+	count := 0
+	for n := lst.Last(); n != nil; n = n.Prev() {
+		backward = append(backward, n.Get())
+		if count == size/2 {
+			mid = n
+		}
+		count++
 	}
+	assert.Equal(t, slices.Reverse(slices.Range(0, size)), backward)
+	assert.Equal(t, lst.First().Get(), mid.First().Get())
+	assert.Equal(t, lst.Last().Get(), mid.Last().Get())
 }
 
 func TestIter(t *testing.T) {
@@ -265,14 +298,11 @@ func TestListRevSeq(t *testing.T) {
 	assert.Equal(t, slices.Reverse(slices.Range(0, size)), c)
 }
 
-func TestNodeFirstLast(t *testing.T) {
-	const size = 10
-	lst := list.From(iterator.Range(0, size))
-	mid := lst.At(size / 2)
-	firstNode := mid.First()
-	lastNode := mid.Last()
-	assert.Equal(t, 0, firstNode.Get())
-	assert.Equal(t, size-1, lastNode.Get())
+func TestNodeAtPanic(t *testing.T) {
+	lst := list.Of(1, 2, 3)
+	node := lst.First()
+	assert.PanicsWithValue(t, list.ErrIndexError, func() { node.At(10) })
+	assert.PanicsWithValue(t, list.ErrIndexError, func() { node.At(-10) })
 }
 
 func TestIterRef(t *testing.T) {
@@ -295,14 +325,10 @@ func TestRevIterRef(t *testing.T) {
 	assert.Equal(t, slices.Range(5, size+5), c)
 }
 
-func TestIterSet(t *testing.T) {
-	const size = 10
-	lst := list.From(iterator.Range(0, size))
-	for ln := range lst.SeqNode() {
-		ln.Set(ln.Get() + 5)
-	}
-	c := lst.Iter().Collect()
-	assert.Equal(t, slices.Range(5, size+5), c)
+func TestNodeRefNil(t *testing.T) {
+	var node *list.Node[int]
+	assert.Nil(t, node.Ref())
+	assert.False(t, node.Set(5))
 }
 
 func TestDelete(t *testing.T) {
@@ -319,11 +345,11 @@ func TestDelete(t *testing.T) {
 	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
 }
 
-func TestDeleteSingleton(t *testing.T) {
-	lst := list.Of(1)
-	lst.Delete(lst.First())
-	assert.True(t, lst.IsEmpty())
-	assert.Equal(t, 0, lst.Size())
+func TestDeleteNil(t *testing.T) {
+	lst := list.Of(1, 2, 3)
+	original := lst.Iter().Collect()
+	lst.Delete(nil)
+	assert.Equal(t, original, lst.Iter().Collect())
 }
 
 func TestDeleteFirst(t *testing.T) {
