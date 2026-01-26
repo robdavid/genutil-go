@@ -9,6 +9,7 @@ import (
 )
 
 var ErrIndexError = errors.New("index out of bounds")
+var ErrNilNode = errors.New("node is nil")
 
 // Node is an element within a doubly linked list.
 type Node[T any] struct {
@@ -392,6 +393,9 @@ func (lst *List[T]) Insert(node *Node[T], values ...T) {
 	if start == nil || end == nil {
 		return
 	}
+	if node == nil {
+		panic(ErrNilNode)
+	}
 	if node.prev == nil {
 		if lst.first == node {
 			// Make this conditional in case node has been deleted
@@ -412,6 +416,9 @@ func (lst *List[T]) InsertAfter(node *Node[T], values ...T) {
 	start, end := Chain(values...)
 	if start == nil || end == nil {
 		return
+	}
+	if node == nil {
+		panic(ErrNilNode)
 	}
 	if node.next == nil {
 		if lst.last == node {

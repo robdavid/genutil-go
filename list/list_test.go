@@ -90,6 +90,13 @@ func TestPrependSlice(t *testing.T) {
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
 }
 
+func TestInsertNothing(t *testing.T) {
+	const size = 10
+	lst := list.From(iterator.Range(0, size))
+	lst.Insert(lst.First())
+	assert.Equal(t, slices.Range(0, size), lst.Iter().Collect())
+}
+
 func TestInsert(t *testing.T) {
 	list := list.Of(1, 2, 4, 5)
 	list.Insert(list.At(2), 3)
@@ -199,10 +206,30 @@ func TestFirstLast(t *testing.T) {
 	assert.Equal(t, size-1, lst.GetLast().Get())
 }
 
+func TestGetSetAt(t *testing.T) {
+	const size = 10
+	var lst list.List[int]
+	for range size {
+		lst.Append(0)
+	}
+	for i := range size {
+		lst.Set(i, i+10)
+	}
+	for i := range size {
+		assert.Equal(t, i+10, lst.Get(i))
+	}
+}
+
 func TestListAtPanic(t *testing.T) {
 	lst := list.Of(1, 2, 3)
 	assert.PanicsWithValue(t, list.ErrIndexError, func() { lst.At(10) })
 	assert.PanicsWithValue(t, list.ErrIndexError, func() { lst.At(-10) })
+}
+
+func TestInsertPanic(t *testing.T) {
+	lst := list.Of[int]()
+	assert.PanicsWithValue(t, list.ErrNilNode, func() { lst.InsertAfter(lst.First(), 0) })
+	assert.PanicsWithValue(t, list.ErrNilNode, func() { lst.Insert(lst.Last(), 0) })
 }
 
 func TestWalkNodes(t *testing.T) {
@@ -226,6 +253,16 @@ func TestWalkNodes(t *testing.T) {
 	assert.Equal(t, slices.Reverse(slices.Range(0, size)), backward)
 	assert.Equal(t, lst.First().Get(), mid.First().Get())
 	assert.Equal(t, lst.Last().Get(), mid.Last().Get())
+}
+
+func TestNodeIter(t *testing.T) {
+	const size = 10
+	lst := list.From(iterator.Range(0, size))
+	assert.Equal(t, slices.Range(0, size), lst.First().Iter().Collect())
+	assert.Equal(t, slices.IncRange(size-1, 0), lst.Last().RevIter().Collect())
+	assert.Equal(t, slices.Range(0, size), iterator.Map(lst.First().IterNode(), list.NodeToValue).Collect())
+	assert.Equal(t, slices.IncRange(size-1, 0), iterator.Map(lst.Last().RevIterNode(), list.NodeToValue).Collect())
+
 }
 
 func TestIter(t *testing.T) {
