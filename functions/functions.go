@@ -27,6 +27,13 @@ func Product[T Numeric](a, b T) T {
 	return a * b
 }
 
+// ForMap takes a map from K to V and re-expresses it as a function from K to V.
+func ForMap[K comparable, V any, M ~map[K]V](m M) func(K) V {
+	return func(key K) V {
+		return m[key]
+	}
+}
+
 type Enum[T any] struct {
 	Index int
 	Value T
