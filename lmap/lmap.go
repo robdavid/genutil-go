@@ -122,6 +122,17 @@ func (lm LinkedMap[K, V]) SeqKeys() iter.Seq[K] {
 	return lm.keys.Seq()
 }
 
+// KeyAt returns the key at the nth position in the map
+func (lm LinkedMap[K, V]) KeyAt(n int) K {
+	return lm.keys.Get(n)
+}
+
+// GetAt returns the value associated with the key in nth position in the map
+func (lm LinkedMap[K, V]) GetAt(n int) V {
+	key := lm.keys.Get(n)
+	return lm.kv[key].value
+}
+
 // Seq2 returns an [iter.Seq2][K,V] iterator over the key-value pairs in the map.
 //
 // Deprecated: use [Seq]

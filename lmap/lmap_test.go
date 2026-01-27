@@ -65,6 +65,20 @@ func TestValuesOrder(t *testing.T) {
 	assert.Equal(t, slices.Range(0, len(stringKeys)), lm.IterValues().Collect())
 }
 
+func TestNthKey(t *testing.T) {
+	lm := lmap.FromKeys(stringKeys, func(key string) int { return slices.Find(stringKeys, key) })
+	for i := range len(stringKeys) {
+		assert.Equal(t, stringKeys[i], lm.KeyAt(i))
+	}
+}
+
+func TestNthValue(t *testing.T) {
+	lm := lmap.FromKeys(stringKeys, func(key string) int { return slices.Find(stringKeys, key) })
+	for i := range len(stringKeys) {
+		assert.Equal(t, i, lm.GetAt(i))
+	}
+}
+
 func TestInsertDelete(t *testing.T) {
 	lm := lmap.Make[string, int]()
 	for i, key := range stringKeys {
