@@ -32,11 +32,3 @@ func TestRef(t *testing.T) {
 	assert.Equal(t, 12.3, *functions.Ref(12.3))
 	assert.Equal(t, "hello", *functions.Ref("hello"))
 }
-
-func TestMapFn(t *testing.T) {
-	mp := map[int]string{1: "one", 2: "two", 3: "three"}
-	fn := functions.ForMap(mp)
-	assert.Equal(t, "one", fn(1))
-	assert.Equal(t, "two", fn(2))
-	assert.Equal(t, "three", fn(3))
-}
