@@ -409,3 +409,58 @@ func TestIterMutNextCollect(t *testing.T) {
 	}
 	assert.Equal(t, 5, len(collected))
 }
+
+func TestClone(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	c := Clone(m)
+	assert.Equal(t, m, c)
+	c["a"] = 9
+	assert.Equal(t, 1, m["a"])
+}
+
+func TestSubAndSubI(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	s := map[string]int{"b": 2}
+	SubI(m, s)
+	assert.Equal(t, map[string]int{"a": 1, "c": 3}, m)
+
+	m2 := map[string]int{"a": 1, "b": 2, "c": 3}
+	r := Sub(m2, s)
+	assert.Equal(t, map[string]int{"a": 1, "c": 3}, r)
+	assert.Equal(t, map[string]int{"a": 1, "b": 2, "c": 3}, m2)
+}
+
+func TestSubI_LargerS(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	s := map[string]int{"b": 9, "c": 3, "d": 4}
+	SubI(m, s)
+	assert.Equal(t, map[string]int{"a": 1}, m)
+}
+
+func TestSub_LargerS(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	s := map[string]int{"b": 9, "c": 3, "d": 4}
+	r := Sub(m, s)
+	assert.Equal(t, map[string]int{"a": 1}, r)
+	// original map should be unchanged
+	assert.Equal(t, map[string]int{"a": 1, "b": 2}, m)
+}
+
+func TestAddAndAddI(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	a := map[string]int{"b": 9, "c": 3}
+	AddI(m, a)
+	assert.Equal(t, map[string]int{"a": 1, "b": 2, "c": 3}, m)
+
+	m2 := map[string]int{"a": 1, "b": 2}
+	r := Add(m2, a)
+	assert.Equal(t, map[string]int{"a": 1, "b": 2, "c": 3}, r)
+	assert.Equal(t, map[string]int{"a": 1, "b": 2}, m2)
+}
+
+func TestAsFunc(t *testing.T) {
+	m := map[int]string{1: "one", 2: "two"}
+	f := AsFunc(m)
+	assert.Equal(t, "one", f(1))
+	assert.Equal(t, "", f(3))
+}

@@ -363,3 +363,54 @@ func IterMut[K comparable, T any](m map[K]T) iterator.MutableIterator2[K, T] {
 	)
 	return iterator.NewDefaultMutableIterator2(core)
 }
+
+// Clone creates a shallow copy of m
+func Clone[K comparable, T any](m map[K]T) map[K]T {
+	c := make(map[K]T)
+	for k, v := range m {
+		c[k] = v
+	}
+	return c
+}
+
+// SubI removes from m any item in m whose key appears in s. Map m is
+// modified in-place.
+func SubI[K comparable, T any](m map[K]T, s map[K]T) {
+	if len(s) <= len(m) {
+		for k := range s {
+			delete(m, k)
+		}
+	} else {
+		for k := range m {
+			if _, found := s[k]; found {
+				delete(m, k)
+			}
+		}
+	}
+}
+
+// Sub takes m and creates a new map r which consists of items from m whose
+// key does not appear in s.
+func Sub[K comparable, T any](m map[K]T, s map[K]T) (r map[K]T) {
+	r = Clone(m)
+	SubI(r, s)
+	return
+}
+
+// AddI adds to map m any items in s whose keys do not already appear in m.
+// Map m is modified in-place.
+func AddI[K comparable, T any](m map[K]T, a map[K]T) {
+	for k, v := range a {
+		if _, found := m[k]; !found {
+			m[k] = v
+		}
+	}
+}
+
+// Add takes map m and create a new map containing all the items in m, plus
+// any items in a that have keys that do not appear in m.
+func Add[K comparable, T any](m map[K]T, a map[K]T) (r map[K]T) {
+	r = Clone(m)
+	AddI(r, a)
+	return
+}
