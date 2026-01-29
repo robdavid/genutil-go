@@ -1,6 +1,7 @@
 package list_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/robdavid/genutil-go/iterator"
@@ -44,6 +45,11 @@ func TestClear(t *testing.T) {
 	assert.Equal(t, 0, lst.Len())
 }
 
+func TestString(t *testing.T) {
+	lst := list.Of(1, 2, 3, 4)
+	assert.Equal(t, fmt.Sprintf("%v", lst.Iter().Collect()), fmt.Sprintf("%v", lst))
+}
+
 func TestAppend(t *testing.T) {
 	const size = 10
 	list := list.Make[int]()
@@ -54,6 +60,16 @@ func TestAppend(t *testing.T) {
 	expected := slices.Range(0, size)
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestAppendNil(t *testing.T) {
+	var lst list.List[int]
+	assert.PanicsWithError(t, list.ErrNilList.Error(), func() {
+		lst.Append(1)
+	})
+	lst = lst.Make()
+	lst.Append(1)
+	assert.Equal(t, []int{1}, lst.Iter().Collect())
 }
 
 func TestAppendSlice(t *testing.T) {
@@ -77,6 +93,13 @@ func TestPrepend(t *testing.T) {
 	expected := slices.Range(0, size)
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestPrependNil(t *testing.T) {
+	assert.PanicsWithError(t, list.ErrNilList.Error(), func() {
+		var lst list.List[int]
+		lst.Prepend(1)
+	})
 }
 
 func TestPrependSlice(t *testing.T) {
@@ -183,7 +206,7 @@ func TestLenAndCount(t *testing.T) {
 	const insSize = 10
 	const iterations = 20
 	const deletions = 50
-	var lst list.List[int]
+	lst := list.New[int]()
 	insSlice := slices.Range(0, insSize)
 	lst.Append(insSlice...)
 	for range iterations {
@@ -208,7 +231,7 @@ func TestFirstLast(t *testing.T) {
 
 func TestGetSetAt(t *testing.T) {
 	const size = 10
-	var lst list.List[int]
+	lst := list.New[int]()
 	for range size {
 		lst.Append(0)
 	}
@@ -407,8 +430,18 @@ func TestDeleteLast(t *testing.T) {
 	assert.Equal(t, slices.Reverse(expected), lst.RevIter().Collect())
 }
 
+func BenchmarkAppend(b *testing.B) {
+	lst := list.Make[int]()
+	for i := range b.N {
+		lst.Append(i)
+	}
+	if lst.Len() != b.N {
+		b.Errorf("Expecting length %d, got %d", b.N, lst.Len())
+	}
+}
+
 func BenchmarkIter(b *testing.B) {
-	var lst list.List[int]
+	lst := list.Make[int]()
 	for i := range b.N {
 		lst.Append(i)
 	}
@@ -423,7 +456,7 @@ func BenchmarkIter(b *testing.B) {
 }
 
 func BenchmarkIterCollect(b *testing.B) {
-	var lst list.List[int]
+	lst := list.New[int]()
 	for i := range b.N {
 		lst.Append(i)
 	}
@@ -435,7 +468,7 @@ func BenchmarkIterCollect(b *testing.B) {
 }
 
 func BenchmarkSeq(b *testing.B) {
-	var lst list.List[int]
+	lst := list.New[int]()
 	for i := range b.N {
 		lst.Append(i)
 	}
@@ -450,7 +483,7 @@ func BenchmarkSeq(b *testing.B) {
 }
 
 func BenchmarkSeqCollect(b *testing.B) {
-	var lst list.List[int]
+	lst := list.Make[int]()
 	for i := range b.N {
 		lst.Append(i)
 	}

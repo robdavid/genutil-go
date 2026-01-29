@@ -23,14 +23,8 @@ func TestZero(t *testing.T) {
 	var lm lmap.LinkedMap[string, int]
 	assert.True(t, lm.IsEmpty())
 	assert.Equal(t, 0, lm.Len())
-	z, ok := lm.Delete("one")
-	assert.False(t, ok)
-	assert.Equal(t, 0, z)
 	assert.Empty(t, lm.IterKeys().Collect())
 	assert.Empty(t, lm.Iter().Collect2())
-	lm.Put("one", 1)
-	assert.False(t, lm.IsEmpty())
-	assert.Equal(t, 1, lm.Len())
 }
 
 func TestPutGet(t *testing.T) {
@@ -44,6 +38,9 @@ func TestPutGet(t *testing.T) {
 	val, ok := lm.GetOk("two")
 	assert.True(t, ok)
 	assert.Equal(t, 2, val)
+	lm2 := lm
+	assert.Equal(t, 1, lm2.Get("one"))
+	assert.Equal(t, 2, lm2.Get("two"))
 }
 
 func TestInsertOrder(t *testing.T) {

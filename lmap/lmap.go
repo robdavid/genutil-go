@@ -89,7 +89,7 @@ func (lm LinkedMap[K, V]) IsEmpty() bool {
 
 // Put places a key and value pair into the map, either adding it as a new
 // entry if the key is not already in the map, or replacing an existing one.
-func (lm *LinkedMap[K, V]) Put(k K, v V) {
+func (lm LinkedMap[K, V]) Put(k K, v V) {
 	if current, ok := lm.kv[k]; ok {
 		current.value = v
 		lm.kv[k] = current
@@ -178,7 +178,7 @@ func (lm LinkedMap[K, V]) IterValues() iterator.Iterator[V] {
 }
 
 // Delete removes the key from the map and returns the associated value and whether the key was present.
-func (lm *LinkedMap[K, V]) Delete(k K) (V, bool) {
+func (lm LinkedMap[K, V]) Delete(k K) (V, bool) {
 	val, ok := lm.kv[k]
 	if ok {
 		lm.keys.Delete(val.node)

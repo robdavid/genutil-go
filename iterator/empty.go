@@ -27,3 +27,11 @@ func Empty[T any]() Iterator[T] {
 func Empty2[K any, V any]() Iterator2[K, V] {
 	return NewDefaultIterator2(emptyIter2[K, V]{})
 }
+
+func EmptySeq[T any]() iter.Seq[T] {
+	return func(func(T) bool) {}
+}
+
+func EmptySeq2[K any, V any]() iter.Seq2[K, V] {
+	return func(func(K, V) bool) {}
+}
