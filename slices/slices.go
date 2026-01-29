@@ -386,6 +386,13 @@ func AllRef[T any](slice []T, predicate func(v *T) bool) bool {
 	return true
 }
 
+// Generate a function equivalent to indexing slice, mapping indexes to values.
+func AsFunc[T any](slice []T) func(int) T {
+	return func(i int) (v T) {
+		return slice[i]
+	}
+}
+
 // Returns true if predicate returns true for at least one element in
 // slice.
 func Any[T any](slice []T, predicate func(v T) bool) bool {
