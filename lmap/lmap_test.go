@@ -6,6 +6,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/iterator"
+	"github.com/robdavid/genutil-go/list"
 	"github.com/robdavid/genutil-go/lmap"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/stretchr/testify/assert"
@@ -25,6 +26,10 @@ func TestZero(t *testing.T) {
 	assert.Equal(t, 0, lm.Len())
 	assert.Empty(t, lm.IterKeys().Collect())
 	assert.Empty(t, lm.Iter().Collect2())
+	assert.Equal(t, "lmap[]", lm.String())
+	assert.PanicsWithError(t, list.ErrNilList.Error(), func() {
+		lm.Put("zero", 0)
+	})
 }
 
 func TestPutGet(t *testing.T) {
@@ -123,6 +128,16 @@ func TestReplaceValues(t *testing.T) {
 	for k, v := range lm.Seq2() {
 		assert.Equal(t, k+100, v)
 	}
+}
+
+func TestString(t *testing.T) {
+	values := []string{"zero", "one", "two", "three", "four"}
+	lm := lmap.FromIterKeys(iterator.Range(0, len(values)), slices.AsFunc(values))
+	m := map[int]string{}
+	for i, v := range values {
+		m[i] = v
+	}
+	assert.Equal(t, fmt.Sprintf("l%v", m), fmt.Sprintf("%v", lm))
 }
 
 func Benchmark(b *testing.B) {

@@ -10,16 +10,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEmpty(t *testing.T) {
-	var empty list.List[int]
-	assert.Equal(t, 0, empty.Len())
-	assert.True(t, empty.IsEmpty())
-	assert.Empty(t, empty.Iter().Collect())
-	assert.Empty(t, empty.RevIter().Collect())
-	assert.Empty(t, empty.IterNode().Collect())
-	assert.Empty(t, empty.RevIterNode().Collect())
-	assert.True(t, empty.GetFirst().ToRef().IsEmpty())
-	assert.True(t, empty.GetLast().ToRef().IsEmpty())
+func TestNil(t *testing.T) {
+	var zero list.List[int]
+	assert.True(t, zero.IsNil())
+	assert.True(t, zero.IsEmpty())
+	assert.Equal(t, 0, zero.Len())
+	assert.Empty(t, zero.Iter().Collect())
+	assert.Empty(t, zero.RevIter().Collect())
+	assert.Empty(t, zero.IterNode().Collect())
+	assert.Empty(t, zero.RevIterNode().Collect())
+	assert.True(t, zero.GetFirst().ToRef().IsEmpty())
+	assert.True(t, zero.GetLast().ToRef().IsEmpty())
 }
 
 func TestOf(t *testing.T) {
@@ -111,6 +112,19 @@ func TestPrependSlice(t *testing.T) {
 	expected := slices.Range(0, size)
 	assert.Equal(t, expected, list.Iter().Collect())
 	assert.Equal(t, slices.Reverse(expected), list.RevIter().Collect())
+}
+
+func TestCopyClone(t *testing.T) {
+	l1 := list.New[string]()
+	l2 := l1
+	l2.Append("first")
+	assert.Equal(t, l2.Get(0), "first")
+	assert.Equal(t, l1.Get(0), "first")
+	l3 := l1.Clone()
+	l1.Append("last")
+	l3.Append("second")
+	assert.Equal(t, l3.Get(1), "second")
+	assert.Equal(t, l1.Get(1), "last")
 }
 
 func TestInsertNothing(t *testing.T) {

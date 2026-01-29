@@ -143,6 +143,18 @@ func (lst List[T]) Make() List[T] {
 	return Make[T]()
 }
 
+// Returns true if the list is "nil", its uninitialized zero value.
+// Such a list behaves like an empty list for read operations, and will
+// panic on write operations.
+func (lst List[T]) IsNil() bool {
+	return lst.inner == nil
+}
+
+// IsEmpty returns true if the list is empty
+func (lst List[T]) IsEmpty() bool {
+	return lst.inner == nil || lst.first == nil
+}
+
 // Len returns the number of elements in the list
 func (lst List[T]) Len() int {
 	if lst.inner == nil {
@@ -321,13 +333,17 @@ func From[T any](itr iterator.Iterator[T]) List[T] {
 	}
 }
 
-func As[U ~struct{ List[T] }, T any](l List[T]) U {
-	return U{l}
+// Clone creates a shallow copy of the list. Cloning a nil list will return
+// a nil list.
+func (lst List[T]) Clone() List[T] {
+	if lst.inner == nil {
+		return List[T]{}
+	}
+	return FromSeq(lst.Seq())
 }
 
-// IsEmpty returns true if the list is empty
-func (lst List[T]) IsEmpty() bool {
-	return lst.inner == nil || lst.first == nil
+func As[U ~struct{ List[T] }, T any](l List[T]) U {
+	return U{l}
 }
 
 // First returns the first node in the list that this node is a member of, found

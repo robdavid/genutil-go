@@ -1,8 +1,11 @@
 package lmap
 
 import (
+	"fmt"
 	"iter"
+	"strings"
 
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/iterator"
 	"github.com/robdavid/genutil-go/list"
 )
@@ -34,7 +37,15 @@ func Make[K comparable, V any]() LinkedMap[K, V] {
 
 // FromSeq2 creates a new LinkedMap instance populated with keys and values taken from
 // the provided [iter.Seq2][K,V] iterator.
+//
+// Deprecated: use [FromSeq]
 func FromSeq2[K comparable, V any](itr iter.Seq2[K, V]) LinkedMap[K, V] {
+	return FromSeq(itr)
+}
+
+// FromSeq creates a new LinkedMap instance populated with keys and values taken from
+// the provided [iter.Seq2][K,V] iterator.
+func FromSeq[K comparable, V any](itr iter.Seq2[K, V]) LinkedMap[K, V] {
 	result := Make[K, V]()
 	for k, v := range itr {
 		result.Put(k, v)
@@ -45,7 +56,7 @@ func FromSeq2[K comparable, V any](itr iter.Seq2[K, V]) LinkedMap[K, V] {
 // From creates a new LinkedMap instance populated with keys and values taken from
 // the provided [iterator.Iterator2][K,V] iterator.
 func From[K comparable, V any](itr iterator.Iterator2[K, V]) LinkedMap[K, V] {
-	return FromSeq2(itr.Seq2())
+	return FromSeq(itr.Seq2())
 }
 
 // FromSeqKeys creates a new LinkedMap instance populated with keys from the
@@ -87,6 +98,22 @@ func (lm LinkedMap[K, V]) IsEmpty() bool {
 	return len(lm.kv) == 0
 }
 
+// IsNil returns true if the map is the uninitialized zero value. A nil map will
+// read like an empty map, but cannot be mutated.
+func (lm LinkedMap[K, V]) IsNil() bool {
+	return lm.keys.IsNil()
+}
+
+// Make creates an empty map of the same type.
+func (lm LinkedMap[K, V]) Make() LinkedMap[K, V] {
+	return Make[K, V]()
+}
+
+// Clone creates a shallow copy of the map.
+func (lm LinkedMap[K, V]) Clone() LinkedMap[K, V] {
+	return FromSeq(lm.Seq())
+}
+
 // Put places a key and value pair into the map, either adding it as a new
 // entry if the key is not already in the map, or replacing an existing one.
 func (lm LinkedMap[K, V]) Put(k K, v V) {
@@ -94,9 +121,6 @@ func (lm LinkedMap[K, V]) Put(k K, v V) {
 		current.value = v
 		lm.kv[k] = current
 	} else {
-		if lm.kv == nil {
-			lm.kv = make(map[K]value[K, V])
-		}
 		lm.keys.Append(k)
 		lm.kv[k] = makeValue(lm.keys.Last(), v)
 	}
@@ -185,4 +209,17 @@ func (lm LinkedMap[K, V]) Delete(k K) (V, bool) {
 	}
 	delete(lm.kv, k)
 	return val.value, ok
+}
+
+func (lm LinkedMap[K, V]) String() string {
+	var str strings.Builder
+	str.WriteString("lmap[")
+	first := true
+	for k, v := range lm.Seq() {
+		fmt.Fprintf(&str, "%s%v:%v", functions.IfElse(first, "", " "), k, v)
+		first = false
+	}
+	str.WriteRune(']')
+	return str.String()
+
 }
