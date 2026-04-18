@@ -95,6 +95,48 @@ func TestRef(t *testing.T) {
 	})
 }
 
+func TestRefOr(t *testing.T) {
+	assert := assert.New(t)
+
+	var x int = 123
+	valWithValue := opt.Value(x)
+	fallbackPtr := &x // Pointer to the same value for testing
+
+	// Test Val[T].RefOr with a fallback pointer
+	refFromVal := valWithValue.RefOr(fallbackPtr)
+	assert.Equal(&x, refFromVal) // Should return the reference to x
+
+	var emptyVal opt.Val[int]
+	nilPtr := (*int)(nil)
+
+	// Test Val[T].RefOr without a value (should return fallback)
+	refFromEmptyVal := emptyVal.RefOr(nilPtr)
+	assert.Nil(refFromEmptyVal) // Should return nil pointer as fallback
+
+	// Test Ref[T].RefOr with a reference
+	y := 456
+	refWithValue := opt.Reference(&y)
+
+	// Test Ref[T].RefOr without a reference (should return fallback)
+	nilFallback := (*int)(nil)
+	refFromEmptyRef := refWithValue.RefOr(nilFallback)
+	assert.Equal(&y, refFromEmptyRef) // Should return the reference to y
+
+	var emptyRef opt.Ref[int]
+	refFromEmptyRef = emptyRef.RefOr(nilPtr)
+	assert.Nil(refFromEmptyRef) // Should return nil pointer as fallback
+}
+
+func TestString(t *testing.T) {
+	val1 := opt.Value(123)
+	var x int = 456
+	val2 := opt.Reference(&x)
+	str := fmt.Sprintf("%s %s", val1, val2)
+	assert.Equal(t, "123 456", str)
+	str = fmt.Sprintf("%s %s", &val1, &val2)
+	assert.Equal(t, "123 456", str)
+}
+
 func ExampleVal_Try() {
 	defer handler.Handle(func(err error) {
 		if err == opt.ErrOptionIsEmpty {
@@ -130,4 +172,18 @@ func ExampleRef_Try() {
 	// Output:
 	// 123
 	// Access of empty option detected
+}
+
+func ExampleVal_AsRef() {
+	value := opt.Value(123)
+	fmt.Println(value.Get())
+
+	valueRef := value.AsRef()
+	*valueRef.Ref() = 456
+	fmt.Println(value.Get())
+
+	// Output:
+	// 123
+	// 456
+
 }

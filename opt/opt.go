@@ -2,6 +2,7 @@ package opt
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/robdavid/genutil-go/errors/handler"
 )
@@ -83,7 +84,7 @@ type Option[T any] interface {
 	// reference
 	RefOr(*T) *T
 
-	// GetOrF eturns the option value if present, or otherwise invokes the provided function
+	// GetOrF returns the option value if present, or otherwise invokes the provided function
 	// and returns the value obtained
 	GetOrF(fallbackFn func() T) T
 }
@@ -104,8 +105,20 @@ func (r Ref[T]) Get() T {
 	}
 }
 
+// ToRef makes a copy of the value option and returns a reference to it. This is useful
+// for fluent method chaining.
 func (v Val[T]) ToRef() *Val[T] {
 	return &v
+}
+
+// AsRef converts the [Val][T] instance to a [Ref][T] that references the value held if present.
+// Otherwise it returns an empty [Ref][T].
+func (v *Val[T]) AsRef() Ref[T] {
+	if v.nonEmpty {
+		return Reference(&v.value)
+	} else {
+		return EmptyRef[T]()
+	}
 }
 
 // GetOK returns the underlying value if present, along with a boolean flag set true
@@ -210,6 +223,16 @@ func (v Val[T]) Try() T {
 	return v.value
 }
 
+// Try returns the value of the option if it exists, or otherwise raises an
+// error that can be recovered via [handler.Catch] or [handler.Handle]
+// functions.
+func (r Ref[T]) Try() T {
+	if r.reference == nil {
+		handler.Raise(ErrOptionIsEmpty)
+	}
+	return *r.reference
+}
+
 // TryRef returns a reference to the underlying option value if there is one. If not,
 // it will panic, similar to [Option.Ref]. However, the panic raised is one that can be recovered via
 // [handler.Catch] or [handler.Handle] functions.
@@ -220,6 +243,15 @@ func (v Val[T]) TryRef() *T {
 	return &v.value
 }
 
+// TryRef returns a reference to the underlying option value if there is one. If not,
+// it will panic, similar to [Option.Ref]. However, the panic raised is one that can be recovered via
+// [handler.Catch] or [handler.Handle] functions.
+func (r Ref[T]) TryRef() *T {
+	if r.reference == nil {
+		handler.Raise(ErrOptionIsEmpty)
+	}
+	return r.reference
+}
 
 // RefOK returns a reference to the underlying value and true if the value is present,
 // or a nil pointer and false if not.
@@ -239,24 +271,20 @@ func (r Ref[T]) RefOK() (*T, bool) {
 	return r.reference, true
 }
 
-// Try returns the value of the option if it exists, or otherwise raises an
-// error that can be recovered via [handler.Catch] or [handler.Handle]
-// functions.
-func (r Ref[T]) Try() T {
-	if r.reference == nil {
-		handler.Raise(ErrOptionIsEmpty)
+func (v Val[T]) String() string {
+	if v.nonEmpty {
+		return fmt.Sprint(v.value)
+	} else {
+		return ""
 	}
-	return *r.reference
 }
 
-// TryRef returns a reference to the underlying option value if there is one. If not,
-// it will panic, similar to [Option.Ref]. However, the panic raised is one that can be recovered via
-// [handler.Catch] or [handler.Handle] functions.
-func (r Ref[T]) TryRef() *T {
-	if r.reference == nil {
-		handler.Raise(ErrOptionIsEmpty)
+func (r Ref[T]) String() string {
+	if r.reference != nil {
+		return fmt.Sprint(*r.reference)
+	} else {
+		return ""
 	}
-	return r.reference
 }
 
 // IsEmpty returns true if there is no value
@@ -264,14 +292,14 @@ func (v Val[T]) IsEmpty() bool {
 	return !v.nonEmpty
 }
 
+func (r Ref[T]) IsEmpty() bool {
+	return r.reference == nil
+}
+
 // Has value returns true if there is a value, and it is
 // safe to access the value via functions such as [Val.Get].
 func (v Val[T]) HasValue() bool {
 	return v.nonEmpty
-}
-
-func (r Ref[T]) IsEmpty() bool {
-	return r.reference == nil
 }
 
 func (r Ref[T]) HasValue() bool {
@@ -300,4 +328,3 @@ func MapRef[T, U any](o Option[T], f func(*T) *U) Option[U] {
 		return Reference(f(r))
 	}
 }
-
