@@ -14,6 +14,8 @@ func TestOptZero(t *testing.T) {
 	var intref opt.Ref[int]
 	assert.True(t, intval.IsEmpty())
 	assert.True(t, intref.IsEmpty())
+	assert.False(t, intval.HasValue())
+	assert.False(t, intref.HasValue())
 }
 
 func TestOption(t *testing.T) {
@@ -125,6 +127,50 @@ func TestRefOr(t *testing.T) {
 	var emptyRef opt.Ref[int]
 	refFromEmptyRef = emptyRef.RefOr(nilPtr)
 	assert.Nil(refFromEmptyRef) // Should return nil pointer as fallback
+}
+
+func TestGetOrF(t *testing.T) {
+	assert := assert.New(t)
+
+	// Test Val[T].GetOrF with a value present
+	var x int = 123
+	valWithValue := opt.Value(x)
+	result := valWithValue.GetOrF(func() int { return 0 })
+	assert.Equal(123, result)
+
+	// Test Val[T].GetOrF without a value (invoke fallback function)
+	var emptyVal opt.Val[int]
+	result = emptyVal.GetOrF(func() int { return 999 })
+	assert.Equal(999, result)
+
+	// Test Ref[T].GetOrF with a reference present
+	y := 456
+	refWithValue := opt.Reference(&y)
+	result = refWithValue.GetOrF(func() int { return 0 })
+	assert.Equal(456, result)
+
+	// Test Ref[T].GetOrF without a reference (invoke fallback function)
+	var emptyRef opt.Ref[int]
+	result = emptyRef.GetOrF(func() int { return 888 })
+	assert.Equal(888, result)
+
+	// Test chained GetOrF with side-effect in fallback function
+	fallbackCounter := 0
+	getValueFunc := func() int {
+		fallbackCounter++
+		return fallbackCounter * 100
+	}
+	var emptyVal2 opt.Val[int]
+	result = emptyVal2.GetOrF(getValueFunc)
+	assert.Equal(100, result)
+	assert.Equal(1, fallbackCounter)
+
+	// Verify GetOrF doesn't run fallback when value is present
+	fallbackCounter = 0
+	valWithValue2 := opt.Value(777)
+	result = valWithValue2.GetOrF(getValueFunc)
+	assert.Equal(777, result)
+	assert.Equal(0, fallbackCounter)
 }
 
 func TestString(t *testing.T) {
