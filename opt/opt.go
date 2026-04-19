@@ -9,35 +9,6 @@ import (
 
 var ErrOptionIsEmpty = errors.New("option is empty")
 
-type Val[T any] struct {
-	value    T
-	nonEmpty bool
-}
-
-type Ref[T any] struct {
-	reference *T
-}
-
-// Value creates an Option[T] from a value of type T.
-// It returns a Val[T] instance.
-func Value[T any](obj T) Val[T] {
-	return Val[T]{value: obj, nonEmpty: true}
-}
-
-// Reference creates an Option[T] from a pointer of type *T.
-// It returns a Ref[T] instance.
-func Reference[T any](obj *T) Ref[T] {
-	return Ref[T]{reference: obj}
-}
-
-func Empty[T any]() Val[T] {
-	return Val[T]{}
-}
-
-func EmptyRef[T any]() Ref[T] {
-	return Ref[T]{}
-}
-
 // Option represents an object that may or may not contain an underlying value of type T.
 // This may be held by value (implemented by *[Val][T]) or by reference (implemented by [Ref][T])
 // The various method allows access to the underlying by value or reference, or detect if the
@@ -89,6 +60,47 @@ type Option[T any] interface {
 	GetOrF(fallbackFn func() T) T
 }
 
+// Val is an [Option] implementation which consists of a member of type T, and a
+// boolean flag which is true if the option holds a value. It is suitable for
+// primitive values, such as int or string, or small structures for which
+// copying represents a small overhead.
+type Val[T any] struct {
+	value    T
+	nonEmpty bool
+}
+
+// Ref is an [Option] implementation which is simply a pointer to the underlying
+// value, which is nil if there is no value present. It is suitable for larger
+// structures the copying of which would represent a significant overhead, or
+// for situations where a reference is required (e.g. to support mutability).
+type Ref[T any] struct {
+	reference *T
+}
+
+// Value creates an Option[T] from a value of type T.
+// It returns a Val[T] instance.
+func Value[T any](obj T) Val[T] {
+	return Val[T]{value: obj, nonEmpty: true}
+}
+
+// Reference creates an Option[T] from a pointer of type *T.
+// It returns a Ref[T] instance.
+func Reference[T any](obj *T) Ref[T] {
+	return Ref[T]{reference: obj}
+}
+
+// Empty creates a [Val][T] with no value.
+func Empty[T any]() Val[T] {
+	return Val[T]{}
+}
+
+// EmptyRef creates a [Ref][T] with no value.
+func EmptyRef[T any]() Ref[T] {
+	return Ref[T]{}
+}
+
+// Get returns the underlying value if there is one, or else the function panics with the
+// value of [ErrOptionIsEmpty].
 func (v Val[T]) Get() T {
 	if !v.nonEmpty {
 		panic(ErrOptionIsEmpty)
@@ -97,6 +109,8 @@ func (v Val[T]) Get() T {
 	}
 }
 
+// Ref returns the underlying referenced value, if there is one , or else the function panics
+// with the value of [ErrOptionIsEmpty].
 func (r Ref[T]) Get() T {
 	if r.reference == nil {
 		panic(ErrOptionIsEmpty)

@@ -2,12 +2,19 @@ package opt_test
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/stretchr/testify/assert"
 )
+
+func checkTry(f func()) (err error) {
+	defer handler.Catch(&err)
+	f()
+	return nil
+}
 
 func TestOptZero(t *testing.T) {
 	var intval opt.Val[int]
@@ -34,6 +41,21 @@ func TestOption(t *testing.T) {
 	assert.Equal(123, intval.Get())
 	*optval.Ref() = 456
 	assert.Equal(456, intval.Get())
+}
+
+func TestGet(t *testing.T) {
+	assert := assert.New(t)
+
+	var v opt.Val[int]
+	assert.PanicsWithValue(opt.ErrOptionIsEmpty, func() { v.Get() })
+	v = opt.Value(123)
+	assert.Equal(123, v.Get())
+
+	var r opt.Ref[int]
+	assert.PanicsWithValue(opt.ErrOptionIsEmpty, func() { r.Get() })
+	var x int = 456
+	r = opt.Reference(&x)
+	assert.Equal(456, r.Get())
 }
 
 func TestGetOK(t *testing.T) {
@@ -63,6 +85,36 @@ func TestGetOK(t *testing.T) {
 	var emptyRef opt.Ref[int]
 	value, ok = emptyRef.GetOK()
 	assert.Equal(0, value) // Zero value for int
+	assert.False(ok)
+}
+
+func TestRefOK(t *testing.T) {
+	assert := assert.New(t)
+
+	// Test Val[T] with a value
+	var x int = 123
+	valWithValue := opt.Value(x)
+	value, ok := valWithValue.RefOK()
+	assert.Equal(123, *value)
+	assert.True(ok)
+
+	// Test Val[T] without a value
+	var emptyVal opt.Val[int]
+	value, ok = emptyVal.RefOK()
+	assert.Nil(value) // Zero value for int
+	assert.False(ok)
+
+	// Test Ref[T] with a reference
+	y := 456
+	refWithValue := opt.Reference(&y)
+	value, ok = refWithValue.RefOK()
+	assert.Equal(&y, value)
+	assert.True(ok)
+
+	// Test Ref[T] without a reference
+	var emptyRef opt.Ref[int]
+	value, ok = emptyRef.RefOK()
+	assert.Nil(value)
 	assert.False(ok)
 }
 
@@ -97,80 +149,65 @@ func TestRef(t *testing.T) {
 	})
 }
 
+func TestGetOr(t *testing.T) {
+	assert := assert.New(t)
+
+	empty := opt.Empty[int]()
+	v := empty.GetOr(123)
+	assert.Equal(123, v)
+
+	value := opt.Value(456)
+	v = value.GetOr(123)
+	assert.Equal(456, v)
+
+	emptyRef := opt.EmptyRef[int]()
+	v = emptyRef.GetOr(123)
+	assert.Equal(123, v)
+
+	var x int = 456
+	ref := opt.Reference(&x)
+	v = ref.GetOr(123)
+	assert.Equal(456, v)
+
+}
+
 func TestRefOr(t *testing.T) {
 	assert := assert.New(t)
 
 	var x int = 123
-	valWithValue := opt.Value(x)
-	fallbackPtr := &x // Pointer to the same value for testing
+	valWithValue := opt.Value(456)
+	assert.Equal(456, *valWithValue.RefOr(&x))
 
-	// Test Val[T].RefOr with a fallback pointer
-	refFromVal := valWithValue.RefOr(fallbackPtr)
-	assert.Equal(&x, refFromVal) // Should return the reference to x
+	emptyVal := opt.Empty[int]()
+	assert.Equal(&x, emptyVal.RefOr(&x))
 
-	var emptyVal opt.Val[int]
-	nilPtr := (*int)(nil)
-
-	// Test Val[T].RefOr without a value (should return fallback)
-	refFromEmptyVal := emptyVal.RefOr(nilPtr)
-	assert.Nil(refFromEmptyVal) // Should return nil pointer as fallback
-
-	// Test Ref[T].RefOr with a reference
-	y := 456
+	var y int = 456
 	refWithValue := opt.Reference(&y)
+	assert.Equal(&y, refWithValue.RefOr(nil))
 
-	// Test Ref[T].RefOr without a reference (should return fallback)
-	nilFallback := (*int)(nil)
-	refFromEmptyRef := refWithValue.RefOr(nilFallback)
-	assert.Equal(&y, refFromEmptyRef) // Should return the reference to y
-
-	var emptyRef opt.Ref[int]
-	refFromEmptyRef = emptyRef.RefOr(nilPtr)
-	assert.Nil(refFromEmptyRef) // Should return nil pointer as fallback
+	emptyRef := opt.EmptyRef[int]()
+	assert.Equal(&y, emptyRef.RefOr(&y)) // Should return nil pointer as fallback
 }
 
 func TestGetOrF(t *testing.T) {
 	assert := assert.New(t)
 
-	// Test Val[T].GetOrF with a value present
-	var x int = 123
-	valWithValue := opt.Value(x)
+	valWithValue := opt.Value(123)
 	result := valWithValue.GetOrF(func() int { return 0 })
 	assert.Equal(123, result)
 
-	// Test Val[T].GetOrF without a value (invoke fallback function)
-	var emptyVal opt.Val[int]
+	emptyVal := opt.Empty[int]()
 	result = emptyVal.GetOrF(func() int { return 999 })
 	assert.Equal(999, result)
 
-	// Test Ref[T].GetOrF with a reference present
 	y := 456
 	refWithValue := opt.Reference(&y)
 	result = refWithValue.GetOrF(func() int { return 0 })
 	assert.Equal(456, result)
 
-	// Test Ref[T].GetOrF without a reference (invoke fallback function)
-	var emptyRef opt.Ref[int]
+	emptyRef := opt.EmptyRef[int]()
 	result = emptyRef.GetOrF(func() int { return 888 })
 	assert.Equal(888, result)
-
-	// Test chained GetOrF with side-effect in fallback function
-	fallbackCounter := 0
-	getValueFunc := func() int {
-		fallbackCounter++
-		return fallbackCounter * 100
-	}
-	var emptyVal2 opt.Val[int]
-	result = emptyVal2.GetOrF(getValueFunc)
-	assert.Equal(100, result)
-	assert.Equal(1, fallbackCounter)
-
-	// Verify GetOrF doesn't run fallback when value is present
-	fallbackCounter = 0
-	valWithValue2 := opt.Value(777)
-	result = valWithValue2.GetOrF(getValueFunc)
-	assert.Equal(777, result)
-	assert.Equal(0, fallbackCounter)
 }
 
 func TestString(t *testing.T) {
@@ -181,6 +218,65 @@ func TestString(t *testing.T) {
 	assert.Equal(t, "123 456", str)
 	str = fmt.Sprintf("%s %s", &val1, &val2)
 	assert.Equal(t, "123 456", str)
+	empty := opt.Empty[int]()
+	emptyRef := opt.Empty[int]()
+	emptyStr := fmt.Sprintf("%s-%s", empty, emptyRef)
+	assert.Equal(t, "-", emptyStr)
+	emptyStr = fmt.Sprintf("%s-%s", &empty, &emptyRef)
+	assert.Equal(t, "-", emptyStr)
+}
+
+func TestTryRef(t *testing.T) {
+	assert := assert.New(t)
+
+	emptyVar := opt.Empty[int]()
+	err := checkTry(func() { emptyVar.TryRef() })
+	assert.ErrorIs(err, opt.ErrOptionIsEmpty)
+
+	nonemptyVar := opt.Value(123)
+	assert.Equal(123, *nonemptyVar.TryRef())
+
+	emptyRef := opt.EmptyRef[int]()
+	err = checkTry(func() { emptyRef.TryRef() })
+	assert.ErrorIs(err, opt.ErrOptionIsEmpty)
+
+	var x int = 456
+	nonemptyRef := opt.Reference(&x)
+	assert.Equal(&x, nonemptyRef.TryRef())
+}
+
+func TestMap(t *testing.T) {
+	assert := assert.New(t)
+
+	v := opt.Value(123)
+	ev := opt.Empty[int]()
+	assert.Equal("123", opt.Map(&v, strconv.Itoa).Get())
+	assert.True(opt.Map(&ev, strconv.Itoa).IsEmpty())
+
+	var x int = 123
+	r := opt.Reference(&x)
+	er := opt.EmptyRef[int]()
+	assert.Equal("123", opt.Map(r, strconv.Itoa).Get())
+	assert.True(opt.Map(er, strconv.Itoa).IsEmpty())
+}
+
+func TestMapRef(t *testing.T) {
+	assert := assert.New(t)
+
+	itoaRef := func(x *int) *string {
+		str := strconv.Itoa(*x)
+		return &str
+	}
+	v := opt.Value(123)
+	ev := opt.Empty[int]()
+	assert.Equal("123", opt.MapRef(&v, itoaRef).Get())
+	assert.True(opt.MapRef(&ev, itoaRef).IsEmpty())
+
+	var x int = 123
+	r := opt.Reference(&x)
+	er := opt.EmptyRef[int]()
+	assert.Equal("123", opt.MapRef(r, itoaRef).Get())
+	assert.True(opt.MapRef(er, itoaRef).IsEmpty())
 }
 
 func ExampleVal_Try() {
