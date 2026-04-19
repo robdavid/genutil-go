@@ -329,3 +329,67 @@ func ExampleVal_AsRef() {
 	// 456
 
 }
+
+func ExampleVal_Mutate() {
+	type mystruct struct {
+		name  string
+		value int
+	}
+	v := opt.Empty[mystruct]()
+	v2 := v.Ensure().Mutate(func(m *mystruct) {
+		m.name = "two"
+		m.value = 2
+	})
+	fmt.Printf("%s: %d\n", v2.Ref().name, v2.Ref().value)
+
+	// Output:
+	// two: 2
+}
+
+func ExampleRef_Mutate() {
+	type mystruct struct {
+		name  string
+		value int
+	}
+	v := opt.EmptyRef[mystruct]()
+	v2 := v.Ensure().Mutate(func(m *mystruct) {
+		m.name = "two"
+		m.value = 2
+	})
+	fmt.Printf("%s: %d\n", v2.Ref().name, v2.Ref().value)
+
+	// Output:
+	// two: 2
+}
+
+func ExampleVal_Ensure() {
+	type mystruct struct {
+		name  string
+		value int
+	}
+	v := opt.Empty[mystruct]()
+	v2 := v.Ensure().Mutate(func(m *mystruct) {
+		m.name = "two"
+		m.value = 2
+	})
+	fmt.Printf("%s: %d\n", v2.Ref().name, v2.Ref().value)
+
+	// Output:
+	// two: 2
+}
+
+func ExampleRef_Ensure() {
+	type mystruct struct {
+		name  string
+		value int
+	}
+	v := opt.EmptyRef[mystruct]()
+	v2 := v.Ensure().Mutate(func(m *mystruct) {
+		m.name = "two"
+		m.value = 2
+	})
+	fmt.Printf("%s: %d\n", v2.Ref().name, v2.Ref().value)
+
+	// Output:
+	// two: 2
+}

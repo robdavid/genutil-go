@@ -7,6 +7,7 @@ import (
 	"github.com/robdavid/genutil-go/errors/handler"
 )
 
+// ErrOptionIsEmpty is an error raised (via a panic) when an option is empty.
 var ErrOptionIsEmpty = errors.New("option is empty")
 
 // Option represents an object that may or may not contain an underlying value of type T.
@@ -58,6 +59,21 @@ type Option[T any] interface {
 	// GetOrF returns the option value if present, or otherwise invokes the provided function
 	// and returns the value obtained
 	GetOrF(fallbackFn func() T) T
+
+	// Mutate applies an in place mutation function to an
+	// option's value. It is a no-op if the option is empty.
+	// The mutated option is returned.
+	Mutate(f func(*T)) Option[T]
+
+	// Ensure makes sure the option is non-empty. If it is already
+	// non-empty, it is a no-op. Otherwise it is mutated to be populated
+	// with the zero value. The mutated or original option is returned.
+	Ensure() Option[T]
+
+	// AsRef converts the underlying option implementation to a [Ref][T] and
+	// returns it. It's a no-op returning the receiver if the implementation is
+	// already a [Ref][T].
+	AsRef() Ref[T]
 }
 
 // Val is an [Option] implementation which consists of a member of type T, and a
@@ -133,6 +149,11 @@ func (v *Val[T]) AsRef() Ref[T] {
 	} else {
 		return EmptyRef[T]()
 	}
+}
+
+// AsRef converts the [Ref][T] instance to a [Ref][T] simply by returning the receiver.
+func (r Ref[T]) AsRef() Ref[T] {
+	return r
 }
 
 // GetOK returns the underlying value if present, along with a boolean flag set true
@@ -306,6 +327,7 @@ func (v Val[T]) IsEmpty() bool {
 	return !v.nonEmpty
 }
 
+// IsEmpty returns true if there is no value
 func (r Ref[T]) IsEmpty() bool {
 	return r.reference == nil
 }
@@ -316,8 +338,47 @@ func (v Val[T]) HasValue() bool {
 	return v.nonEmpty
 }
 
+// Has value returns true if there is a value, and it is
+// safe to access the value via functions such as [Ref.Get].
 func (r Ref[T]) HasValue() bool {
 	return r.reference != nil
+}
+
+func (v *Val[T]) Mutate(f func(*T)) Option[T] {
+	if v.nonEmpty {
+		f(&v.value)
+	}
+	return v
+}
+
+func (r Ref[T]) Mutate(f func(*T)) Option[T] {
+	if r.reference != nil {
+		f(r.reference)
+	}
+	return r
+}
+
+// Ensure ensures that the option is non-empty. If it is already non-empty, it is a no-op.
+// Otherwise, it is mutated to be populated with the zero value. The mutated or original option is returned.
+//
+// For [Val][T], this method uses a pointer receiver to allow for fluent method chaining.
+func (v *Val[T]) Ensure() Option[T] {
+	if !v.nonEmpty {
+		var zero T
+		v.value = zero
+		v.nonEmpty = true
+	}
+	return v
+}
+
+// Ensure ensures that the option is non-empty. If it is already non-empty, it is a no-op.
+// Otherwise, it is mutated to be populated with the zero value. The mutated or original option is returned.
+func (r Ref[T]) Ensure() Option[T] {
+	if r.reference == nil {
+		var zero T
+		r.reference = &zero
+	}
+	return r
 }
 
 // Map applies a function to the non-empty value of an Option.
