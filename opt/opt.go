@@ -74,6 +74,23 @@ type Option[T any] interface {
 	// returns it. It's a no-op returning the receiver if the implementation is
 	// already a [Ref][T].
 	AsRef() Ref[T]
+
+	// Morph, inspired by the concept of [Endomorphism]:
+	// https://en.wikipedia.org/wiki/Endomorphism, maps an [Option] value, if
+	// non-empty, to another value of the same type, wrapped in an [Val]. If the
+	// passed [Option] is empty, an empty [Val][T] is returned. Mapping to
+	// values of different types via methods is not possible due to limitations
+	// in Go generics. For this use the [Map] function.
+	Morph(func(T) T) Val[T]
+
+	// MorphRef, inspired by the concept of [Endomorphism]:
+	// https://en.wikipedia.org/wiki/Endomorphism, maps a Option value, if
+	// non-empty, to another value of the same type, wrapped in in a [Ref][T].
+	// The mapping function takes and returns pointers to the underlying values.
+	// If the passed Option is empty, an empty [Ref][T] is returned.
+	// Mapping to values of different types via methods is not possible due to
+	// limitations in Go generics. For this use the option.Map function.
+	MorphRef(func(*T) *T) Ref[T]
 }
 
 // Val is an [Option] implementation which consists of a member of type T, and a
@@ -379,6 +396,54 @@ func (r Ref[T]) Ensure() Option[T] {
 		r.reference = &zero
 	}
 	return r
+}
+
+// Morph transforms the underlying value, if present, by means of the supplied
+// function f. If the underlying value is present, it is passed to the function
+// and the resulting value is wrapped in a [Val][T]. If there is no underlying
+// value, an empty Val[T] is returned.
+func (v Val[T]) Morph(f func(T) T) Val[T] {
+	if v.nonEmpty {
+		return Value(f(v.value))
+	} else {
+		return Empty[T]()
+	}
+}
+
+// Morph transforms the underlying value, if present, by means of the supplied
+// function f. If the underlying value is present, it is passed to the function
+// and the resulting value is wrapped in a [Val][T]. If there is no underlying
+// value, an empty Val[T] is returned.
+func (r Ref[T]) Morph(f func(T) T) Val[T] {
+	if r.reference != nil {
+		return Value(f(*r.reference))
+	} else {
+		return Empty[T]()
+	}
+}
+
+// MorphRef transforms the underlying value, if present, by means of the supplied
+// function f. If the underlying value is present, a reference to it is passed to
+// the function, and the resulting value reference is wrapped in a [Ref][T]. If
+// there is no underlying value, and empty [Ref][T] is returned.
+func (v *Val[T]) MorphRef(f func(*T) *T) Ref[T] {
+	if v.nonEmpty {
+		return Reference(f(&v.value))
+	} else {
+		return EmptyRef[T]()
+	}
+}
+
+// MorphRef transforms the underlying value, if present, by means of the supplied
+// function f. If the underlying value is present, a reference to it is passed to
+// the function, and the resulting value reference is wrapped in a [Ref][T]. If
+// there is no underlying value, and empty [Ref][T] is returned.
+func (r Ref[T]) MorphRef(f func(*T) *T) Ref[T] {
+	if r.reference != nil {
+		return Reference(f(r.reference))
+	} else {
+		return EmptyRef[T]()
+	}
 }
 
 // Map applies a function to the non-empty value of an Option.
