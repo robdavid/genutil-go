@@ -3,6 +3,7 @@ package opt_test
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/handler"
@@ -243,6 +244,30 @@ func TestTryRef(t *testing.T) {
 	var x int = 456
 	nonemptyRef := opt.Reference(&x)
 	assert.Equal(&x, nonemptyRef.TryRef())
+}
+
+func TestMorph(t *testing.T) {
+	assert := assert.New(t)
+	v := opt.Value("hello")
+	uv := v.Morph(strings.ToUpper)
+	assert.Equal("HELLO", uv.Get())
+
+	v = opt.Empty[string]()
+	uv = v.Morph(strings.ToUpper)
+	assert.True(uv.IsEmpty())
+
+	var hello string = "hello"
+	upperRef := func(s *string) *string {
+		upper := strings.ToUpper(*s)
+		return &upper
+	}
+	r := opt.Reference(&hello)
+	ur := r.MorphRef(upperRef)
+	assert.Equal("HELLO", ur.Get())
+
+	r = opt.EmptyRef[string]()
+	ur = r.MorphRef(upperRef)
+	assert.True(ur.IsEmpty())
 }
 
 func TestMap(t *testing.T) {
