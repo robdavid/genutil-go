@@ -270,6 +270,36 @@ func TestMorph(t *testing.T) {
 	assert.True(ur.IsEmpty())
 }
 
+func TestThenElse(t *testing.T) {
+	assert := assert.New(t)
+
+	var thenValue int
+	var elseTaken bool = false
+
+	v := opt.Value(123)
+	v.Then(func(x int) { thenValue = x }).Else(func() { elseTaken = true })
+	assert.Equal(123, thenValue)
+	assert.False(elseTaken)
+
+	v = opt.Empty[int]()
+	v.Then(func(x int) { thenValue = x }).Else(func() { elseTaken = true })
+	assert.Equal(123, thenValue)
+	assert.True(elseTaken)
+
+	var x int = 456
+	elseTaken = false
+	r := opt.Reference(&x)
+	r.Then(func(x int) { thenValue = x }).Else(func() { elseTaken = true })
+	assert.Equal(456, thenValue)
+	assert.False(elseTaken)
+
+	r = opt.EmptyRef[int]()
+	r.Then(func(x int) { thenValue = x }).Else(func() { elseTaken = true })
+	assert.Equal(456, thenValue)
+	assert.True(elseTaken)
+
+}
+
 func TestMap(t *testing.T) {
 	assert := assert.New(t)
 

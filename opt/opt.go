@@ -91,6 +91,14 @@ type Option[T any] interface {
 	// Mapping to values of different types via methods is not possible due to
 	// limitations in Go generics. For this use the option.Map function.
 	MorphRef(func(*T) *T) Ref[T]
+
+	// Then invokes the supplied function with the Option's value
+	// if the Option is non-empty. Otherwise, this is a no-op. It
+	// always returns the option instance it was called with.
+	Then(func(T)) Option[T]
+
+	// Else invokes the provided function if the Option is empty.
+	Else(func()) Option[T]
 }
 
 // Val is an [Option] implementation which consists of a member of type T, and a
@@ -444,6 +452,40 @@ func (r Ref[T]) MorphRef(f func(*T) *T) Ref[T] {
 	} else {
 		return EmptyRef[T]()
 	}
+}
+
+// Then invokes the supplied function with the Option's value
+// if the Option is non-empty. Otherwise, this is a no-op. It
+// always returns the option instance it was called with.
+func (v Val[T]) Then(f func(T)) Option[T] {
+	if v.nonEmpty {
+		f(v.value)
+	}
+	return &v
+}
+
+// Then invokes the supplied function with the Option's value
+// if the Option is non-empty. Otherwise, this is a no-op. It
+// always returns the option instance it was called with.
+func (r Ref[T]) Then(f func(T)) Option[T] {
+	if r.reference != nil {
+		f(*r.reference)
+	}
+	return r
+}
+
+func (v Val[T]) Else(f func()) Option[T] {
+	if !v.nonEmpty {
+		f()
+	}
+	return &v
+}
+
+func (r Ref[T]) Else(f func()) Option[T] {
+	if r.reference == nil {
+		f()
+	}
+	return r
 }
 
 // Map applies a function to the non-empty value of an Option.
