@@ -1,6 +1,7 @@
 package opt
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -454,9 +455,9 @@ func (r Ref[T]) MorphRef(f func(*T) *T) Ref[T] {
 	}
 }
 
-// Then invokes the supplied function with the Option's value
-// if the Option is non-empty. Otherwise, this is a no-op. It
-// always returns the option instance it was called with.
+// Then invokes the supplied function with the Option's value if the Option is
+// non-empty. Otherwise, this is a no-op. It always returns the option instance
+// it was called with.
 func (v Val[T]) Then(f func(T)) Option[T] {
 	if v.nonEmpty {
 		f(v.value)
@@ -464,9 +465,9 @@ func (v Val[T]) Then(f func(T)) Option[T] {
 	return &v
 }
 
-// Then invokes the supplied function with the Option's value
-// if the Option is non-empty. Otherwise, this is a no-op. It
-// always returns the option instance it was called with.
+// Then invokes the supplied function with the Option's value if the Option is
+// non-empty. Otherwise, this is a no-op. It always returns the option instance
+// it was called with.
 func (r Ref[T]) Then(f func(T)) Option[T] {
 	if r.reference != nil {
 		f(*r.reference)
@@ -474,6 +475,7 @@ func (r Ref[T]) Then(f func(T)) Option[T] {
 	return r
 }
 
+// Else invokes the provided function if the Option passed is empty.
 func (v Val[T]) Else(f func()) Option[T] {
 	if !v.nonEmpty {
 		f()
@@ -481,9 +483,30 @@ func (v Val[T]) Else(f func()) Option[T] {
 	return &v
 }
 
+// Else invokes the provided function if the Option passed is empty.
 func (r Ref[T]) Else(f func()) Option[T] {
 	if r.reference == nil {
 		f()
+	}
+	return r
+}
+
+// ThenRef invokes the supplied function with a reference to the Option's value
+// if the Option is non-empty. Otherwise, this is a no-op. It always returns the
+// option instance it was called with.
+func (v Val[T]) ThenRef(f func(*T)) Option[T] {
+	if v.nonEmpty {
+		f(&v.value)
+	}
+	return &v
+}
+
+// ThenRef invokes the supplied function with a reference to the Option's value
+// if the Option is non-empty. Otherwise, this is a no-op. It always returns the
+// option instance it was called with.
+func (r Ref[T]) ThenRef(f func(*T)) Option[T] {
+	if r.reference != nil {
+		f(r.reference)
 	}
 	return r
 }
@@ -509,4 +532,49 @@ func MapRef[T, U any](o Option[T], f func(*T) *U) Option[U] {
 	} else {
 		return Reference(f(r))
 	}
+}
+
+// Marshalling / unmarshalling support //
+
+// JSON marshalling of an option. Empty options are
+// marshalled as "null". Non-empty options are marshalled
+// as their underlying value.
+func (v *Val[T]) MarshalJSON() ([]byte, error) {
+	if !v.nonEmpty {
+		return []byte("null"), nil
+	} else {
+		return json.Marshal(v.value)
+	}
+}
+
+// JSON un-marshalling of an option.
+func (v *Val[T]) UnmarshalJSON(j []byte) error {
+	if len(j) == 0 || string(j) == "null" {
+		*v = Empty[T]()
+	} else {
+		if err := json.Unmarshal(j, &v.value); err != nil {
+			return err
+		}
+		v.nonEmpty = true
+	}
+	return nil
+}
+
+// Returns true if the option is empty. Used by the YAML
+// marshalling/un-marshalling interface, and by the standard
+// library JSON marshaling if using "omitzero".
+func (v *Val[T]) IsZero() bool {
+	return !v.nonEmpty
+}
+
+func (v *Val[T]) MarshalYAML() (interface{}, error) {
+	return v.value, nil
+}
+
+func (v *Val[T]) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	if err := unmarshal(&v.value); err != nil {
+		return err
+	}
+	v.nonEmpty = true
+	return nil
 }

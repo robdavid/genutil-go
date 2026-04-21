@@ -1,6 +1,9 @@
+//go:build !goexperiment.jsonv2
+
 package opt_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +12,7 @@ import (
 	"github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func checkTry(f func()) (err error) {
@@ -300,6 +304,36 @@ func TestThenElse(t *testing.T) {
 
 }
 
+func TestThenRefElse(t *testing.T) {
+	assert := assert.New(t)
+
+	var thenValue int
+	var elseTaken bool = false
+
+	v := opt.Value(123)
+	v.ThenRef(func(x *int) { thenValue = *x }).Else(func() { elseTaken = true })
+	assert.Equal(123, thenValue)
+	assert.False(elseTaken)
+
+	v = opt.Empty[int]()
+	v.ThenRef(func(x *int) { thenValue = *x }).Else(func() { elseTaken = true })
+	assert.Equal(123, thenValue)
+	assert.True(elseTaken)
+
+	var x int = 456
+	elseTaken = false
+	r := opt.Reference(&x)
+	r.ThenRef(func(x *int) { thenValue = *x }).Else(func() { elseTaken = true })
+	assert.Equal(456, thenValue)
+	assert.False(elseTaken)
+
+	r = opt.EmptyRef[int]()
+	r.ThenRef(func(x *int) { thenValue = *x }).Else(func() { elseTaken = true })
+	assert.Equal(456, thenValue)
+	assert.True(elseTaken)
+
+}
+
 func TestMap(t *testing.T) {
 	assert := assert.New(t)
 
@@ -332,6 +366,29 @@ func TestMapRef(t *testing.T) {
 	er := opt.EmptyRef[int]()
 	assert.Equal("123", opt.MapRef(r, itoaRef).Get())
 	assert.True(opt.MapRef(er, itoaRef).IsEmpty())
+}
+
+type testMarshalVal struct {
+	Name  string       `json:"name" yaml:"name"`
+	Value int          `json:"value" yaml:"value"`
+	Opt   opt.Val[int] `json:"opt" yaml:"opt,omitzero"`
+}
+
+func TestJSONMarshalOmitOption(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	testData := testMarshalVal{
+		Name:  "test1",
+		Value: 1,
+		Opt:   opt.Empty[int](),
+	}
+	y, err := json.Marshal(&testData)
+	require.NoError(err)
+	text := string(y)
+	assert.Contains(text, "\"opt\":null")
+	var testData2 testMarshalVal
+	assert.NoError(json.Unmarshal(y, &testData2))
+	assert.Equal(testData, testData2)
 }
 
 func ExampleVal_Try() {
