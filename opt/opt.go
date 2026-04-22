@@ -534,11 +534,11 @@ func MapRef[T, U any](o Option[T], f func(*T) *U) Option[U] {
 	}
 }
 
-// Marshalling / unmarshalling support //
+// Marshalling / unmarshaling support //
 
-// JSON marshalling of an option. Empty options are
-// marshalled as "null". Non-empty options are marshalled
-// as their underlying value.
+// MarshalJSON implements JSON marshaling of a [Val][T] object. Empty options
+// are marshaled as "null". Non-empty options are marshaled as their
+// underlying value.
 func (v *Val[T]) MarshalJSON() ([]byte, error) {
 	if !v.nonEmpty {
 		return []byte("null"), nil
@@ -547,7 +547,9 @@ func (v *Val[T]) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// JSON un-marshalling of an option.
+// UnmarshalJSON implements JSON umarshaling into a [Val][T] object. An
+// input of null or zero length unmarshals as an empty value. Otherwise,
+// the input in unmarshaled as the underlying type.
 func (v *Val[T]) UnmarshalJSON(j []byte) error {
 	if len(j) == 0 || string(j) == "null" {
 		*v = Empty[T]()
@@ -561,20 +563,93 @@ func (v *Val[T]) UnmarshalJSON(j []byte) error {
 }
 
 // Returns true if the option is empty. Used by the YAML
-// marshalling/un-marshalling interface, and by the standard
-// library JSON marshaling if using "omitzero".
-func (v *Val[T]) IsZero() bool {
+// marshaling/un-marshaling interface, and by the standard
+// library JSON v2 marshaling if using "omitzero".
+func (v Val[T]) IsZero() bool {
 	return !v.nonEmpty
 }
 
-func (v *Val[T]) MarshalYAML() (interface{}, error) {
+// MarshalYAML implements YAML marshaling of a [Val][T] for the
+// https://pkg.go.dev/gopkg.in/yaml.v2 YAML parser. An empty value
+// is marshaled as it's zero value. Otherwise it is simply marshaled
+// and the underlying value. Note that if "omitempty" is used, this
+// function won't be called for empty values, as it should be guarded
+// due the the [Val.IsZero] method.
+func (v Val[T]) MarshalYAML() (any, error) {
+	if !v.nonEmpty {
+		var zero T
+		return zero, nil
+	}
 	return v.value, nil
 }
 
+// UnmarshalYAML implements YAML unmarshaling into a [Val][T] for the
+// https://pkg.go.dev/gopkg.in/yaml.v2 YAML parser. Input is unmarshaled
+// into the underlying value, and the [Val] will always be non-empty, unless
+// an error is
 func (v *Val[T]) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal(&v.value); err != nil {
 		return err
 	}
 	v.nonEmpty = true
+	return nil
+}
+
+// MarshalJSON implements JSON marshaling of a [Ref][T] object. Empty options
+// are marshaled as "null". Non-empty options are marshaled as their
+// underlying value.
+func (r Ref[T]) MarshalJSON() ([]byte, error) {
+	if r.reference == nil {
+		return []byte("null"), nil
+	} else {
+		return json.Marshal(r.reference)
+	}
+}
+
+// UnmarshalJSON implements JSON umarshaling into a [Ref][T] object. An
+// input of null or zero length unmarshals as an empty value. Otherwise,
+// the input in unmarshaled as the underlying type.
+func (r *Ref[T]) UnmarshalJSON(j []byte) error {
+	if len(j) == 0 || string(j) == "null" {
+		r.reference = nil
+	} else {
+		r.reference = new(T)
+		if err := json.Unmarshal(j, r.reference); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Returns true if the option is empty. Used by the YAML
+// marshaling/un-marshaling interface, and by the standard
+// library JSON v2 marshaling if using "omitzero".
+func (r Ref[T]) IsZero() bool {
+	return r.reference == nil
+}
+
+// MarshalYAML implements YAML marshaling of a [Ref][T] for the
+// https://pkg.go.dev/gopkg.in/yaml.v2 YAML parser. An empty value
+// is marshaled as it's zero value. Otherwise it is simply marshaled
+// and the underlying value. Note that if "omitempty" is used, this
+// function won't be called for empty values, as it should be guarded
+// due the the [Ref.IsZero] method.
+func (r Ref[T]) MarshalYAML() (any, error) {
+	if r.reference == nil {
+		var zero T
+		return zero, nil
+	}
+	return r.reference, nil
+}
+
+// UnmarshalYAML implements YAML unmarshaling into a [Ref][T] for the
+// https://pkg.go.dev/gopkg.in/yaml.v2 YAML parser. Input is unmarshaled
+// into the underlying value, and the [Ref] will always be non-empty, unless
+// an error is
+func (r *Ref[T]) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	r.reference = new(T)
+	if err := unmarshal(r.reference); err != nil {
+		return err
+	}
 	return nil
 }
