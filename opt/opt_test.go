@@ -213,6 +213,49 @@ func TestGetOrF(t *testing.T) {
 	assert.Equal(888, result)
 }
 
+func TestEqual(t *testing.T) {
+	assert := assert.New(t)
+	val1 := opt.Value(123)
+	val2 := val1
+	val3 := opt.Value(456)
+	val4 := opt.Empty[int]()
+	assert.False(val1.Ref() == val2.Ref())
+	assert.True(val1 == val2)
+	assert.False(val1 == val3)
+	assert.False(val1 == val4)
+	ref1 := val1.AsRef()
+	ref2 := val2.AsRef()
+	assert.False(ref1 == ref2) // Pointers will not be equal
+	assert.True(opt.Equal(ref1, ref2))
+	assert.True(opt.Equal(&val1, &val2))
+	assert.True(opt.Equal(&val1, ref2))
+	assert.False(opt.Equal(&val1, &val3))
+}
+
+func TestDeepEqual(t *testing.T) {
+	assert := assert.New(t)
+	type testdata struct {
+		name   string
+		values []int
+	}
+	val1 := opt.Value(testdata{
+		name:   "val1",
+		values: []int{1, 2, 3},
+	})
+	val2 := opt.Value(testdata{
+		name:   "val1",
+		values: []int{1, 2, 3},
+	})
+	val3 := opt.Value(testdata{
+		name:   "val1",
+		values: []int{4, 5, 6},
+	})
+	assert.False(val1.Ref() == val2.Ref())
+	assert.True(opt.DeepEqual(&val1, &val2))
+	assert.True(opt.DeepEqual(&val1, val2.AsRef()))
+	assert.False(opt.DeepEqual(&val1, &val3))
+}
+
 func TestString(t *testing.T) {
 	val1 := opt.Value(123)
 	var x int = 456

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/robdavid/genutil-go/errors/handler"
 )
@@ -370,6 +371,9 @@ func (r Ref[T]) HasValue() bool {
 	return r.reference != nil
 }
 
+// Mutate applies function f to a reference to the underlying value
+// if present. The function may alter the value via this pointer.
+// If there is no value present, the method is a no-op.
 func (v *Val[T]) Mutate(f func(*T)) Option[T] {
 	if v.nonEmpty {
 		f(&v.value)
@@ -377,6 +381,9 @@ func (v *Val[T]) Mutate(f func(*T)) Option[T] {
 	return v
 }
 
+// Mutate applies function f to a reference to the underlying value
+// if present. The function may alter the value via this pointer.
+// If there is no value present, the method is a no-op.
 func (r Ref[T]) Mutate(f func(*T)) Option[T] {
 	if r.reference != nil {
 		f(r.reference)
@@ -531,6 +538,26 @@ func MapRef[T, U any](o Option[T], f func(*T) *U) Option[U] {
 		return EmptyRef[U]()
 	} else {
 		return Reference(f(r))
+	}
+}
+
+func Equal[T comparable](o1 Option[T], o2 Option[T]) bool {
+	if o1.IsEmpty() != o2.IsEmpty() {
+		return false
+	} else if o1.IsEmpty() && o2.IsEmpty() {
+		return true
+	} else {
+		return *o1.Ref() == *o2.Ref()
+	}
+}
+
+func DeepEqual[T any](o1 Option[T], o2 Option[T]) bool {
+	if o1.IsEmpty() != o2.IsEmpty() {
+		return false
+	} else if o1.IsEmpty() && o2.IsEmpty() {
+		return true
+	} else {
+		return reflect.DeepEqual(o1.Ref(), o2.Ref())
 	}
 }
 
