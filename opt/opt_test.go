@@ -267,8 +267,23 @@ func TestMorph(t *testing.T) {
 	ur := r.MorphRef(upperRef)
 	assert.Equal("HELLO", ur.Get())
 
+	r = opt.Reference(&hello)
+	assert.Equal("hello", r.Get())
+	uv = r.Morph(strings.ToUpper)
+	assert.Equal("HELLO", uv.Get())
+
 	r = opt.EmptyRef[string]()
 	ur = r.MorphRef(upperRef)
+	assert.True(ur.IsEmpty())
+	uv = r.Morph(strings.ToUpper)
+	assert.True(ur.IsEmpty())
+
+	v = opt.Value("hello")
+	ur = v.MorphRef(upperRef)
+	assert.Equal("HELLO", ur.Get())
+
+	v = opt.Empty[string]()
+	ur = v.MorphRef(upperRef)
 	assert.True(ur.IsEmpty())
 }
 
