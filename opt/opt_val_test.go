@@ -13,7 +13,7 @@ import (
 type testMarshalVal struct {
 	Name  string              `json:"name" yaml:"name"`
 	Value int                 `json:"value" yaml:"value"`
-	Opt   opt.Val[testOptVal] `json:"opt" yaml:"opt,omitzero"`
+	Opt   opt.Val[testOptVal] `json:"opt" yaml:"opt"`
 }
 
 type testOptVal struct {
@@ -27,8 +27,8 @@ type testOptNoOmitMarshalVal struct {
 }
 
 type testOptMarshalVal struct {
-	Name  opt.Val[string] `json:"name,omitempty" yaml:"name,omitempty"`
-	Value opt.Val[int]    `json:"value,omitempty" yaml:"value,omitempty"`
+	Name  opt.Val[string] `json:"name,omitzero" yaml:"name,omitempty"`
+	Value opt.Val[int]    `json:"value,omitzero" yaml:"value,omitempty"`
 }
 
 func TestJSONMarshalOmitVal(t *testing.T) {
@@ -103,13 +103,34 @@ func TestJSONMarshalValSimple(t *testing.T) {
 	var testDataMap map[string]any
 	require.NoError(json.Unmarshal(y, &testDataMap))
 	expected := map[string]any{
-		"name":  "a name",
-		"value": nil,
+		"name": "a name",
 	}
 	assert.Equal(expected, testDataMap)
 	var testData2 testOptMarshalVal
 	assert.NoError(json.Unmarshal(y, &testData2))
 	assert.Equal(testData, testData2)
+}
+
+func TestJSONMarshalPresentZeroVal(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	testData := testOptMarshalVal{
+		Value: opt.Value(0),
+	}
+	y, err := json.Marshal(&testData)
+	require.NoError(err)
+	var testDataMap map[string]any
+	require.NoError(json.Unmarshal(y, &testDataMap))
+	expected := map[string]any{
+		"value": float64(0),
+	}
+	assert.Equal(expected, testDataMap)
+	var testData2 testOptMarshalVal
+	err = json.Unmarshal(y, &testData2)
+	require.NoError(err)
+	assert.True(testData2.Name.IsEmpty())
+	require.False(testData2.Value.IsEmpty())
+	assert.Equal(0, testData2.Value.Get())
 }
 
 func TestJSONMarshalValSimpleNoEmpty(t *testing.T) {

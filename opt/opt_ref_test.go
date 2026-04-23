@@ -14,7 +14,7 @@ import (
 type testMarshalRef struct {
 	Name  string              `json:"name" yaml:"name"`
 	Value int                 `json:"value" yaml:"value"`
-	Opt   opt.Ref[testOptRef] `json:"opt" yaml:"opt,omitzero"`
+	Opt   opt.Ref[testOptRef] `json:"opt" yaml:"opt"`
 }
 
 type testOptRef struct {
@@ -28,8 +28,8 @@ type testOptNoOmitMarshalRef struct {
 }
 
 type testOptMarshalRef struct {
-	Name  opt.Ref[string] `json:"name,omitempty" yaml:"name,omitempty"`
-	Value opt.Ref[int]    `json:"value,omitempty" yaml:"value,omitempty"`
+	Name  opt.Ref[string] `json:"name,omitzero" yaml:"name,omitempty"`
+	Value opt.Ref[int]    `json:"value,omitzero" yaml:"value,omitempty"`
 }
 
 func TestJSONMarshalOmitRef(t *testing.T) {
@@ -92,6 +92,28 @@ func TestJSONMarshalEmptyRef(t *testing.T) {
 	assert.Equal(t, expected, testDataMap)
 }
 
+func TestJSONMarshalPresentZeroRef(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	testData := testOptMarshalRef{
+		Value: opt.Reference(functions.Ref(0)),
+	}
+	y, err := json.Marshal(&testData)
+	require.NoError(err)
+	var testDataMap map[string]any
+	require.NoError(json.Unmarshal(y, &testDataMap))
+	expected := map[string]any{
+		"value": float64(0),
+	}
+	assert.Equal(expected, testDataMap)
+	var testData2 testOptMarshalRef
+	err = json.Unmarshal(y, &testData2)
+	require.NoError(err)
+	assert.True(testData2.Name.IsEmpty())
+	require.False(testData2.Value.IsEmpty())
+	assert.Equal(0, testData2.Value.Get())
+}
+
 func TestJSONMarshalRefSimple(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
@@ -104,8 +126,7 @@ func TestJSONMarshalRefSimple(t *testing.T) {
 	var testDataMap map[string]any
 	require.NoError(json.Unmarshal(y, &testDataMap))
 	expected := map[string]any{
-		"name":  "a name",
-		"value": nil,
+		"name": "a name",
 	}
 	assert.Equal(expected, testDataMap)
 	var testData2 testOptMarshalRef
