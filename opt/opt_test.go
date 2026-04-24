@@ -3,6 +3,7 @@
 package opt_test
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -50,12 +51,12 @@ func TestGet(t *testing.T) {
 	assert := assert.New(t)
 
 	var v opt.Val[int]
-	assert.PanicsWithValue(opt.ErrOptionIsEmpty, func() { v.Get() })
+	assert.PanicsWithError("error in opt.Val[int]: optional value not present", func() { v.Get() })
 	v = opt.Value(123)
 	assert.Equal(123, v.Get())
 
 	var r opt.Ref[int]
-	assert.PanicsWithValue(opt.ErrOptionIsEmpty, func() { r.Get() })
+	assert.PanicsWithError("error in opt.Ref[int]: optional value not present", func() { r.Get() })
 	var x int = 456
 	r = opt.Reference(&x)
 	assert.Equal(456, r.Get())
@@ -426,8 +427,8 @@ func TestMapRef(t *testing.T) {
 
 func ExampleVal_Try() {
 	defer handler.Handle(func(err error) {
-		if err == opt.ErrOptionIsEmpty {
-			fmt.Println("Access of empty option detected")
+		if errors.Is(err, opt.ErrOptionIsEmpty) {
+			fmt.Println(err.Error())
 		}
 	})
 
@@ -439,13 +440,13 @@ func ExampleVal_Try() {
 
 	// Output:
 	// 123
-	// Access of empty option detected
+	// error in opt.Val[int]: optional value not present
 }
 
 func ExampleRef_Try() {
 	defer handler.Handle(func(err error) {
-		if err == opt.ErrOptionIsEmpty {
-			fmt.Println("Access of empty option detected")
+		if errors.Is(err, opt.ErrOptionIsEmpty) {
+			fmt.Println(err.Error())
 		}
 	})
 
@@ -458,7 +459,40 @@ func ExampleRef_Try() {
 
 	// Output:
 	// 123
-	// Access of empty option detected
+	// error in opt.Ref[int]: optional value not present
+}
+
+func ExampleVal_TryRefOr() {
+	defer handler.Handle(func(err error) {
+		fmt.Println(err.Error())
+	})
+
+	var empty opt.Val[int]
+	var present opt.Val[int] = opt.Value(123)
+
+	fmt.Println(*present.TryRefOr(fmt.Errorf("not expecting this error")))
+	fmt.Println(empty.TryRefOr(fmt.Errorf("empty value encountered")))
+
+	// Output:
+	// 123
+	// empty value encountered
+}
+
+func ExampleRef_TryRefOr() {
+	defer handler.Handle(func(err error) {
+		fmt.Println(err.Error())
+	})
+
+	var empty opt.Ref[int]
+	var x int = 123
+	var present opt.Ref[int] = opt.Reference(&x)
+
+	fmt.Println(*present.TryRefOr(fmt.Errorf("not expecting this error")))
+	fmt.Println(empty.TryRefOr(fmt.Errorf("empty value encountered")))
+
+	// Output:
+	// 123
+	// empty value encountered
 }
 
 func ExampleVal_AsRef() {

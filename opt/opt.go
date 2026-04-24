@@ -10,7 +10,7 @@ import (
 )
 
 // ErrOptionIsEmpty is an error raised (via a panic) when an option is empty.
-var ErrOptionIsEmpty = errors.New("option is empty")
+var ErrOptionIsEmpty = errors.New("optional value not present")
 
 // Option represents an object that may or may not contain an underlying value of type T.
 // This may be held by value (implemented by *[Val][T]) or by reference (implemented by [Ref][T])
@@ -142,21 +142,31 @@ func EmptyRef[T any]() Ref[T] {
 	return Ref[T]{}
 }
 
+func (v *Val[T]) error() error {
+	typ := reflect.TypeFor[T]()
+	return fmt.Errorf("error in opt.Val[%s]: %w", typ.Name(), ErrOptionIsEmpty)
+}
+
+func (r Ref[T]) error() error {
+	typ := reflect.TypeFor[T]()
+	return fmt.Errorf("error in opt.Ref[%s]: %w", typ.Name(), ErrOptionIsEmpty)
+}
+
 // Get returns the underlying value if there is one, or else the function panics with the
-// value of [ErrOptionIsEmpty].
+// an error value that contains [ErrOptionIsEmpty].
 func (v Val[T]) Get() T {
 	if !v.nonEmpty {
-		panic(ErrOptionIsEmpty)
+		panic(v.error())
 	} else {
 		return v.value
 	}
 }
 
 // Ref returns the underlying referenced value, if there is one , or else the function panics
-// with the value of [ErrOptionIsEmpty].
+// with an error value that contains [ErrOptionIsEmpty].
 func (r Ref[T]) Get() T {
 	if r.reference == nil {
-		panic(ErrOptionIsEmpty)
+		panic(r.error())
 	} else {
 		return *r.reference
 	}
@@ -225,7 +235,7 @@ func (r Ref[T]) GetOr(fallback T) T {
 
 func (v *Val[T]) Ref() *T {
 	if !v.nonEmpty {
-		panic(ErrOptionIsEmpty)
+		panic(v.error())
 	} else {
 		return &v.value
 	}
@@ -233,7 +243,7 @@ func (v *Val[T]) Ref() *T {
 
 func (r Ref[T]) Ref() *T {
 	if r.reference == nil {
-		panic(ErrOptionIsEmpty)
+		panic(r.error())
 	} else {
 		return r.reference
 	}
@@ -280,7 +290,7 @@ func (r Ref[T]) GetOrF(fallbackFn func() T) T {
 // functions.
 func (v Val[T]) Try() T {
 	if !v.nonEmpty {
-		handler.Raise(ErrOptionIsEmpty)
+		handler.Raise(v.error())
 	}
 	return v.value
 }
@@ -290,7 +300,27 @@ func (v Val[T]) Try() T {
 // functions.
 func (r Ref[T]) Try() T {
 	if r.reference == nil {
-		handler.Raise(ErrOptionIsEmpty)
+		handler.Raise(r.error())
+	}
+	return *r.reference
+}
+
+// Try returns the value of the option if it exists, or otherwise raises the
+// error value provided in the err parameter which can be recovered via
+// [handler.Catch] or [handler.Handle] functions.
+func (v Val[T]) TryOr(err error) T {
+	if !v.nonEmpty {
+		handler.Raise(err)
+	}
+	return v.value
+}
+
+// Try returns the value of the option if it exists, or otherwise raises the
+// error value provided in the err parameter which can be recovered via
+// [handler.Catch] or [handler.Handle] functions.
+func (r Ref[T]) TryOr(err error) T {
+	if r.reference == nil {
+		handler.Raise(err)
 	}
 	return *r.reference
 }
@@ -300,7 +330,7 @@ func (r Ref[T]) Try() T {
 // [handler.Catch] or [handler.Handle] functions.
 func (v Val[T]) TryRef() *T {
 	if !v.nonEmpty {
-		handler.Raise(ErrOptionIsEmpty)
+		handler.Raise(v.error())
 	}
 	return &v.value
 }
@@ -310,7 +340,29 @@ func (v Val[T]) TryRef() *T {
 // [handler.Catch] or [handler.Handle] functions.
 func (r Ref[T]) TryRef() *T {
 	if r.reference == nil {
-		handler.Raise(ErrOptionIsEmpty)
+		handler.Raise(r.error())
+	}
+	return r.reference
+}
+
+// TryRef returns a reference to the underlying option value if there is one. If
+// not, it will panic, similar to [Option.Ref]. However, the panic raised is one
+// that wraps the error provided in err and can be recovered via [handler.Catch]
+// or [handler.Handle] functions.
+func (v Val[T]) TryRefOr(err error) *T {
+	if !v.nonEmpty {
+		handler.Raise(err)
+	}
+	return &v.value
+}
+
+// TryRef returns a reference to the underlying option value if there is one. If
+// not, it will panic, similar to [Option.Ref]. However, the panic raised is one
+// that wraps the error provided in err and can be recovered via [handler.Catch]
+// or [handler.Handle] functions.
+func (r Ref[T]) TryRefOr(err error) *T {
+	if r.reference == nil {
+		handler.Raise(err)
 	}
 	return r.reference
 }
