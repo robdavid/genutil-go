@@ -233,6 +233,8 @@ func (r Ref[T]) GetOr(fallback T) T {
 	}
 }
 
+// Ref returns a pointer to the underlying value if present. If the option is empty,
+// it panics with an error containing [ErrOptionIsEmpty].
 func (v *Val[T]) Ref() *T {
 	if !v.nonEmpty {
 		panic(v.error())
@@ -241,6 +243,8 @@ func (v *Val[T]) Ref() *T {
 	}
 }
 
+// Ref returns a pointer to the underlying value if present. If the option is empty,
+// it panics with an error containing [ErrOptionIsEmpty].
 func (r Ref[T]) Ref() *T {
 	if r.reference == nil {
 		panic(r.error())
@@ -385,6 +389,8 @@ func (r Ref[T]) RefOK() (*T, bool) {
 	return r.reference, true
 }
 
+// String returns a string representation of the underlying value if present,
+// or an empty string if the option is empty.
 func (v Val[T]) String() string {
 	if v.nonEmpty {
 		return fmt.Sprint(v.value)
@@ -393,6 +399,8 @@ func (v Val[T]) String() string {
 	}
 }
 
+// String returns a string representation of the underlying value if present,
+// or an empty string if the option is empty.
 func (r Ref[T]) String() string {
 	if r.reference != nil {
 		return fmt.Sprint(*r.reference)
@@ -443,10 +451,12 @@ func (r Ref[T]) Mutate(f func(*T)) Option[T] {
 	return r
 }
 
-// Ensure ensures that the option is non-empty. If it is already non-empty, it is a no-op.
-// Otherwise, it is mutated to be populated with the zero value. The mutated or original option is returned.
+// Ensure ensures that the option is non-empty. If it is already non-empty, it
+// is a no-op. Otherwise, it is mutated to be populated with the zero value. The
+// mutated or original option is returned.
 //
-// For [Val][T], this method uses a pointer receiver to allow for fluent method chaining.
+// For [Val][T], this method uses a pointer receiver to allow for fluent method
+// chaining.
 func (v *Val[T]) Ensure() Option[T] {
 	if !v.nonEmpty {
 		var zero T
@@ -456,8 +466,9 @@ func (v *Val[T]) Ensure() Option[T] {
 	return v
 }
 
-// Ensure ensures that the option is non-empty. If it is already non-empty, it is a no-op.
-// Otherwise, it is mutated to be populated with the zero value. The mutated or original option is returned.
+// Ensure ensures that the option is non-empty. If it is already non-empty, it
+// is a no-op. Otherwise, it is mutated to be populated with the zero value. The
+// mutated or original option is returned.
 func (r Ref[T]) Ensure() Option[T] {
 	if r.reference == nil {
 		var zero T
@@ -593,6 +604,11 @@ func MapRef[T, U any](o Option[T], f func(*T) *U) Option[U] {
 	}
 }
 
+// Equal compares two Option values for equality. It first checks if both options
+// are empty or both are non-empty. If one is empty and the other is not, it returns
+// false. If both are empty, it returns true. If both are non-empty, it dereferences
+// the underlying values and compares them for equality using the == operator.
+// The type T must be comparable for this function to work.
 func Equal[T comparable](o1 Option[T], o2 Option[T]) bool {
 	if o1.IsEmpty() != o2.IsEmpty() {
 		return false
@@ -603,6 +619,11 @@ func Equal[T comparable](o1 Option[T], o2 Option[T]) bool {
 	}
 }
 
+// DeepEqual compares two Option values for deep equality. It first checks if both
+// options are empty or both are non-empty. If one is empty and the other is not, it
+// returns false. If both are empty, it returns true. If both are non-empty, it
+// compares the underlying values using reflect.DeepEqual, which recursively compares
+// the values, including nested structures, slices, maps, and pointers.
 func DeepEqual[T any](o1 Option[T], o2 Option[T]) bool {
 	if o1.IsEmpty() != o2.IsEmpty() {
 		return false
@@ -710,9 +731,9 @@ func (r Ref[T]) IsZero() bool {
 // MarshalYAML implements YAML marshaling of a [Ref][T] for the
 // https://pkg.go.dev/gopkg.in/yaml.v2 YAML parser. An empty value
 // is marshaled as it's zero value. Otherwise it is simply marshaled
-// and the underlying value. Note that if "omitempty" is used, this
+// as the underlying value. Note that if "omitempty" is used, this
 // function won't be called for empty values, as it should be guarded
-// due the the [Ref.IsZero] method.
+// by the the [Ref.IsZero] method.
 func (r Ref[T]) MarshalYAML() (any, error) {
 	if r.reference == nil {
 		var zero T

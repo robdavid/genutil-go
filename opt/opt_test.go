@@ -1,5 +1,3 @@
-//go:build !goexperiment.jsonv2
-
 package opt_test
 
 import (
@@ -460,6 +458,39 @@ func ExampleRef_Try() {
 	// Output:
 	// 123
 	// error in opt.Ref[int]: optional value not present
+}
+
+func ExampleVal_TryOr() {
+	defer handler.Handle(func(err error) {
+		fmt.Println(err.Error())
+	})
+
+	var empty opt.Val[int]
+	var present opt.Val[int] = opt.Value(123)
+
+	fmt.Println(present.TryOr(fmt.Errorf("not expecting this error")))
+	fmt.Println(empty.TryOr(fmt.Errorf("empty value encountered")))
+
+	// Output:
+	// 123
+	// empty value encountered
+}
+
+func ExampleRef_TryOr() {
+	defer handler.Handle(func(err error) {
+		fmt.Println(err.Error())
+	})
+
+	var empty opt.Ref[int]
+	var x int = 123
+	var present opt.Ref[int] = opt.Reference(&x)
+
+	fmt.Println(present.TryOr(fmt.Errorf("not expecting this error")))
+	fmt.Println(empty.TryOr(fmt.Errorf("empty value encountered")))
+
+	// Output:
+	// 123
+	// empty value encountered
 }
 
 func ExampleVal_TryRefOr() {
