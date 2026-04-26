@@ -31,6 +31,10 @@ func EmptyRef[T any]() Ref[T] {
 	return Ref[T]{opt.EmptyRef[T]()}
 }
 
+func Equal[T comparable](o1 Option[T], o2 Option[T]) bool {
+	return opt.Equal(o1, o2)
+}
+
 func (v *Val[T]) UnmarshalYAML(node *yaml.Node) error {
 	var value T
 	if err := node.Decode(&value); err != nil {

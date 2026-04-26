@@ -12,6 +12,8 @@ import (
 var ErrOptionIsEmpty = errors.New("option is empty")
 
 // A container for a value that might be empty
+//
+// Deprecated: use the Val or Ref types in the opt package.
 type Option[T any] struct {
 	value    T
 	nonEmpty bool

@@ -117,7 +117,7 @@ type Ref[T any] struct {
 	reference *T
 }
 
-// Value creates an [Val][T] instance from a value of type T.
+// Value creates a [Val][T] instance from a value of type T.
 func Value[T any](obj T) Val[T] {
 	return Val[T]{value: obj, nonEmpty: true}
 }

@@ -48,13 +48,16 @@ The library falls into a number of categories, subdivided into separate packages
     - [Predicate functions](#predicate-functions)
     - [Transformations](#transformations)
   - [Range functions](#range-functions)
-- [Option type](#option-type)
+- [Null safe values](#null-safe-values)
   - [Usage](#usage)
-  - [Zero value](#zero-value)
+  - [Accessing the Wrapped Value](#accessing-the-wrapped-value)
+  - [Zero Value](#zero-value)
   - [Comparisons](#comparisons)
   - [Mutations](#mutations)
-  - [Marshalling and Unmarshalling](#marshalling-and-unmarshalling)
-    - [Unmarshalling](#unmarshalling)
+  - [Marshalling and Unmarshaling](#marshalling-and-unmarshaling)
+    - [Marshalling](#marshalling)
+    - [Unmarshaling](#unmarshaling)
+    - [YAML parser v3](#yaml-parser-v3)
 
 ## Tuple
 
@@ -914,135 +917,155 @@ As well as `ParRange` there are parallel range functions for each of the non-par
 * `ParRangeBy`
 * `ParIncRangeBy`
 
-## Option type
+## Null safe values
 
-Option types are used to hold "nullable" values whilst providing a greater degree of null safety than simple pointers. An option either holds a value (referred to as non-empty) or holds nothing (an empty option). Option types avoid potential additional heap allocation by avoiding the use of a pointer; they are implemented as an underlying value plus a boolean flag. They are particularly useful for representing nullable basic types.
+The opt package is intended to bring some null safety to Go. The idiomatic
+approach to values that might be missing (i.e. nullable values) is to use a
+pointer to that value, with a nil pointer indicating the value is absent. This
+tends to overload two concerns, i.e. using pointers to implement access by
+reference, and also to indicate the possibility of missing values. This package
+tries to separate these concerns.
+
+The core concepts are two concrete types, `opt.Val[T]` and `opt.Ref[T]`, both
+implementing the Option interface:
+
+  - `opt.Val[T]`: A value wrapper that holds a concrete value of type T, and a boolean
+    flag to indicate a value is present (non-empty). Best suited for simple,
+    non-reference data types like int, string, etc.
+  - `opt.Ref[T]`: A reference wrapper that holds a pointer to a value of type T, which
+    when nil indicates the value is not present (empty). Used when the underlying
+    type is expensive to copy or access by reference is desired, e.g. for mutability.
+
+The package provides utility functions such as `opt.Value`(v) and
+`opt.Empty[T]`() to create instances of `opt.Val[T]`, and opt.Reference(&v) and
+`opt.EmptyRef[T]`() to create instances of `opt.Ref[T]`.
 
 ### Usage
 
-A simple option value can be created with the `Value` function.
+To use the option types, first determine if you need a simple value wrapper
+(`opt.Val[T]`) or a reference wrapper (`opt.Ref[T]`), and then use the
+appropriate factory function:
 
-```go
-optInt := option.Value(10) // optInt is a non-empty option.Option[int] type
-```
+	func Example() {
+	    // Simple value (e.g., int)
+	    valInt := opt.Value(123)   // Non-empty opt.Val[int]
+	    var emptyInt opt.Option[int] = opt.Empty[int]() // Empty opt.Val[int]
 
-This creates a "non-empty" option holding an `int` value. Options implement the `Stringer` interface, so they can be printed directly.
+	    // Referenced struct (requires address of the struct)
+	    type MyStruct struct { Name string; Count int }
+	    myInstance := MyStruct{}
+	    structRef := opt.Reference(&myInstance) // Non-empty opt.Ref[MyStruct]
+	    var emptyStructRef opt.Ref[MyStruct] = opt.EmptyRef[MyStruct]() // Empty opt.Ref[MyStruct]
 
-```go
-message := fmt.Sprintf("Hello %s", option.Value("world")) // message == "Hello world"
-```
+	}
 
-However, the underlying value cannot be accessed directly but only via access methods. This is to encourage the programmer to give adequate attention to the empty case. The `Get` method will return the value of a non-empty option but it will panic if the option is empty. The `IsEmpty` method can be used to detect the empty case. Consider the following function adding a number to an option.Option[int].
+### Accessing the Wrapped Value
 
-```go
-func optAdd(o option.Option[int], n int) option.Option[int] {
-  if o.IsEmpty() {
-    return option.Empty[int]()
-  } else {
-    return option.Value(o.Get() + n)
-  }
-}
-```
+There are a number of methods by which the underlying value may be accessed,
+like `opt.Option.Get`, `opt.Option.Ref`, `opt.Option.GetOK` or `opt.Option.Try`
+and others, and also methods to check if the value is there to be accessed, like
+`opt.Option.IsEmpty` or `opt.Option.HasValue`. The general concept in each case
+is that in order to access the value, it must be accessed through one or other
+of these methods. This hopefully forces the programmer to give some thought as
+to how to handle the absent value case.
 
-The function is using `IsEmpty` to validate the option is non-empty before attempting to access the value with `Get`. It returns an option as a result as it may return no value if there is no value in the option supplied. If a value is supplied, an option is returned with result of the addition. This kind of pattern is actually quite common and the option library has utility functions to perform this kind of option chaining. The effect of the above function can be achieved with the `Morph` method that applies a function to a non empty option.
+### Zero Value
 
-```go
-func optAdd(o option.Option[int], n int) option.Option[int] {
-  return o.Morph(func (x int) int { return x + n })
-}
-```
+The zero value for any option type (`opt.Val[T]` or `opt.Ref[T]`) is always
+empty, indicating no stored value was provided.
 
-An alternative approach, if the option is expected to be non-empty and is an error otherwise, is to access the value with a `Try` method.
-
-```go
-func optAdd(o option.Option[int], n int) (result int, err error) {
-  defer Catch(&err)
-  result = o.Try() + n
-  return
-}
-```
-
-Here the `Catch` function in the error handling package is used to ensure the function just returns an error value in response to an unexpectedly empty option rather than causing panics. The error returned will be `option.ErrOptionIsEmpty`. This kind of approach can be especially useful in functions that process a number of options which should not be empty. It is not recommended for options for which empty values are a non-exceptional condition due to the extra overhead of handling the error processing path.
-
-### Zero value
-
-The zero value of an option is empty. For example.
-
-```go
-var zero Option[int]
-fmt.Println(zero.IsEmpty()) // true
-```
+	func Example() {
+	    var zeroOpt opt.Val[int] // If Option is used as an alias for Val/Ref, this will be empty
+	    fmt.Println(zeroOpt.IsEmpty()) // true
+	}
 
 ### Comparisons
 
-Two options of the same type can be compared successfully with `==` provided the underlying types can be likewise compared. An empty option will always compare as not equal to a non-empty one.
+Two `opt.Val[T]` of the same underlying type can be compared successfully using
+==, provided the contained types also support comparison. An empty option will
+always compare as unequal to a non-empty one. Comparison with == on a `opt.Ref`
+instance will be comparing pointers rather than values.
+
+Two additional functions, `opt.Equal` and `opt.DeepEqual` are provided for value
+based comparison across both `opt.Val` and `opt.Ref` instances (or a mix of
+each).
 
 ### Mutations
 
-If you are wrapping a `struct` inside an option, there are methods that allow mutation in place, avoiding any need for wholesale copying of the struct data. The `Ensure` method will set a given option to non-empty, if it isn't already, and `Mutate` allows updates to be performed against a non-empty option value (against an empty option, it is a no-op). These together allows an empty option containing no data to be mutated to contain any desired values.
+The package provides methods like `opt.Ensure` and `opt.Mutate` which allow for
+in-place mutation, especially useful when wrapping large structs by reference
+(`opt.Ref[T]`). The `opt.Ensure` method will ensure the Option is non-empty by
+placing a zero value in the Option if it currently empty. The `opt.Mutate`
+method passes a pointer to the value to a user provided function that may then
+modify it.
 
 ```go
-type nv struct{ name, value string }
-opt := Empty[nv]()
-opt.Ensure().Mutate(func(n *nv) {
-  n.name = "name"
-  n.value = "value"
-})
+	func Example() {
+	    type nv struct{ name, value string }
+	    optEmpty := opt.Empty[nv]()
+	    // Mutates the underlying data structure in place.
+	    optEmpty.Ensure().Mutate(func(n *nv) {
+	        n.name = "new_name"
+	        n.value = "new_value"
+	    })
+	}
 ```
 
-### Marshalling and Unmarshalling
+### Marshalling and Unmarshaling
 
-Option types support marshalling and unmarshalling via the `encoding/json` or `gopkg.in/yaml.v2` packages. Note that `yaml.v3` is not yet supported. A non-empty option is marshalled as simply the value it contains in both JSON and YAML, e.g.
+Option types implement JSON and YAML marshaling interfaces. This allows them to
+be included in standard Go structures that are serialized or deserialized by
+external packages. Note that this behavior is consistent for both `opt.Val[T]`
+and `opt.Ref[T]`.
+
+#### Marshalling
+A non-empty option will be marshalled as its contained value in
+both JSON and YAML (assuming omitempty tag usage).
 
 ```go
-type testOptMarshall struct {
-  Name  Option[string] `json:"name,omitempty" yaml:"name,omitempty"`
-  Value Option[int]    `json:"value,omitempty" yaml:"value,omitempty"`
-}
+
+	type testOptMarshall struct {
+	    Name  opt.Val[string] `json:"name,omitempty" yaml:"name,omitempty"`
+	    Value opt.Val[int]    `json:"value,omitempty" yaml:"value,omitempty"`
+	}
+
+	func Example() {
+	    testData := testOptMarshall{
+	        Name:   opt.Value("a name"),
+	        Value:  opt.Value(123),
+	    }
+	    // Marshal this struct into JSON/YAML bytes...
+	}
 ```
+
+Empty options will be rendered as null in JSON, and omitted entirely if the
+omitempty tag is present when marshalling YAML. For the more recent JSON v2
+package in the standard library, omitzero can be used to omit empty values
+entirely from JSON output.
+
+#### Unmarshaling
+
+When unmarshaling data (JSON or YAML) to option types, keys that
+are missing or explicitly set to null will result in an empty option value.
 
 ```go
-testData := testOptMarshall{
-  Name:  Value("a name"),
-  Value: Value(123),
-}
-y := Try(json.Marshal(&testData))
-text := string(y) // "{\"name\":\"a name\",\"value\":123}"
+	func Example() {
+	    var unmarshalledData testOptMarshall
+	    // Unmarshal YAML containing null/missing fields into testOptMarshall
+	    yaml.Unmarshal([]byte("name: a name\nvalue: null"), &unmarshalledData)
+
+	    // Check the status of the fields:
+	    fmt.Println(unmarshalledData.Name.HasValue())  // true (was present)
+	    fmt.Println(unmarshalledData.Value.HasValue()) // false (was null/missing)
+	}
 ```
 
-Empty options are rendered as "null":
+#### YAML parser v3
 
-```go
-testData := testOptMarshall{
-  Name:  Value("a name"),
-  Value: Empty[int](),
-}
-y := Try(json.Marshal(&testData))
-text := string(y) // "{\"name\":\"a name\",\"value\":null}"
-```
+Support for "gopkg.in/yaml.v2" is available in the standard opt
+package, and is implemented without any explicit dependency on that library.
+Support for the more recent "gopkg.in/yaml.3" package is also available, but via
+the opt/yamlv3 package which pulls in the YAML library as a dependency. To use
+this version of opt use the following import statement:
 
-However, when rendering YAML, and the `omitempty` annotation is present, any empty values will be omitted:
-
-```go
-testData := testOptMarshall{
-  Name:  Value("a name"),
-  Value: Empty[int](),
-}
-y := Try(json.Marshal(&testData))
-text := string(y) // "name: a name\n"
-```
-
-This is unfortunately not true of JSON marshalling, due to limitations of the `json.Marshalling` interface.
-#### Unmarshalling
-
-When unmarshalling to option values, omitted keys and `null` values in JSON or YAML are unmarshalled as an empty option.
-
-Eg unmarshalling YAML:
-
-```go
-const input := "name: a name\n"
-var unmarshalledData testOptMarshall
-Try0(yaml.Unmarshall([]byte(input), &unmarshalledData))
-unmarshalled.Name.HasValue()  // true
-unmarshalled.Value.HasValue() // false
-```
+	import opt "github.com/robdavid/genutil-go/opt/yamlv3"
