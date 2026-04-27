@@ -7,7 +7,7 @@ reference, and also to indicate the possibility of missing values. This package
 tries to separate these concerns.
 
 The core concepts are two concrete types, [opt.Val][T] and [opt.Ref][T], both
-implementing the [Option] interface:
+implementing the [Opt] interface:
 
   - [opt.Val][T]: A value wrapper that holds a concrete value of type T, and a boolean
     flag to indicate a value is present (non-empty). Best suited for simple,
@@ -29,7 +29,7 @@ appropriate factory function:
 	func Example() {
 	    // Simple value (e.g., int)
 	    valInt := opt.Value(123)   // Non-empty opt.Val[int]
-	    var emptyInt opt.Option[int] = opt.Empty[int]() // Empty opt.Val[int]
+	    var emptyInt opt.Opt[int] = opt.Empty[int]() // Empty opt.Val[int]
 
 	    // Referenced struct (requires address of the struct)
 	    type MyStruct struct { Name string; Count int }
@@ -42,12 +42,12 @@ appropriate factory function:
 # Accessing the Wrapped Value
 
 There are a number of methods by which the underlying value may be accessed,
-like [opt.Option.Get], [opt.Option.Ref], [opt.Option.GetOK] or [opt.Option.Try]
+like [opt.Opt.Get], [opt.Opt.Ref], [opt.Opt.GetOK] or [opt.Opt.Try]
 and others, and also methods to check if the value is there to be accessed, like
-[opt.Option.IsEmpty] or [opt.Option.HasValue]. The general concept in each case
+[opt.Opt.IsEmpty] or [opt.Opt.HasValue]. The general concept in each case
 is that in order to access the value, it must be accessed through one or other
 of these methods. This hopefully forces the programmer to give some thought as
-to how to handle the absent value case.
+to how to handle the absent case.
 
 # Zero Value
 
@@ -55,7 +55,7 @@ The zero value for any option type ([opt.Val][T] or [opt.Ref][T]) is always
 empty, indicating no stored value was provided.
 
 	func Example() {
-	    var zeroOpt opt.Val[int] // If Option is used as an alias for Val/Ref, this will be empty
+	    var zeroOpt opt.Val[int]
 	    fmt.Println(zeroOpt.IsEmpty()) // true
 	}
 
@@ -73,11 +73,13 @@ each).
 # Mutations
 
 The package provides methods like [opt.Ensure] and [opt.Mutate] which allow for
-in-place mutation, especially useful when wrapping large structs by reference
-([opt.Ref][T]). The [opt.Ensure] method will ensure the Option is non-empty by
-placing a zero value in the Option if it currently empty. The [opt.Mutate]
-method passes a pointer to the value to a user provided function that may then
-modify it.
+in-place mutation of [opt.Ref] and [opt.Val] instances. Both methods always return the
+mutated version of the receiver. This facilitates fluid method
+chaining.
+
+The [opt.Ensure] method will ensure the option is non-empty by placing a zero
+value in the option if it currently empty. The [opt.Mutate] method passes a
+pointer to the value to a user provided function that may then modify it.
 
 	func Example() {
 	    type nv struct{ name, value string }

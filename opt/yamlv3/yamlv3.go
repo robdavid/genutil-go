@@ -5,7 +5,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Option[T any] = opt.Option[T]
+type Opt[T any] = opt.Opt[T]
+type MutOpt[T any] = opt.MutOpt[T]
 
 type Val[T any] struct {
 	opt.Val[T]
@@ -31,7 +32,7 @@ func EmptyRef[T any]() Ref[T] {
 	return Ref[T]{opt.EmptyRef[T]()}
 }
 
-func Equal[T comparable](o1 Option[T], o2 Option[T]) bool {
+func Equal[T comparable](o1 Opt[T], o2 Opt[T]) bool {
 	return opt.Equal(o1, o2)
 }
 

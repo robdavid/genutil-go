@@ -34,8 +34,8 @@ func TestOption(t *testing.T) {
 	intref := opt.Reference(&x)
 	assert.Equal(123, intval.Get())
 	assert.Equal(123, intref.Get())
-	optval := opt.Option[int](&intval)
-	optref := opt.Option[int](intref)
+	optval := opt.Opt[int](&intval)
+	optref := opt.Opt[int](intref)
 	assert.Equal(123, optval.Get())
 	assert.Equal(123, optref.Get())
 	*optref.Ref() = 456
@@ -226,9 +226,9 @@ func TestEqual(t *testing.T) {
 	ref2 := val2.AsRef()
 	assert.False(ref1 == ref2) // Pointers will not be equal
 	assert.True(opt.Equal(ref1, ref2))
-	assert.True(opt.Equal(&val1, &val2))
-	assert.True(opt.Equal(&val1, ref2))
-	assert.False(opt.Equal(&val1, &val3))
+	assert.True(opt.Equal(val1, val2))
+	assert.True(opt.Equal(val1, ref2))
+	assert.False(opt.Equal(val1, val3))
 }
 
 func TestDeepEqual(t *testing.T) {
@@ -250,9 +250,9 @@ func TestDeepEqual(t *testing.T) {
 		values: []int{4, 5, 6},
 	})
 	assert.False(val1.Ref() == val2.Ref())
-	assert.True(opt.DeepEqual(&val1, &val2))
-	assert.True(opt.DeepEqual(&val1, val2.AsRef()))
-	assert.False(opt.DeepEqual(&val1, &val3))
+	assert.True(opt.DeepEqual(val1, val2))
+	assert.True(opt.DeepEqual(val1, val2.AsRef()))
+	assert.False(opt.DeepEqual(val1, val3))
 }
 
 func TestString(t *testing.T) {
@@ -318,7 +318,7 @@ func TestMorph(t *testing.T) {
 	ur = r.MorphRef(upperRef)
 	assert.True(ur.IsEmpty())
 	uv = r.Morph(strings.ToUpper)
-	assert.True(ur.IsEmpty())
+	assert.True(uv.IsEmpty())
 
 	v = opt.Value("hello")
 	ur = v.MorphRef(upperRef)
@@ -550,10 +550,25 @@ func ExampleVal_Mutate() {
 		m.name = "two"
 		m.value = 2
 	})
-	fmt.Printf("%s: %d\n", v2.Ref().name, v2.Ref().value)
+	fmt.Printf("v: \"%s\", v2 \"%s\"\n", v, v2)
 
 	// Output:
-	// two: 2
+	// v: "{two 2}", v2 "{two 2}"
+}
+
+func ExampleVal_Mutate_vs_Ref() {
+	mutate := func(v1 opt.MutOpt[int], v2 opt.MutOpt[int]) {
+		v1.Mutate(func(x *int) { *x++ })
+		// Ref creates a defensive copy for Val[int]
+		// (Ref is not part of opt.MutOpt[T] and takes a non-pointer receiver)
+		*v2.Ref()++
+	}
+	v1 := opt.Value(1)
+	v2 := opt.Value(1)
+	mutate(&v1, &v2)
+	fmt.Printf("v1: %v, v2: %v\n", v1, v2)
+	// Output:
+	// v1: 2, v2: 1
 }
 
 func ExampleRef_Mutate() {
@@ -561,15 +576,30 @@ func ExampleRef_Mutate() {
 		name  string
 		value int
 	}
-	v := opt.EmptyRef[mystruct]()
+	v := opt.Reference(&mystruct{"one", 1})
 	v2 := v.Ensure().Mutate(func(m *mystruct) {
 		m.name = "two"
 		m.value = 2
 	})
-	fmt.Printf("%s: %d\n", v2.Ref().name, v2.Ref().value)
+	fmt.Printf("v: \"%s\", v2: \"%s\"\n", v, v2)
 
 	// Output:
-	// two: 2
+	// v: "{two 2}", v2: "{two 2}"
+}
+
+func ExampleRef_Mutate_vs_Ref() {
+	mutate := func(v1 opt.MutOpt[int], v2 opt.MutOpt[int]) {
+		v1.Mutate(func(x *int) { *x++ })
+		*v2.Ref()++
+	}
+	v1 := 1
+	v2 := 1
+	r1 := opt.Reference(&v1)
+	r2 := opt.Reference(&v2)
+	mutate(&r1, &r2)
+	fmt.Printf("v1: %v, v2: %v\n", r1, r2)
+	// Output:
+	// v1: 2, v2: 2
 }
 
 func ExampleVal_Ensure() {
