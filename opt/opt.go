@@ -25,6 +25,9 @@ type Option[T any] interface {
 	// is safe to access the underlying value directly, e.g. via [Get].
 	HasValue() bool
 
+	// IsRef returns true if the [Option] implementation is reference based.
+	IsRef() bool
+
 	// Get returns the option value if present. If empty, this function panics
 	// with an error containing [ErrOptionIsEmpty].
 	Get() T
@@ -65,33 +68,19 @@ type Option[T any] interface {
 	// the result of the provided function.
 	GetOrF(fallbackFn func() T) T
 
-	// Mutate applies an in place mutation function to an option's value. It is
-	// a no-op if the option is empty. The mutated option is returned.
-	Mutate(f func(*T)) Option[T]
-
-	// Ensure ensures that the option is non-empty. If it is already non-empty,
-	// it is a no-op. Otherwise, it is populated with the zero value. The
-	// mutated or original option is returned.
-	Ensure() Option[T]
-
-	// AsRef converts the underlying option implementation to a [Ref][T] and
-	// returns it. It's a no-op returning the receiver if the implementation is
-	// already a [Ref][T].
-	AsRef() Ref[T]
-
 	// Morph, inspired by the concept of [Endomorphism]:
 	// https://en.wikipedia.org/wiki/Endomorphism, maps an [Option] value. If
 	// non-empty, it applies f(T) and wraps the result in a [Val][T]. If empty,
 	// an empty [Val][T] is returned. Mapping to any type other than [Val][T]
 	// requires the use of the [Map]() function.
-	Morph(func(T) T) Val[T]
+	Morph(func(T) T) Option[T]
 
 	// MorphRef, inspired by the concept of [Endomorphism]:
 	// https://en.wikipedia.org/wiki/Endomorphism, maps a Option value. If
 	// non-empty, it applies f(*T) and wraps the resulting pointer in Ref[T]. If
 	// empty, an empty Ref[T] is returned. Mapping to any type other than [Ref][T]
 	// requires the use of the [Map]() function.
-	MorphRef(func(*T) *T) Ref[T]
+	MorphRef(func(*T) *T) Option[T]
 
 	// Then executes the supplied function if the Option is non-empty. It always
 	// returns the option instance it was called with.
@@ -100,6 +89,15 @@ type Option[T any] interface {
 	// Else executes the provided function if the Option is empty. It always
 	// returns the option instance it was called with.
 	Else(func()) Option[T]
+
+	// Mutate applies an in place mutation function to an option's value. It is
+	// a no-op if the option is empty. The mutated option is returned.
+	Mutate(f func(*T)) Option[T]
+
+	// Ensure ensures that the option is non-empty. If it is already non-empty,
+	// it is a no-op. Otherwise, it is populated with the zero value. The
+	// mutated or original option is returned.
+	Ensure() Option[T]
 }
 
 // Val is an [Option] implementation which consists of a member of type T, and a
@@ -147,6 +145,38 @@ func (r Ref[T]) error() error {
 	return fmt.Errorf("error in opt.Ref[%s]: %w", typ.Name(), ErrOptionIsEmpty)
 }
 
+// IsEmpty returns true if there is no value
+func (v Val[T]) IsEmpty() bool {
+	return !v.nonEmpty
+}
+
+// IsEmpty returns true if there is no value
+func (r Ref[T]) IsEmpty() bool {
+	return r.reference == nil
+}
+
+// HasValue returns true if there is a value, and it is safe to access the value
+// via functions such as [Val.Get].
+func (v Val[T]) HasValue() bool {
+	return v.nonEmpty
+}
+
+// HasValue returns true if there is a value, and it is safe to access the value
+// via functions such as [Ref.Get].
+func (r Ref[T]) HasValue() bool {
+	return r.reference != nil
+}
+
+// IsRef is always false for [Val] types
+func (Val[T]) IsRef() bool {
+	return false
+}
+
+// IsRef is always true for [Ref] types
+func (Ref[T]) IsRef() bool {
+	return true
+}
+
 // Get returns the underlying value if there is one, or else this function
 // panics with an error containing [ErrOptionIsEmpty].
 func (v Val[T]) Get() T {
@@ -167,12 +197,6 @@ func (r Ref[T]) Get() T {
 	}
 }
 
-// ToRef makes a copy of the value option and returns a reference to it. This is useful
-// for fluent method chaining.
-func (v Val[T]) ToRef() *Val[T] {
-	return &v
-}
-
 // AsRef converts the [Val][T] instance to a [Ref][T] that references the value held if present.
 // Otherwise it returns an empty [Ref][T].
 func (v *Val[T]) AsRef() Ref[T] {
@@ -183,9 +207,12 @@ func (v *Val[T]) AsRef() Ref[T] {
 	}
 }
 
-// AsRef converts the [Ref][T] instance to a [Ref][T] simply by returning the receiver.
-func (r Ref[T]) AsRef() Ref[T] {
-	return r
+func (r Ref[T]) AsVal() Val[T] {
+	if r.reference != nil {
+		return Value(*r.reference)
+	} else {
+		return Empty[T]()
+	}
 }
 
 // GetOK returns the underlying value and a true boolean if present. It returns
@@ -228,9 +255,9 @@ func (r Ref[T]) GetOr(fallback T) T {
 	}
 }
 
-// Ref returns a pointer to the underlying value if present. If the option is empty,
-// it panics with an error containing [ErrOptionIsEmpty].
-func (v *Val[T]) Ref() *T {
+// Ref returns a pointer to a copy of the underlying value if present. If the
+// option is empty, it panics with an error containing [ErrOptionIsEmpty].
+func (v Val[T]) Ref() *T {
 	if !v.nonEmpty {
 		panic(v.error())
 	} else {
@@ -248,9 +275,9 @@ func (r Ref[T]) Ref() *T {
 	}
 }
 
-// RefOr returns a pointer to the value stored in the Val option if it exists,
-// otherwise returns the fallback pointer.
-func (v *Val[T]) RefOr(fallback *T) *T {
+// RefOr returns a pointer to a copy of the underlying value if present. If empty it
+// returns the fallback pointer.
+func (v Val[T]) RefOr(fallback *T) *T {
 	if !v.nonEmpty {
 		return fallback
 	} else {
@@ -406,32 +433,10 @@ func (r Ref[T]) String() string {
 	}
 }
 
-// IsEmpty returns true if there is no value
-func (v Val[T]) IsEmpty() bool {
-	return !v.nonEmpty
-}
-
-// IsEmpty returns true if there is no value
-func (r Ref[T]) IsEmpty() bool {
-	return r.reference == nil
-}
-
-// HasValue returns true if there is a value, and it is safe to access the value
-// via functions such as [Val.Get].
-func (v Val[T]) HasValue() bool {
-	return v.nonEmpty
-}
-
-// HasValue returns true if there is a value, and it is safe to access the value
-// via functions such as [Ref.Get].
-func (r Ref[T]) HasValue() bool {
-	return r.reference != nil
-}
-
-// Mutate applies function f to a reference to the underlying value if present.
-// The function may alter the value via this pointer. If there is no value
-// present, the method is a no-op.
-func (v *Val[T]) Mutate(f func(*T)) Option[T] {
+// Mutate applies function f to a reference to a copy of the underlying value if present,
+// returning a modified [Val][T] object. If there is no value
+// present, the method is a no-op and the receiver is returned.
+func (v Val[T]) Mutate(f func(*T)) Option[T] {
 	if v.nonEmpty {
 		f(&v.value)
 	}
@@ -440,7 +445,7 @@ func (v *Val[T]) Mutate(f func(*T)) Option[T] {
 
 // Mutate applies function f to a reference to the underlying value if present.
 // The function may alter the value via this pointer. If there is no value
-// present, the method is a no-op.
+// present, the method is a no-op. The receiver is always returned.
 func (r Ref[T]) Mutate(f func(*T)) Option[T] {
 	if r.reference != nil {
 		f(r.reference)
@@ -449,13 +454,11 @@ func (r Ref[T]) Mutate(f func(*T)) Option[T] {
 }
 
 // Ensure ensures that the option is non-empty. If it is already non-empty, it
-// is a no-op. Otherwise, it is mutated to be populated with the zero value. The
-// mutated or original option is returned.
-func (v *Val[T]) Ensure() Option[T] {
+// returns the receiver. Otherwise, a new empty Val[T] is returned.
+func (v Val[T]) Ensure() Option[T] {
 	if !v.nonEmpty {
 		var zero T
-		v.value = zero
-		v.nonEmpty = true
+		return Value(zero)
 	}
 	return v
 }
@@ -474,7 +477,7 @@ func (r Ref[T]) Ensure() Option[T] {
 // Morph transforms the underlying value, if present, by means of the supplied
 // function f. If non-empty, the function is applied to the value, and the
 // result is wrapped in a [Val][T]. If empty, an empty Val[T] is returned.
-func (v Val[T]) Morph(f func(T) T) Val[T] {
+func (v Val[T]) Morph(f func(T) T) Option[T] {
 	if v.nonEmpty {
 		return Value(f(v.value))
 	} else {
@@ -485,9 +488,22 @@ func (v Val[T]) Morph(f func(T) T) Val[T] {
 // Morph transforms the underlying value, if present, by means of the supplied
 // function f. If non-empty, it applies f to the pointer and wraps the result in
 // a [Ref][T]. If empty, an empty Ref[T] is returned.
-func (r Ref[T]) Morph(f func(T) T) Val[T] {
+func (r Ref[T]) Morph(f func(T) T) Option[T] {
 	if r.reference != nil {
-		return Value(f(*r.reference))
+		value := f(*r.reference)
+		return Reference(&value)
+	} else {
+		return EmptyRef[T]()
+	}
+}
+
+// MorphRef transforms the underlying value, if present, by means of the
+// supplied function f. If non-empty, a reference to a copy of it is passed to
+// the function, and the resulting pointer is wrapped in a [Val][T]. If empty,
+// an empty [Val][T] is returned. The receiver is not modified.
+func (v Val[T]) MorphRef(f func(*T) *T) Option[T] {
+	if v.nonEmpty {
+		return Value(*f(&v.value))
 	} else {
 		return Empty[T]()
 	}
@@ -497,19 +513,7 @@ func (r Ref[T]) Morph(f func(T) T) Val[T] {
 // supplied function f. If non-empty, a reference to it is passed to the
 // function, and the resulting pointer is wrapped in a [Ref][T]. If empty, an
 // empty [Ref][T] is returned.
-func (v *Val[T]) MorphRef(f func(*T) *T) Ref[T] {
-	if v.nonEmpty {
-		return Reference(f(&v.value))
-	} else {
-		return EmptyRef[T]()
-	}
-}
-
-// MorphRef transforms the underlying value, if present, by means of the
-// supplied function f. If non-empty, a reference to it is passed to the
-// function, and the resulting pointer is wrapped in a [Ref][T]. If empty, an
-// empty [Ref][T] is returned.
-func (r Ref[T]) MorphRef(f func(*T) *T) Ref[T] {
+func (r Ref[T]) MorphRef(f func(*T) *T) Option[T] {
 	if r.reference != nil {
 		return Reference(f(r.reference))
 	} else {
@@ -576,9 +580,9 @@ func (r Ref[T]) ThenRef(f func(*T)) Option[T] {
 // as an [Option][U] and returned. Otherwise, an empty option is returned.
 func Map[T, U any](o Option[T], f func(T) U) Option[U] {
 	if val, ok := o.GetOK(); !ok {
-		return Empty[U]().ToRef()
+		return Empty[U]()
 	} else {
-		return Value(f(val)).ToRef()
+		return Value(f(val))
 	}
 }
 
@@ -735,7 +739,7 @@ func (r Ref[T]) MarshalYAML() (any, error) {
 // https://pkg.go.dev/gopkg.in/yaml.v2 YAML parser. Input is unmarshaled
 // into the underlying value, and the [Ref] will always be non-empty, unless
 // an error occurs during parsing.
-func (r *Ref[T]) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (r *Ref[T]) UnmarshalYAML(unmarshal func(any) error) error {
 	r.reference = new(T)
 	if err := unmarshal(r.reference); err != nil {
 		return err

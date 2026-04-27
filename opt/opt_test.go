@@ -42,7 +42,7 @@ func TestOption(t *testing.T) {
 	assert.Equal(456, x)
 	assert.Equal(123, intval.Get())
 	*optval.Ref() = 456
-	assert.Equal(456, intval.Get())
+	assert.Equal(123, intval.Get())
 }
 
 func TestGet(t *testing.T) {
@@ -128,7 +128,7 @@ func TestRef(t *testing.T) {
 	ref := valWithValue.Ref()
 	assert.Equal(123, *ref)
 	*ref = 789 // Modify the reference
-	assert.Equal(789, valWithValue.Get())
+	assert.Equal(123, valWithValue.Get())
 
 	// Test Val[T].Ref() without a value (should panic)
 	var emptyVal opt.Val[int]
