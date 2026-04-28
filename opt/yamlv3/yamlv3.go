@@ -1,7 +1,5 @@
-// Package yamlv3 provides specialized wrapper types for opt.Opt[T] to ensure
-// compatibility and seamless integration when working with gopkg.in/yaml.v3,
-// without needing direct dependencies on the 'opt' package internals.
-
+// Package yamlv3 provides specialized wrapper types for opt.Opt[T] which can be
+// used with gopkg.in/yaml.v3 for marshaling and unmarshaling.
 package yamlv3
 
 import (
