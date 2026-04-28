@@ -135,9 +135,6 @@ are missing or explicitly set to null will result in an empty option value.
 YAML parser v3: Support for "gopkg.in/yaml.v2" is available in the standard opt
 package, and is implemented without any explicit dependency on that library.
 Support for the more recent "gopkg.in/yaml.3" package is also available, but via
-the opt/yamlv3 package which pulls in the YAML library as a dependency. To use
-this version of opt use the following import statement:
-
-	import opt "github.com/robdavid/genutil-go/opt/yamlv3"
+the opt/yamlv3 package which pulls in the YAML library as a dependency.
 */
 package opt
