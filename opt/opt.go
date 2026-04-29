@@ -91,8 +91,13 @@ type Opt[T any] interface {
 	Else(func()) Opt[T]
 }
 
-// MutOpt is an extension of [Opt] which provides methods for mutation of
-// option values. [MutOpt][T] is implemented by *[Val][T] and *[Ref][T].
+// MutOpt is an extension of [Opt] which provides methods for mutation of option
+// values. [MutOpt][T] is implemented by *[Val][T] and *[Ref][T]. Methods in
+// this interface (that is, excluding those in [Opt]) are able to mutate the
+// underlying value held by the option wrapper ([Val] or [Ref]). Methods in
+// [Opt], by contrast, may or may not be able to obtain a reference to the
+// underlying value depending on which option type is being used. In the case of
+// [Val] instances, only a reference to a copy of the data can be obtained.
 type MutOpt[T any] interface {
 	Opt[T]
 
