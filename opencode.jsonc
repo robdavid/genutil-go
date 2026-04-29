@@ -10,6 +10,9 @@
       "models": {
         "google/gemma-4-e4b": {
           "name": "Gemma 4 E4B (local)"
+        },
+        "qwen/qwen3.6-27b": {
+          "name": "Qwen3.6 27B (local)"
         }
       }
     }

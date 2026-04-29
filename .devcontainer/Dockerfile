@@ -9,4 +9,8 @@ ENV LANG=en_GB.UTF-8
 ENV STARSHIP_CONFIG=/etc/starship.toml
 COPY assets/starship.toml /etc/starship.toml
 COPY assets/starship.sh /usr/local/bin/star.sh
+RUN apt update -y && apt upgrade -y
+RUN apt install -y npm
+RUN npm install -g opencode-ai
+
 
