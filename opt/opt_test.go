@@ -526,6 +526,69 @@ func ExampleRef_TryRefOr() {
 	// empty value encountered
 }
 
+func ExampleVal_Morph_chaining() {
+	times2 := func(x int) int { return x * 2 }
+	v := opt.Value(6)
+	v2 := v.Morph(times2).Morph(times2)
+	fmt.Println(v, v2)
+
+	// Output:
+	// 6 24
+}
+
+func ExampleRef_Morph_chaining() {
+	times2 := func(x int) int { return x * 2 }
+	x := 6
+	r := opt.Reference(&x)
+	r2 := r.Morph(times2).Morph(times2)
+	fmt.Println(x, r, r2)
+
+	// Output:
+	// 6 6 24
+}
+
+func ExampleVal_MorphRef_chaining() {
+	times2ref := func(x *int) *int { newval := *x * 2; return &newval }
+	v := opt.Value(6)
+	v2 := v.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(v, v2)
+
+	// Output:
+	// 6 24
+}
+
+func ExampleVal_MorphRef_chaining_mutation() {
+	times2ref := func(x *int) *int { *x *= 2; return x }
+	v := opt.Value(6)
+	v2 := v.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(v, v2)
+
+	// Output:
+	// 6 24
+}
+
+func ExampleRef_MorphRef_chaining() {
+	times2ref := func(x *int) *int { newval := *x * 2; return &newval }
+	x := 6
+	r := opt.Reference(&x)
+	r2 := r.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(x, r, r2)
+
+	// Output:
+	// 6 6 24
+}
+
+func ExampleRef_MorphRef_chaining_mutation() {
+	times2ref := func(x *int) *int { *x *= 2; return x }
+	x := 6
+	r := opt.Reference(&x)
+	r2 := r.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(x, r, r2)
+
+	// Output:
+	// 24 24 24
+}
+
 func ExampleVal_AsRef() {
 	value := opt.Value(123)
 	fmt.Println(value.Get())
@@ -632,4 +695,65 @@ func ExampleRef_Ensure() {
 
 	// Output:
 	// two: 2
+}
+
+func ExampleVal_Set() {
+	v := opt.Value(123)
+	fmt.Println(v)
+	v1 := v.Set(456)
+	fmt.Println(v, v1)
+
+	// Output:
+	// 123
+	// 456 456
+}
+
+func ExampleVal_Set_chaining() {
+	v := opt.Value(123)
+	fmt.Println(v)
+	v1 := v.Set(456).Set(789)
+	fmt.Println(v, v1)
+
+	// Output:
+	// 123
+	// 789 789
+}
+
+func ExampleRef_Set() {
+	x := 123
+	r := opt.Reference(&x)
+	fmt.Println(r)
+	r1 := r.Set(456)
+	fmt.Println(x, r, r1)
+
+	// Output:
+	// 123
+	// 456 456 456
+}
+
+func ExampleRef_SetRef() {
+	x := 123
+	y := 456
+	r := opt.Reference(&x)
+	fmt.Println(r)
+	r1 := r.SetRef(&y)
+	fmt.Println(x, y, r, r1)
+	fmt.Println(r.Ref() == r1.Ref(), r.Ref() == &y)
+
+	// Output:
+	// 123
+	// 123 456 456 456
+	// true true
+}
+
+func ExampleRef_Set_chaining() {
+	x := 123
+	r := opt.Reference(&x)
+	fmt.Println(r)
+	r1 := r.Set(456).Set(789)
+	fmt.Println(x, r, r1)
+
+	// Output:
+	// 123
+	// 789 789 789
 }

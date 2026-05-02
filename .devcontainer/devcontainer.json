@@ -1,5 +1,8 @@
 {
     "build": { "dockerfile": "Dockerfile" },
+        "features": {
+        "ghcr.io/devcontainer-community/devcontainer-features/starship.rs:1":{}
+    },
     "customizations": {
         "vscode": {
             "extensions": [
@@ -12,8 +15,12 @@
         }
     },
     "runArgs": ["--network=host"],
+    "initializeCommand": "mkdir -p $HOME/.config/opencode",
     "postCreateCommand": "echo 'eval $(starship init bash)' >> /home/vscode/.bashrc",
     "features": {
         "ghcr.io/devcontainer-community/devcontainer-features/starship.rs:1":{}
-    }
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.config/opencode,target=/home/vscode/.config/opencode,type=bind,consistency=cached"
+    ]
 }

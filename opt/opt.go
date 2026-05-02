@@ -109,6 +109,26 @@ type MutOpt[T any] interface {
 	// it is a no-op. Otherwise, it is populated with the zero value. The
 	// mutated or original option is returned.
 	Ensure() MutOpt[T]
+
+	// Set sets the underlying value, mutating the option. It will cause the
+	// option to become non-empty, if it isn't already. The mutated option is
+	// returned.
+	Set(value T) MutOpt[T]
+
+	// SetRef sets the underlying value by reference, mutating the option. For a
+	// [Val], the underlying value is set by copying the value pointed to by
+	// reference, unless reference is nil. For a [Ref] the underlying reference
+	// becomes the one provided. If reference is nil, the option becomes empty,
+	// otherwise it becomes non-empty. The mutated option is returned.
+	SetRef(reference *T) MutOpt[T]
+
+	// Causes the option to become empty, if it isn't already, mutating it. The
+	// mutated option is returned.
+	Unset() MutOpt[T]
+
+	// SetFrom mutates the option to copy the value or reference from an [Opt][T] in opt. If opt is
+	// empty, the resulting option will be empty.
+	SetFrom(opt Opt[T]) MutOpt[T]
 }
 
 // Val is an [Opt] implementation which consists of a member of type T, and a
@@ -144,6 +164,22 @@ func Empty[T any]() Val[T] {
 // EmptyRef creates a [Ref][T] with no value.
 func EmptyRef[T any]() Ref[T] {
 	return Ref[T]{}
+}
+
+// ValFrom creates a [Val][T] from the value obtained from an [Opt][T]. If the
+// [Opt] is empty, the result will be empty.
+func ValFrom[T any](opt Opt[T]) Val[T] {
+	if v, ok := opt.GetOK(); ok {
+		return Value(v)
+	} else {
+		return Empty[T]()
+	}
+}
+
+// RefFrom creates a [Ref][T] from the reference obtained from an Opt[T]. If the
+// [Opt] is empty, the result will be empty.
+func RefFrom[T any](opt Opt[T]) Ref[T] {
+	return Reference(opt.RefOr(nil))
 }
 
 func (v *Val[T]) error() error {
@@ -482,6 +518,79 @@ func (r *Ref[T]) Ensure() MutOpt[T] {
 		var zero T
 		r.reference = &zero
 	}
+	return r
+}
+
+// Set sets the underlying value, mutating the option. It will cause the
+// option to become non-empty, if it isn't already. The mutated option is
+// returned.
+func (v *Val[T]) Set(value T) MutOpt[T] {
+	*v = Value(value)
+	return v
+}
+
+// Set sets the underlying value, mutating the option. It will cause the
+// option to become non-empty, if it isn't already. The mutated option is
+// returned.
+func (r *Ref[T]) Set(value T) MutOpt[T] {
+	if r.reference == nil {
+		r.reference = &value
+	} else {
+		*r.reference = value
+	}
+	return r
+}
+
+// Unset causes the option to become empty, if it isn't already, mutating it. The
+// mutated option is returned.
+func (v *Val[T]) Unset() MutOpt[T] {
+	*v = Empty[T]()
+	return v
+}
+
+// Unset causes the option to become empty, if it isn't already, mutating it. The
+// mutated option is returned.
+func (r *Ref[T]) Unset() MutOpt[T] {
+	r.reference = nil
+	return r
+}
+
+// SetRef sets the underlying value by reference, mutating the option. If
+// reference is nil, the option becomes empty. Otherwise the underlying value is
+// set by copying the value pointed to by reference, and the value becomes
+// non-empty. The mutated option is returned.
+func (v *Val[T]) SetRef(reference *T) MutOpt[T] {
+	if reference == nil {
+		*v = Empty[T]()
+	} else {
+		*v = Value(*reference)
+	}
+	return v
+}
+
+// SetRef sets the underlying value by reference, mutating the option. The
+// underlying reference becomes the one provided. If the option was empty, it
+// becomes non empty, unless reference is nil. The mutated option is returned.
+func (r *Ref[T]) SetRef(reference *T) MutOpt[T] {
+	r.reference = reference
+	return r
+}
+
+// SetFrom sets the underlying value from the value obtained from opt, mutating
+// the option. If opt is empty, the option will be empty.
+func (v *Val[T]) SetFrom(opt Opt[T]) MutOpt[T] {
+	if optv, ok := opt.GetOK(); ok {
+		*v = Value(optv)
+	} else {
+		*v = Empty[T]()
+	}
+	return v
+}
+
+// SetFrom sets the underlying reference from the reference obtained from opt,
+// mutating the option. If opt is empty, the option will be empty.
+func (r *Ref[T]) SetFrom(opt Opt[T]) MutOpt[T] {
+	r.reference = opt.RefOr(nil)
 	return r
 }
 

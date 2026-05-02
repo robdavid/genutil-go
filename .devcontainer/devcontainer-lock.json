@@ -1,0 +1,9 @@
+{
+  "features": {
+    "ghcr.io/devcontainer-community/devcontainer-features/starship.rs:1": {
+      "version": "1.0.4",
+      "resolved": "ghcr.io/devcontainer-community/devcontainer-features/starship.rs@sha256:27b4dfe2f04debaa32a6d76dd6e20e8239f6851c4f3259644f68f5242cd11589",
+      "integrity": "sha256:27b4dfe2f04debaa32a6d76dd6e20e8239f6851c4f3259644f68f5242cd11589"
+    }
+  }
+}
