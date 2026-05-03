@@ -126,8 +126,8 @@ type MutOpt[T any] interface {
 	// mutated option is returned.
 	Unset() MutOpt[T]
 
-	// SetFrom mutates the option to copy the value or reference from an [Opt][T] in opt. If opt is
-	// empty, the resulting option will be empty.
+	// SetFrom mutates the option to copy the value or reference from an
+	// [Opt][T] in opt. If opt is empty, the resulting option will be empty.
 	SetFrom(opt Opt[T]) MutOpt[T]
 }
 
@@ -254,6 +254,8 @@ func (v *Val[T]) AsRef() Ref[T] {
 	}
 }
 
+// AsVal converts the [Ref][T] instance to a [Val][T] that has the value referenced
+// by the receiver if present. Otherwise it returns an empty [Val][T].
 func (r Ref[T]) AsVal() Val[T] {
 	if r.reference != nil {
 		return Value(*r.reference)

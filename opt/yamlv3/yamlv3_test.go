@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/genutil-go/opt/yamlv3"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,37 @@ func TestOptionCompat(t *testing.T) {
 	option = ref
 	assert.True(opt.Equal(val, option))
 	assert.True(opt.Equal(val.OptVal, ref.OptRef))
+}
+
+func TestReferenceNil(t *testing.T) {
+	r := yamlv3.Reference[int](nil)
+	assert.True(t, r.IsEmpty())
+}
+
+func TestValFrom(t *testing.T) {
+	assert := assert.New(t)
+	v := yamlv3.Value(123)
+	v2 := yamlv3.ValFrom(v)
+	r := yamlv3.Reference(functions.Ref(456))
+	v3 := yamlv3.ValFrom(r)
+	e := yamlv3.Empty[int]()
+	v4 := yamlv3.ValFrom(e)
+	assert.Equal(123, v2.Get())
+	assert.Equal(456, v3.Get())
+	assert.True(v4.IsEmpty())
+}
+
+func TestRefFrom(t *testing.T) {
+	assert := assert.New(t)
+	v := yamlv3.Value(123)
+	r2 := yamlv3.RefFrom(v)
+	r := yamlv3.Reference(functions.Ref(456))
+	r3 := yamlv3.RefFrom(r)
+	e := yamlv3.EmptyRef[int]()
+	r4 := yamlv3.RefFrom(e)
+	assert.Equal(123, r2.Get())
+	assert.Equal(456, r3.Get())
+	assert.True(r4.IsEmpty())
 }
 
 func Example() {

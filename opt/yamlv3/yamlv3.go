@@ -53,6 +53,22 @@ func EmptyRef[T any]() Ref[T] {
 	return Ref[T]{opt.EmptyRef[T]()}
 }
 
+// ValFrom creates a [Val][T] from the value obtained from an [Opt][T]. If the
+// [Opt] is empty, the result will be empty.
+func ValFrom[T any](opt Opt[T]) Val[T] {
+	if v, ok := opt.GetOK(); ok {
+		return Value(v)
+	} else {
+		return Empty[T]()
+	}
+}
+
+// RefFrom creates a [Ref][T] from the reference obtained from an Opt[T]. If the
+// [Opt] is empty, the result will be empty.
+func RefFrom[T any](opt Opt[T]) Ref[T] {
+	return Reference(opt.RefOr(nil))
+}
+
 // UnmarshalYAML implements yaml.Unmarshaler for Val[T]. It decodes a YAML node
 // into the underlying type T and wraps it in a new Value wrapper instance.
 func (v *Val[T]) UnmarshalYAML(node *yaml.Node) error {
