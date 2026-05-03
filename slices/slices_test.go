@@ -8,7 +8,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/iterator"
-	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/opt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -199,16 +199,16 @@ func TestFilter(t *testing.T) {
 
 func TestFilterMap(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	sliceOut := FilterMapOpt(sliceIn, func(i int) option.Option[int] {
-		return functions.IfElse(i%2 == 0, option.Value(i*3), option.Empty[int]())
+	sliceOut := FilterMapOpt(sliceIn, func(i int) opt.Opt[int] {
+		return functions.IfElse(i%2 == 0, opt.Value(i*3), opt.Empty[int]())
 	})
 	assert.Equal(t, []int{6, 12, 18, 24}, sliceOut)
 }
 
 func TestFilterMapRefOpt(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	sliceOut := FilterMapRefOpt(sliceIn, func(i *int) option.Option[int] {
-		return functions.IfElse(*i%2 == 0, option.Value(*i*3), option.Empty[int]())
+	sliceOut := FilterMapRefOpt(sliceIn, func(i *int) opt.Opt[int] {
+		return functions.IfElse(*i%2 == 0, opt.Value(*i*3), opt.Empty[int]())
 	})
 	assert.Equal(t, []int{6, 12, 18, 24}, sliceOut)
 }

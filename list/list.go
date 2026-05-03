@@ -8,7 +8,7 @@ import (
 
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/iterator"
-	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/opt"
 )
 
 var ErrIndexError = errors.New("index out of bounds")
@@ -432,22 +432,22 @@ func (lst List[T]) Set(n int, value T) {
 // GetFirst returns the element at the head of the given list. If the list is
 // empty, an empty option is returned; otherwise it will hold the element's
 // value.
-func (lst List[T]) GetFirst() option.Option[T] {
+func (lst List[T]) GetFirst() opt.Val[T] {
 	if lst.inner == nil || lst.first == nil {
-		return option.Empty[T]()
+		return opt.Empty[T]()
 	} else {
-		return option.Value(lst.first.value)
+		return opt.Value(lst.first.value)
 	}
 }
 
 // GetLast returns the element at the end of the given list. If the list is
 // empty, an empty option is returned; otherwise it will hold the element's
 // value.
-func (lst List[T]) GetLast() option.Option[T] {
+func (lst List[T]) GetLast() opt.Val[T] {
 	if lst.inner == nil || lst.last == nil {
-		return option.Empty[T]()
+		return opt.Empty[T]()
 	} else {
-		return option.Value(lst.last.value)
+		return opt.Value(lst.last.value)
 	}
 }
 

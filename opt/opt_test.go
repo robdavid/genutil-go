@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/robdavid/genutil-go/errors/handler"
+	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/stretchr/testify/assert"
 )
@@ -43,6 +44,37 @@ func TestOption(t *testing.T) {
 	assert.Equal(123, intval.Get())
 	*optval.Ref() = 456
 	assert.Equal(123, intval.Get())
+}
+
+func TestReferenceNil(t *testing.T) {
+	r := opt.Reference[int](nil)
+	assert.True(t, r.IsEmpty())
+}
+
+func TestValFrom(t *testing.T) {
+	assert := assert.New(t)
+	v := opt.Value(123)
+	v2 := opt.ValFrom(v)
+	r := opt.Reference(functions.Ref(456))
+	v3 := opt.ValFrom(r)
+	e := opt.Empty[int]()
+	v4 := opt.ValFrom(e)
+	assert.Equal(123, v2.Get())
+	assert.Equal(456, v3.Get())
+	assert.True(v4.IsEmpty())
+}
+
+func TestRefFrom(t *testing.T) {
+	assert := assert.New(t)
+	v := opt.Value(123)
+	r2 := opt.RefFrom(v)
+	r := opt.Reference(functions.Ref(456))
+	r3 := opt.RefFrom(r)
+	e := opt.EmptyRef[int]()
+	r4 := opt.RefFrom(e)
+	assert.Equal(123, r2.Get())
+	assert.Equal(456, r3.Get())
+	assert.True(r4.IsEmpty())
 }
 
 func TestGet(t *testing.T) {
@@ -389,6 +421,18 @@ func TestThenRefElse(t *testing.T) {
 
 }
 
+func TestUnset(t *testing.T) {
+	assert := assert.New(t)
+	v := opt.Value(123)
+	assert.Equal(123, v.Get())
+	v.Unset()
+	assert.True(v.IsEmpty())
+	r := opt.Reference(functions.Ref(456))
+	assert.Equal(456, r.Get())
+	r.Unset()
+	assert.True(r.IsEmpty())
+}
+
 func TestMap(t *testing.T) {
 	assert := assert.New(t)
 
@@ -526,6 +570,69 @@ func ExampleRef_TryRefOr() {
 	// empty value encountered
 }
 
+func ExampleVal_Morph_chaining() {
+	times2 := func(x int) int { return x * 2 }
+	v := opt.Value(6)
+	v2 := v.Morph(times2).Morph(times2)
+	fmt.Println(v, v2)
+
+	// Output:
+	// 6 24
+}
+
+func ExampleRef_Morph_chaining() {
+	times2 := func(x int) int { return x * 2 }
+	x := 6
+	r := opt.Reference(&x)
+	r2 := r.Morph(times2).Morph(times2)
+	fmt.Println(x, r, r2)
+
+	// Output:
+	// 6 6 24
+}
+
+func ExampleVal_MorphRef_chaining() {
+	times2ref := func(x *int) *int { newval := *x * 2; return &newval }
+	v := opt.Value(6)
+	v2 := v.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(v, v2)
+
+	// Output:
+	// 6 24
+}
+
+func ExampleVal_MorphRef_chaining_mutation() {
+	times2ref := func(x *int) *int { *x *= 2; return x }
+	v := opt.Value(6)
+	v2 := v.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(v, v2)
+
+	// Output:
+	// 6 24
+}
+
+func ExampleRef_MorphRef_chaining() {
+	times2ref := func(x *int) *int { newval := *x * 2; return &newval }
+	x := 6
+	r := opt.Reference(&x)
+	r2 := r.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(x, r, r2)
+
+	// Output:
+	// 6 6 24
+}
+
+func ExampleRef_MorphRef_chaining_mutation() {
+	times2ref := func(x *int) *int { *x *= 2; return x }
+	x := 6
+	r := opt.Reference(&x)
+	r2 := r.MorphRef(times2ref).MorphRef(times2ref)
+	fmt.Println(x, r, r2)
+
+	// Output:
+	// 24 24 24
+}
+
 func ExampleVal_AsRef() {
 	value := opt.Value(123)
 	fmt.Println(value.Get())
@@ -537,7 +644,16 @@ func ExampleVal_AsRef() {
 	// Output:
 	// 123
 	// 456
+}
 
+func ExampleRef_AsVal() {
+	x := 123
+	ref := opt.Reference(&x)
+	value := ref.AsVal()
+	fmt.Println(value.Get(), value.Ref() == &x, ref.Ref() == &x)
+
+	// Output:
+	// 123 false true
 }
 
 func ExampleVal_Mutate() {
@@ -632,4 +748,124 @@ func ExampleRef_Ensure() {
 
 	// Output:
 	// two: 2
+}
+
+func ExampleVal_Set() {
+	v := opt.Value(123)
+	fmt.Println(v)
+	v1 := v.Set(456)
+	fmt.Println(v, v1)
+
+	// Output:
+	// 123
+	// 456 456
+}
+
+func ExampleVal_Set_chaining() {
+	v := opt.Value(123)
+	fmt.Println(v)
+	v1 := v.Set(456).Set(789)
+	fmt.Println(v, v1)
+
+	// Output:
+	// 123
+	// 789 789
+}
+
+func ExampleRef_Set() {
+	x := 123
+	r := opt.Reference(&x)
+	fmt.Println(r)
+	r1 := r.Set(456)
+	fmt.Println(x, r, r1)
+
+	// Output:
+	// 123
+	// 456 456 456
+}
+
+func ExampleRef_SetRef() {
+	x := 123
+	y := 456
+	r := opt.Reference(&x)
+	fmt.Println(r)
+	r1 := r.SetRef(&y)
+	fmt.Println(x, y, r, r1)
+	fmt.Println(r.Ref() == r1.Ref(), r.Ref() == &y)
+
+	// Output:
+	// 123
+	// 123 456 456 456
+	// true true
+}
+
+func ExampleVal_SetRef() {
+	y := 456
+	v := opt.Value(123)
+	fmt.Println(v)
+	v2 := v.SetRef(&y)
+	fmt.Println(v, v2)
+	fmt.Println(v.Ref() == v2.Ref(), v.Ref() == &y)
+
+	// Output:
+	// 123
+	// 456 456
+	// false false
+}
+
+func ExampleRef_Set_chaining() {
+	x := 123
+	r := opt.Reference(&x)
+	fmt.Println(r)
+	r1 := r.Set(456).Set(789)
+	fmt.Println(x, r, r1)
+
+	// Output:
+	// 123
+	// 789 789 789
+}
+
+func ExampleRef_SetFrom() {
+	x := 123
+	y := 456
+	r1 := opt.Reference(&x)
+	fmt.Println(r1)
+	r2 := opt.Reference(&y)
+	fmt.Println(r2)
+	r1.SetFrom(r2)
+	fmt.Println(r1, r2, r1.Ref() == r2.Ref(), r1.Ref() == &y)
+
+	// Output:
+	// 123
+	// 456
+	// 456 456 true true
+}
+
+func ExampleRef_SetFrom_nil() {
+	x := 123
+	r1 := opt.Reference(&x)
+	fmt.Println(r1)
+	r2 := opt.EmptyRef[int]()
+	fmt.Println(r2)
+	r1.SetFrom(r2)
+	fmt.Println(r1.IsEmpty(), r2.IsEmpty())
+
+	// Output:
+	// 123
+	//
+	// true true
+}
+
+func ExampleVal_SetFrom() {
+	v1 := opt.Value(123)
+	fmt.Println(v1)
+	v2 := opt.Value(456)
+	fmt.Println(v2)
+	v1.SetFrom(v2)
+	fmt.Println(v1, v2, v1.Ref() == v2.Ref())
+
+	// Output:
+	// 123
+	// 456
+	// 456 456 false
 }

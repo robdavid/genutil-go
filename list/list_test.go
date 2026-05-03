@@ -19,8 +19,8 @@ func TestNil(t *testing.T) {
 	assert.Empty(t, zero.RevIter().Collect())
 	assert.Empty(t, zero.IterNode().Collect())
 	assert.Empty(t, zero.RevIterNode().Collect())
-	assert.True(t, zero.GetFirst().ToRef().IsEmpty())
-	assert.True(t, zero.GetLast().ToRef().IsEmpty())
+	assert.True(t, zero.GetFirst().IsEmpty())
+	assert.True(t, zero.GetLast().IsEmpty())
 }
 
 func TestOf(t *testing.T) {

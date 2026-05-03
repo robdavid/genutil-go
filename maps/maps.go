@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/robdavid/genutil-go/iterator"
-	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/genutil-go/tuple"
 	"github.com/robdavid/genutil-go/types"
@@ -147,11 +147,11 @@ func DeletePath[K comparable](top map[K]any, path []K) (result any, ok bool, err
 // Get fetches an item out of a map, returning an Option whose
 // value is the value found for the key, or an empty Option if
 // no value is found.
-func Get[K comparable, V any](m map[K]V, k K) option.Option[V] {
+func Get[K comparable, V any](m map[K]V, k K) opt.Val[V] {
 	if v, ok := m[k]; ok {
-		return option.Value(v)
+		return opt.Value(v)
 	} else {
-		return option.Empty[V]()
+		return opt.Empty[V]()
 	}
 }
 
@@ -159,9 +159,13 @@ func Get[K comparable, V any](m map[K]V, k K) option.Option[V] {
 // type assertion on it to another type. If either the item was not found,
 // or is not of the correct type, an empty option is returned.
 // Otherwise the option contains the successfully obtained value.
-func GetAs[T any, K comparable, V any](m map[K]V, k K) option.Option[T] {
+func GetAs[T any, K comparable, V any](m map[K]V, k K) opt.Val[T] {
 	// return option.FlatMap[V,T](Get(m,k),types.As[T])
-	return option.FlatMap(Get(m, k), func(v V) option.Option[T] { return types.As[T](v) })
+	if v, ok := Get(m, k).GetOK(); ok {
+		return types.As[T](v)
+	} else {
+		return opt.Empty[T]()
+	}
 }
 
 // GetPath fetches a value from a (possibly) nested map of maps. It traverses a map
@@ -261,13 +265,13 @@ func AsFunc[K comparable, T any](m map[K]T) func(K) T {
 // against both key and value. The return value is an option that either contains a
 // 2-tuple of a matching key and value, or is empty. If there are multiple matching
 // key value pairs, then which of those are returned is indeterminate.
-func FindUsing[K comparable, T any](m map[K]T, p func(K, T) bool) option.Option[tuple.Tuple2[K, T]] {
+func FindUsing[K comparable, T any](m map[K]T, p func(K, T) bool) opt.Val[tuple.Tuple2[K, T]] {
 	for k, v := range m {
 		if p(k, v) {
-			return option.Value(tuple.Of2(k, v))
+			return opt.Value(tuple.Of2(k, v))
 		}
 	}
-	return option.Empty[tuple.Tuple2[K, T]]()
+	return opt.Empty[tuple.Tuple2[K, T]]()
 }
 
 // Finds a key value pair in a map which satisfies the predicate p which can match
@@ -275,13 +279,13 @@ func FindUsing[K comparable, T any](m map[K]T, p func(K, T) bool) option.Option[
 // by reference. The return value is an option that either contains a 2-tuple of
 // references to a matching key and value, or is empty. If there are multiple matching
 // key value pairs, then which of those are returned is indeterminate.
-func FindUsingRef[K comparable, T any](m map[K]T, p func(*K, *T) bool) option.Option[tuple.Tuple2[*K, *T]] {
+func FindUsingRef[K comparable, T any](m map[K]T, p func(*K, *T) bool) opt.Val[tuple.Tuple2[*K, *T]] {
 	for k, v := range m {
 		if p(&k, &v) {
-			return option.Value(tuple.Of2(&k, &v))
+			return opt.Value(tuple.Of2(&k, &v))
 		}
 	}
-	return option.Empty[tuple.Tuple2[*K, *T]]()
+	return opt.Empty[tuple.Tuple2[*K, *T]]()
 }
 
 // Returns an iterator over the keys of a map.
