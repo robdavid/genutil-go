@@ -5,7 +5,7 @@ import (
 
 	"github.com/robdavid/genutil-go/errors/result"
 	"github.com/robdavid/genutil-go/functions"
-	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/opt"
 )
 
 // funcNext is a function supporting a transforming operation by consuming
@@ -188,7 +188,7 @@ func FilterMap[T, U any](iter CoreIterator[T], mapping func(T) (U, bool)) Iterat
 // function mapping is applied to each element of type T, producing either an option
 // value of type U or an empty option. The result is an iterator over U drawn from
 // only the non-empty options returned.
-func FilterMapOpt[T any, U any](iter CoreIterator[T], mapping func(T) option.Option[U]) Iterator[U] {
+func FilterMapOpt[T any, U any](iter CoreIterator[T], mapping func(T) opt.Opt[U]) Iterator[U] {
 	filterMapNext := func(value T) (U, bool) {
 		return mapping(value).GetOK()
 	}
@@ -207,11 +207,11 @@ func FilterMap2[K, V, X, Y any](iter CoreIterator2[K, V], mapping func(K, V) (X,
 // FilterValues takes an iterator of results and returns an iterator of the underlying
 // result value type for only those results that have no error.
 func FilterValues[T any](iter CoreIterator[result.Result[T]]) Iterator[T] {
-	return FilterMapOpt(iter, func(res result.Result[T]) option.Option[T] {
+	return FilterMapOpt(iter, func(res result.Result[T]) opt.Opt[T] {
 		if res.IsError() {
-			return option.Empty[T]()
+			return opt.Empty[T]()
 		} else {
-			return option.Value(res.Get())
+			return opt.Value(res.Get())
 		}
 	})
 }

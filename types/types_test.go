@@ -23,6 +23,6 @@ func TestAsRef(t *testing.T) {
 	opt := AsRef[int](&n).Get()
 	assert.Equal(t, 123, opt)
 	assert.True(t, AsRef[int](i).IsEmpty())
-	i = AsRef[int](v).GetRef()
+	i = AsRef[int](v).Ref()
 	assert.Equal(t, 123, AsRef[int](i).Get())
 }

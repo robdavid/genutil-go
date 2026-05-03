@@ -10,7 +10,7 @@ import (
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/internal/rangehelper"
 	"github.com/robdavid/genutil-go/iterator"
-	"github.com/robdavid/genutil-go/option"
+	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/genutil-go/ordered"
 )
 
@@ -686,7 +686,7 @@ func FilterMap[T any, U any](s []T, f func(T) (U, bool)) (result []U) {
 // to each element in the slice of type T, and returns an Option value of type U. If the
 // option is non-empty, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMapOpt[T any, U any](s []T, f func(T) option.Option[U]) (result []U) {
+func FilterMapOpt[T any, U any](s []T, f func(T) opt.Opt[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for _, v := range s {
 		if o := f(v); o.HasValue() {
@@ -714,7 +714,7 @@ func FilterMapRef[T any, U any](s []T, f func(*T) (U, bool)) (result []U) {
 // to each element in the slice of type T, and returns an Option value of type U. If the option
 // is non-empty, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMapRefOpt[T any, U any](s []T, f func(*T) option.Option[U]) (result []U) {
+func FilterMapRefOpt[T any, U any](s []T, f func(*T) opt.Opt[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for i := range s {
 		if o := f(&s[i]); o.HasValue() {

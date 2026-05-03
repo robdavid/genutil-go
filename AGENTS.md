@@ -8,7 +8,8 @@ This repository contains advanced generic utilities for Go. An agent should trea
     *   Use `Try()` to execute an operation that returns a value/error tuple, stripping the error part and relying on panic recovery for failure.
     *   If error wrapping is needed, use `Handle` instead of `Catch`.
 *   **Slicing Mutability:** When using mutable iterators over slices (`slices.IterMut(&s)`), **you MUST pass a pointer to the slice**. Failing to do so may cause reallocation and invalidating the iterator's view of the data.
-*   **Option Type Safety:** Never call `.Get()` on an `option.Option` without first checking if it is non-empty using `.IsEmpty()`. This will result in a runtime panic. The preferred functional pattern for safe modification is using `.Morph()`.
+*   **Option Type Safety:** Never call `.Get()` on an `opt.Val`, `opt.Ref`, `opt.Opt` without first checking if it is non-empty using `.IsEmpty()`. This will result in a runtime panic. The preferred functional pattern for safe modification is using `.Morph()`.
+    *   `option.Option` is deprecated new code should not use it.
 
 ## ⚙️ Workflow & Technical Quirks
 ### Testing and Verification
