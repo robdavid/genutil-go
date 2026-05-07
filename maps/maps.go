@@ -1,6 +1,7 @@
 package maps
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 
@@ -234,7 +235,7 @@ func Items[K comparable, T any](m map[K]T) []tuple.Tuple2[K, T] {
 }
 
 // Returns keys and values as a slice of 2-tuples, sorted in key order
-func SortedItems[K slices.Sortable, T any](m map[K]T) []tuple.Tuple2[K, T] {
+func SortedItems[K cmp.Ordered, T any](m map[K]T) []tuple.Tuple2[K, T] {
 	result := Items(m)
 	slices.SortUsing(result, func(i1, i2 tuple.Tuple2[K, T]) bool { return i1.First < i2.First })
 	return result
@@ -242,7 +243,7 @@ func SortedItems[K slices.Sortable, T any](m map[K]T) []tuple.Tuple2[K, T] {
 
 // Returns the keys of a map as a slice. The keys are sorted in their
 // natural order, as defined by the < operator.
-func SortedKeys[K slices.Sortable, T any](m map[K]T) []K {
+func SortedKeys[K cmp.Ordered, T any](m map[K]T) []K {
 	keys := Keys(m)
 	slices.Sort(keys)
 	return keys
@@ -250,7 +251,7 @@ func SortedKeys[K slices.Sortable, T any](m map[K]T) []K {
 
 // Returns the values of a map as a slice, sorted in the order
 // of the associated key.
-func SortedValuesByKey[K slices.Sortable, T any](m map[K]T) []T {
+func SortedValuesByKey[K cmp.Ordered, T any](m map[K]T) []T {
 	return slices.Map(SortedKeys(m), AsFunc(m))
 }
 

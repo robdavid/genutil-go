@@ -1,9 +1,11 @@
 package slices
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"runtime"
+	stdslices "slices"
 	"sort"
 	"sync"
 
@@ -17,17 +19,62 @@ import (
 var ErrInvalidRange = errors.New("invalid range")
 var ErrInvalidNumCPU = errors.New("invalid number of CPUs")
 
-// Concatenates a list of list of items into a list of items
-func Concat[T any](ss ...[]T) (result []T) {
-	cap := Fold(ss, 0, func(a int, s []T) int { return a + len(s) })
-	result = make([]T, 0, cap)
-	for i := range ss {
-		result = append(result, ss[i]...)
-	}
-	return
+// Clone returns a copy of the slice.
+// The elements are copied using assignment, so this is a shallow clone.
+// The result may have additional unused capacity.
+// The result preserves the nilness of s.
+// This function is pulled through from the standard library
+func Clone[S ~[]E, E any](s S) S {
+	return stdslices.Clone(s)
 }
 
-func reverse[T any](from, to []T) {
+// BinarySearch searches for target in a sorted slice and returns the earliest
+// position where target is found, or the position where target would appear
+// in the sort order; it also returns a bool saying whether the target is
+// really found in the slice. The slice must be sorted in increasing order.
+// This function is pulled through from the standard library.
+func BinarySearch[S ~[]E, E cmp.Ordered](x S, target E) (int, bool) {
+	return stdslices.BinarySearch(x, target)
+}
+
+// BinarySearchUsing works like [BinarySearch], but uses a custom comparison
+// function. The slice must be sorted in increasing order, where "increasing"
+// is defined by cmp. cmp should return 0 if the slice element matches
+// the target, a negative number if the slice element precedes the target,
+// or a positive number if the slice element follows the target.
+// cmp must implement the same ordering as the slice, such that if
+// cmp(a, t) < 0 and cmp(b, t) >= 0, then a must precede b in the slice.
+// This function is pulled through from the standard library and renamed for
+// consistency.
+func BinarySearchUsing[S ~[]E, E, T any](x S, target T, cmp func(E, T) int) (int, bool) {
+	return stdslices.BinarySearchFunc(x, target, cmp)
+}
+
+// Concat concatenates a slice of slices of items into a new slice of items
+// This function is pulled through from the standard library.
+func Concat[S ~[]E, E any](slices ...S) S {
+	return stdslices.Concat(slices...)
+}
+
+// Affix concatenates a slice with a number of elements, creating a new slice.
+// This is similar to [append] but differs in that it always allocates a new
+// slice for the result.
+func Affix[S ~[]E, E any](slice S, items ...E) S {
+	return stdslices.Concat(slice, items)
+}
+
+// New creates a new slice with the given elements
+func New[T any](items ...T) []T {
+	return items
+}
+
+// New creates a new slice with the given elements, wrapping
+// the slice in explicit type S.
+func NewAs[S ~[]T, T any](items ...T) S {
+	return S(items)
+}
+
+func reverse[S ~[]T, T any](from, to S) {
 	len := len(from)
 	for i := 0; i < len/2; i++ {
 		to[i], to[len-1-i] = from[len-1-i], from[i]
@@ -45,7 +92,7 @@ ReverseI reverses the elements of s in place.
 	slices.Reverse(s)
 	s == []int{5,4,3,2,1} // true
 */
-func ReverseI[T any](s []T) {
+func ReverseI[S ~[]T, T any](s S) {
 	reverse(s, s)
 }
 
@@ -55,9 +102,9 @@ of f in reverse order. If f is nil, nil will be returned.
 
 	slices.Reverse([]int{1,2,3,4,5}) // []int{5,4,3,2,1}
 */
-func Reverse[T any](f []T) (t []T) {
+func Reverse[S ~[]T, T any](f S) (t S) {
 	if f != nil {
-		t = make([]T, len(f))
+		t = make(S, len(f))
 		reverse(f, t)
 	}
 	return
@@ -93,7 +140,7 @@ func parChunks[T any](slice []T, minPar int, maxCpu int) (slices [][]T) {
 	}
 }
 
-func sliceFill[T ordered.Real](start, aStep T, desc bool, slice []T) {
+func sliceFill[S ~[]T, T ordered.Real](start, aStep T, desc bool, slice S) {
 	v := start
 	if desc {
 		for i := range slice {
@@ -365,7 +412,7 @@ func ParIncRangeBy[T ordered.Real, S ordered.Real](start, end T, step S, parOpts
 
 // Returns true if predicate returns true for all elements in
 // slice.
-func All[T any](slice []T, predicate func(v T) bool) bool {
+func All[S ~[]T, T any](slice S, predicate func(v T) bool) bool {
 	for i := range slice {
 		if !predicate(slice[i]) {
 			return false
@@ -377,7 +424,7 @@ func All[T any](slice []T, predicate func(v T) bool) bool {
 // Returns true if predicate returns true for all the elements in
 // slice. This is a variation on All in which the predicate function
 // takes a pointer to the element.
-func AllRef[T any](slice []T, predicate func(v *T) bool) bool {
+func AllRef[S ~[]T, T any](slice S, predicate func(v *T) bool) bool {
 	for i := range slice {
 		if !predicate(&slice[i]) {
 			return false
@@ -387,7 +434,7 @@ func AllRef[T any](slice []T, predicate func(v *T) bool) bool {
 }
 
 // Generate a function equivalent to indexing slice, mapping indexes to values.
-func AsFunc[T any](slice []T) func(int) T {
+func AsFunc[S ~[]T, T any](slice S) func(int) T {
 	return func(i int) (v T) {
 		return slice[i]
 	}
@@ -395,7 +442,7 @@ func AsFunc[T any](slice []T) func(int) T {
 
 // Returns true if predicate returns true for at least one element in
 // slice.
-func Any[T any](slice []T, predicate func(v T) bool) bool {
+func Any[S ~[]T, T any](slice S, predicate func(v T) bool) bool {
 	for i := range slice {
 		if predicate(slice[i]) {
 			return true
@@ -407,7 +454,7 @@ func Any[T any](slice []T, predicate func(v T) bool) bool {
 // Returns true if predicate returns true for at least one element in
 // slice. This is a variation on Any in which the predicate function
 // takes a pointer to the element.
-func AnyRef[T any](slice []T, predicate func(v *T) bool) bool {
+func AnyRef[S ~[]T, T any](slice S, predicate func(v *T) bool) bool {
 	for i := range slice {
 		if predicate(&slice[i]) {
 			return true
@@ -417,7 +464,7 @@ func AnyRef[T any](slice []T, predicate func(v *T) bool) bool {
 }
 
 // Returns true if slice contains value
-func Contains[T comparable](slice []T, value T) bool {
+func Contains[S ~[]T, T comparable](slice S, value T) bool {
 	return Find(slice, value) != -1
 }
 
@@ -425,7 +472,7 @@ func Contains[T comparable](slice []T, value T) bool {
 // and contain the same elements in the same order. The nil slice
 // and the empty slice are regarded as equivalent and therefore
 // equal.
-func Equal[T comparable](left []T, right []T) bool {
+func Equal[S ~[]T, T comparable](left S, right S) bool {
 	var i int
 	if len(left) != len(right) {
 		return false
@@ -438,25 +485,12 @@ func Equal[T comparable](left []T, right []T) bool {
 	return true
 }
 
-// Types that have a well defined ordering, comparable with
-// `<` and `>` operators.
-type OrderComparable interface {
-	int | int8 | int16 | int32 | int64 |
-		uint | uint8 | uint16 | uint32 | uint64 |
-		float32 | float64
-}
-
 // Compare two slices of `OrderComparable` elements, most significant item first.
 // It will return a value less than 0 if the left slice is smaller than the right
 // slice, a value greater than 0 if the left slice is greater than the right slice,
 // and 0 if they are equal. The nil slice and the empty slice are regarded as equivalent,
 // and therefore equal.
-// Examples:
-//
-//	slices.Compare([]int{1,2},[]int{1,3}) < 0 // true
-//	slices.Compare([]int{1,3},[]int{1,3}) == 0 // true
-//	slices.Compare([]int{1,3,4},[]int{1,3}) > 0 // true
-func Compare[T OrderComparable](left []T, right []T) int {
+func Compare[S ~[]T, T cmp.Ordered](left S, right S) int {
 	var i int
 	lenR := len(right)
 	lenL := len(left)
@@ -477,13 +511,13 @@ func Compare[T OrderComparable](left []T, right []T) int {
 
 // Returns the smallest index in slice for which the element equals value, or -1
 // none do.
-func Find[T comparable](slice []T, value T) int {
+func Find[S ~[]T, T comparable](slice S, value T) int {
 	return FindFrom(0, slice, value)
 }
 
 // Returns the smallest index in slice, greater than or equal to start,
 // for which the element equals value, or -1 if none do.
-func FindFrom[T comparable](start int, slice []T, value T) int {
+func FindFrom[S ~[]T, T comparable](start int, slice S, value T) int {
 	for i := start; i < len(slice); i++ {
 		if slice[i] == value {
 			return i
@@ -494,7 +528,7 @@ func FindFrom[T comparable](start int, slice []T, value T) int {
 
 // Returns the smallest index in slice for which the element satisfies the predicate,
 // or -1 if none do.
-func FindUsing[T any](slice []T, predicate func(T) bool) int {
+func FindUsing[S ~[]T, T any](slice S, predicate func(T) bool) int {
 	return FindFromUsing(0, slice, predicate)
 }
 
@@ -502,13 +536,13 @@ func FindUsing[T any](slice []T, predicate func(T) bool) int {
 // or -1 if none do.
 // This is a variation on FindUsing where the element is passed to the predicate
 // by reference.
-func FindUsingRef[T any](slice []T, predicate func(*T) bool) int {
+func FindUsingRef[S ~[]T, T any](slice S, predicate func(*T) bool) int {
 	return FindFromUsingRef(0, slice, predicate)
 }
 
 // Returns the first index in slice greater than or equal to start,
 // for which the element satisfies predicate, or -1 if none do.
-func FindFromUsing[T any](start int, slice []T, predicate func(T) bool) int {
+func FindFromUsing[S ~[]T, T any](start int, slice S, predicate func(T) bool) int {
 	for i := start; i < len(slice); i++ {
 		if predicate(slice[i]) {
 			return i
@@ -587,7 +621,7 @@ func RFindUsingRef[T any](slice []T, predicate func(*T) bool) int {
 
 // Generates sliceOut from sliceIn, by applying function f to each element of
 // sliceIn.
-func Map[T any, U any](sliceIn []T, f func(T) U) (sliceOut []U) {
+func Map[S ~[]T, T any, U any](sliceIn S, f func(T) U) (sliceOut []U) {
 	sliceOut = make([]U, len(sliceIn))
 	for i := range sliceIn {
 		sliceOut[i] = f(sliceIn[i])
@@ -595,9 +629,13 @@ func Map[T any, U any](sliceIn []T, f func(T) U) (sliceOut []U) {
 	return
 }
 
+func MapAs[SO ~[]U, S ~[]T, T, U any](sliceIn S, f func(T) U) SO {
+	return SO(Map(sliceIn, f))
+}
+
 // Generates sliceOut from sliceIn, by applying function f to
 // the address of each element of sliceIn.
-func MapRef[T any, U any](sliceIn []T, f func(*T) U) (sliceOut []U) {
+func MapRef[S ~[]T, T any, U any](sliceIn S, f func(*T) U) (sliceOut []U) {
 	sliceOut = make([]U, len(sliceIn))
 	for i := range sliceIn {
 		sliceOut[i] = f(&sliceIn[i])
@@ -607,7 +645,7 @@ func MapRef[T any, U any](sliceIn []T, f func(*T) U) (sliceOut []U) {
 
 // Applies a mapping function to each element of a slice in place. The mapping function is
 // from type T to type T.
-func MapI[T any](slice []T, f func(T) T) {
+func MapI[S ~[]T, T any](slice S, f func(T) T) {
 	for i := range slice {
 		slice[i] = f(slice[i])
 	}
@@ -615,7 +653,7 @@ func MapI[T any](slice []T, f func(T) T) {
 
 // Applies a mapping function to each element of a slice in place. The mapping function is
 // from type T to type T, and each element is passed by reference.
-func MapRefI[T any](slice []T, f func(*T) T) {
+func MapRefI[S ~[]T, T any](slice S, f func(*T) T) {
 	for i := range slice {
 		slice[i] = f(&slice[i])
 	}
@@ -624,7 +662,7 @@ func MapRefI[T any](slice []T, f func(*T) T) {
 // Applies a function f to an accumulator, with initial value
 // a, and a slice element, returning a new accumulator, for each element
 // in the slice s. The final accumulator value is returned.
-func Fold[A any, T any](s []T, a A, f func(A, T) A) A {
+func Fold[S ~[]T, A any, T any](s S, a A, f func(A, T) A) A {
 	for i := range s {
 		a = f(a, s[i])
 	}
@@ -634,7 +672,7 @@ func Fold[A any, T any](s []T, a A, f func(A, T) A) A {
 // Applies a function f to a reference to an accumulator, with initial value a,
 // and a reference to slice element, mutating the accumulator, for every element in the
 // slice s. The final value of the accumulator is returned.
-func FoldRef[A any, T any](s []T, a A, f func(*A, *T)) A {
+func FoldRef[S ~[]T, A any, T any](s S, a A, f func(*A, *T)) A {
 	result := a
 	for i := range s {
 		f(&result, &s[i])
@@ -644,8 +682,8 @@ func FoldRef[A any, T any](s []T, a A, f func(*A, *T)) A {
 
 // Accept only the elements of s that satisfy the predicate function f,
 // returning a new slice containing those elements.
-func Filter[T any](s []T, f func(T) bool) (result []T) {
-	result = make([]T, 0, len(s))
+func Filter[S ~[]T, T any](s S, f func(T) bool) (result S) {
+	result = make(S, 0, len(s))
 	for _, v := range s {
 		if f(v) {
 			result = append(result, v)
@@ -658,8 +696,8 @@ func Filter[T any](s []T, f func(T) bool) (result []T) {
 // returning a new slice containing those elements. Similar to Filter()
 // except that the elements are passed to the predicate function by
 // reference.
-func FilterRef[T any](s []T, f func(*T) bool) (result []T) {
-	result = make([]T, 0, len(s))
+func FilterRef[S ~[]T, T any](s S, f func(*T) bool) (result S) {
+	result = make(S, 0, len(s))
 	for i := range s {
 		if f(&s[i]) {
 			result = append(result, s[i])
@@ -672,7 +710,7 @@ func FilterRef[T any](s []T, f func(*T) bool) (result []T) {
 // to each element in the slice of type T, and returns a value of type U and a boolean. If the
 // boolean is true, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMap[T any, U any](s []T, f func(T) (U, bool)) (result []U) {
+func FilterMap[S ~[]T, T any, U any](s S, f func(T) (U, bool)) (result []U) {
 	result = make([]U, 0, len(s))
 	for _, v := range s {
 		if o, ok := f(v); ok {
@@ -686,7 +724,7 @@ func FilterMap[T any, U any](s []T, f func(T) (U, bool)) (result []U) {
 // to each element in the slice of type T, and returns an Option value of type U. If the
 // option is non-empty, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMapOpt[T any, U any](s []T, f func(T) opt.Opt[U]) (result []U) {
+func FilterMapOpt[S ~[]T, T any, U any](s S, f func(T) opt.Opt[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for _, v := range s {
 		if o := f(v); o.HasValue() {
@@ -700,7 +738,7 @@ func FilterMapOpt[T any, U any](s []T, f func(T) opt.Opt[U]) (result []U) {
 // to each element in the slice of type T, and returns an Option value of type U. If the option
 // is non-empty, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMapRef[T any, U any](s []T, f func(*T) (U, bool)) (result []U) {
+func FilterMapRef[S ~[]T, T any, U any](s S, f func(*T) (U, bool)) (result []U) {
 	result = make([]U, 0, len(s))
 	for i := range s {
 		if o, ok := f(&s[i]); ok {
@@ -714,7 +752,7 @@ func FilterMapRef[T any, U any](s []T, f func(*T) (U, bool)) (result []U) {
 // to each element in the slice of type T, and returns an Option value of type U. If the option
 // is non-empty, the value of type U is appended to the result slice. Otherwise,
 // the element is skipped.
-func FilterMapRefOpt[T any, U any](s []T, f func(*T) opt.Opt[U]) (result []U) {
+func FilterMapRefOpt[S ~[]T, T any, U any](s S, f func(*T) opt.Opt[U]) (result []U) {
 	result = make([]U, 0, len(s))
 	for i := range s {
 		if o := f(&s[i]); o.HasValue() {
@@ -733,7 +771,7 @@ func FilterMapRefOpt[T any, U any](s []T, f func(*T) opt.Opt[U]) (result []U) {
 //	slice := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
 //	FilterI(&slice, func(i int) bool { return i%2 == 0 })
 //	fmt.Printf("%v",slice) // [2 4 6 8]
-func FilterI[T any](s *[]T, f func(T) bool) {
+func FilterI[S ~[]T, T any](s *S, f func(T) bool) {
 	j := 0
 	for i := range *s {
 		if f((*s)[i]) {
@@ -754,7 +792,7 @@ func FilterI[T any](s *[]T, f func(T) bool) {
 //	slice := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
 //	FilterRefI(&slice, func(i *int) bool { return (*i)%2 == 0 })
 //	fmt.Printf("%v",slice) // [2 4 6 8]
-func FilterRefI[T any](s *[]T, f func(*T) bool) {
+func FilterRefI[S ~[]T, T any](s *S, f func(*T) bool) {
 	j := 0
 	for i := range *s {
 		if f(&(*s)[i]) {
@@ -765,20 +803,11 @@ func FilterRefI[T any](s *[]T, f func(*T) bool) {
 	*s = (*s)[:j]
 }
 
-// A type constraint for types that can be compared
-// via the < operator
-type Sortable interface {
-	int | int8 | int16 | int32 | int64 |
-		uint | uint8 | uint16 | uint32 | uint64 |
-		float32 | float64 |
-		string
-}
-
 // A wrapper type around a slice that satisfies the
 // sort.Interface interface. The element type of the
-// slice must satisfy Sortable, meaning that the elements
+// slice must satisfy [cmp.Ordered], meaning that the elements
 // must be comparable by the < operator
-type SortableSlice[T Sortable] []T
+type SortableSlice[T cmp.Ordered] []T
 
 func (ss SortableSlice[T]) Len() int {
 	return len(ss)
@@ -795,13 +824,13 @@ func (ss SortableSlice[T]) Swap(i, j int) {
 }
 
 // Sorts slice in place
-func Sort[T Sortable](slice []T) {
+func Sort[T cmp.Ordered](slice []T) {
 	sort.Sort(SortableSlice[T](slice))
 }
 
 // Creates a copy of slice, sorted. The
 // slice parameter remains unchanged.
-func Sorted[T Sortable](slice []T) []T {
+func Sorted[T cmp.Ordered](slice []T) []T {
 	sorted := make([]T, len(slice))
 	copy(sorted, slice)
 	sort.Sort(SortableSlice[T](sorted))
@@ -840,7 +869,7 @@ func SortUsing[T any](slice []T, less func(T, T) bool) {
 }
 
 // Fill fills an existing slice with a specified value
-func Fill[T any](slice []T, value T) {
+func Fill[S ~[]T, T any](slice S, value T) {
 	for i := range slice {
 		slice[i] = value
 	}
