@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type ints []int
+
 func TestAll(t *testing.T) {
 	trueInput := []rune("---------")
 	assert.True(t, All(trueInput, func(r rune) bool {
@@ -111,6 +113,13 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestMapAs(t *testing.T) {
+	sliceIn := []int{1, 2, 3, 4}
+	expected := ints{2, 4, 6, 8}
+	actual := MapAs[ints](sliceIn, func(x int) int { return x * 2 })
+	assert.Equal(t, expected, actual)
+}
+
 func TestMapDifferentTypes(t *testing.T) {
 	sliceIn := []string{"apple", "banana", "cherry", "strawberry"}
 	expected := []int{5, 6, 6, 10}
@@ -170,6 +179,13 @@ func TestReverse(t *testing.T) {
 	assert.Equal(t, []int{7, 6, 5, 4, 3, 2, 1}, Reverse(sliceIn))
 }
 
+func TestReverseWrapped(t *testing.T) {
+	sliceIn := ints{1, 2, 3, 4, 5, 6}
+	assert.Equal(t, ints{6, 5, 4, 3, 2, 1}, Reverse(sliceIn))
+	sliceIn = append(sliceIn, 7)
+	assert.Equal(t, ints{7, 6, 5, 4, 3, 2, 1}, Reverse(sliceIn))
+}
+
 func TestReverseINil(t *testing.T) {
 	var sliceIn []int = nil
 	ReverseI(sliceIn)
@@ -195,6 +211,12 @@ func TestFilter(t *testing.T) {
 	sliceIn := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	sliceOut := Filter(sliceIn, func(i int) bool { return i%2 == 0 })
 	assert.Equal(t, []int{2, 4, 6, 8}, sliceOut)
+}
+
+func TestFilterInts(t *testing.T) {
+	sliceIn := ints{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	sliceOut := Filter(sliceIn, func(i int) bool { return i%2 == 0 })
+	assert.Equal(t, ints{2, 4, 6, 8}, sliceOut)
 }
 
 func TestFilterMap(t *testing.T) {
