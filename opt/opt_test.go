@@ -11,6 +11,7 @@ import (
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func checkTry(f func()) (err error) {
@@ -465,6 +466,32 @@ func TestMapRef(t *testing.T) {
 	er := opt.EmptyRef[int]()
 	assert.Equal("123", opt.MapRef(r, itoaRef).Get())
 	assert.True(opt.MapRef(er, itoaRef).IsEmpty())
+}
+
+func TestFirstOf(t *testing.T) {
+	o1 := opt.FirstOf(opt.EmptyRef[int](), opt.Empty[int](), opt.Value(123), opt.Value(456))
+	assert.Equal(t, opt.Value(123), o1)
+	o2 := opt.FirstOf(opt.EmptyRef[int](), opt.Empty[int]())
+	assert.True(t, o2.IsEmpty())
+}
+
+func TestFirstOfAny(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	oa := opt.FirstOfAny(opt.Empty[string](), opt.Value(123), opt.Value(true))
+	require.True(oa.HasValue())
+	switch o := oa.(type) {
+	case opt.Opt[string]:
+		assert.Fail("String was not expected")
+	case opt.Opt[int]:
+		assert.Equal(123, o.Get())
+	case opt.Opt[bool]:
+		assert.Fail("Bool was not expected")
+	default:
+		assert.Fail("No item matched")
+	}
+	oe := opt.FirstOfAny()
+	assert.True(oe.IsEmpty())
 }
 
 func ExampleVal_Try() {

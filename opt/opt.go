@@ -131,6 +131,14 @@ type MutOpt[T any] interface {
 	SetFrom(opt Opt[T]) MutOpt[T]
 }
 
+// AnyOpt contains methods common to all [Opt]s that don't involve a type parameter.
+type AnyOpt interface {
+	IsEmpty() bool
+	HasValue() bool
+	IsRef() bool
+	IsZero() bool
+}
+
 // Val is an [Opt] implementation which consists of a member of type T, and a
 // boolean flag indicating presence. It is suitable for primitive values (int, string)
 // or small structures where copying overhead is negligible.
@@ -747,6 +755,29 @@ func DeepEqual[T any](o1 Opt[T], o2 Opt[T]) bool {
 	} else {
 		return reflect.DeepEqual(o1.Ref(), o2.Ref())
 	}
+}
+
+// FirstOfAny returns the first of a list of any option that has a
+// value. If all are empty it returns an empty [Val][bool].
+func FirstOfAny(opts ...AnyOpt) AnyOpt {
+	for _, o := range opts {
+		if o.HasValue() {
+			return o
+		}
+	}
+	return Empty[bool]()
+}
+
+// FirstOfAny returns the first of a list of any option that has a
+// value. If all are empty it returns an empty [Val][bool].
+func FirstOf[T any](opts ...Opt[T]) Opt[T] {
+	for _, o := range opts {
+		if o.HasValue() {
+			return o
+		}
+	}
+	return Empty[T]()
+
 }
 
 // Marshalling / unmarshaling support //
