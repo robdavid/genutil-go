@@ -36,6 +36,14 @@ type Opt[T any] interface {
 	// the zero value for T and false if not. This approach avoids panics.
 	GetOK() (T, bool)
 
+	// GetAny returns the value in an any interface wrapper. It will panic if
+	// this is no value.
+	GetAny() any
+
+	// GetAny returns the value in an [any] interface wrapper, along with a
+	// presence flag. This flag will be false if there is no value.
+	GetAnyOK() (any, bool)
+
 	// Try returns the option value if present, or else will panic, similar to
 	// [Option.Get] method. However, the panic raised is one that can be
 	// recovered via [handler.Catch] or [handler.Handle] functions.
@@ -49,6 +57,14 @@ type Opt[T any] interface {
 	// RefOK either returns a reference to the option value and true if
 	// the value is present, or a nil pointer and false if not.
 	RefOK() (*T, bool)
+
+	// RefAny returns a pointer to the value in an any interface wrapper. It
+	// will panic if there is no value.
+	RefAny() any
+
+	// RefAnyOK returns a pointer to the value in an [any] interface wrapper, and
+	// a presence flag. This flag will be false if there is no value.
+	RefAnyOK() (any, bool)
 
 	// TryRef returns a reference to the option value if there is
 	// one. If not, it will panic, similar to [Option.Ref]. However, the panic
@@ -89,6 +105,10 @@ type Opt[T any] interface {
 	// Else executes the provided function if the Option is empty. It always
 	// returns the option instance it was called with.
 	Else(func()) Opt[T]
+
+	// String returns the string representation of the value if present. Otherwise
+	// it returns the empty string.
+	String() string
 }
 
 // MutOpt is an extension of [Opt] which provides methods for mutation of option
@@ -136,7 +156,12 @@ type AnyOpt interface {
 	IsEmpty() bool
 	HasValue() bool
 	IsRef() bool
+	String() string
 	IsZero() bool
+	GetAny() any
+	RefAny() any
+	GetAnyOK() (any, bool)
+	RefAnyOK() (any, bool)
 }
 
 // Val is an [Opt] implementation which consists of a member of type T, and a
@@ -470,6 +495,83 @@ func (r Ref[T]) RefOK() (*T, bool) {
 	return r.reference, true
 }
 
+// RefAny returns a pointer to the value in an any interface wrapper. It
+// will panic if there is no value.
+func (r Ref[T]) RefAny() any {
+	if r.reference == nil {
+		panic(r.error())
+	}
+	return r.reference
+}
+
+// RefAny returns a pointer to the value in an any interface wrapper. It
+// will panic if there is no value.
+func (v Val[T]) RefAny() any {
+	if !v.nonEmpty {
+		panic(v.error())
+	} else {
+		return &v.value
+	}
+}
+
+// RefAnyOK returns a pointer to the value in an [any] interface wrapper, and
+// a presence flag. This flag will be false if there is no value.
+func (r Ref[T]) RefAnyOK() (any, bool) {
+	if r.reference == nil {
+		return nil, false
+	}
+	return r.reference, true
+}
+
+// RefAnyOK returns a pointer to the value in an [any] interface wrapper, and
+// a presence flag. This flag will be false if there is no value.
+func (v Val[T]) RefAnyOK() (any, bool) {
+	if !v.nonEmpty {
+		return nil, false
+	} else {
+		return &v.value, true
+	}
+}
+
+// GetAny returns a pointer to the value in an any interface wrapper. It
+// will panic if there is no value.
+func (v Val[T]) GetAny() any {
+	if !v.nonEmpty {
+		panic(v.error())
+	} else {
+		return v.value
+	}
+}
+
+// RefAny returns a pointer to the value in an any interface wrapper. It
+// will panic if there is no value.
+func (r Ref[T]) GetAny() any {
+	if r.reference == nil {
+		panic(r.error())
+	}
+	return *r.reference
+}
+
+// GetAnyOK returns a pointer to the value in an [any] interface wrapper, and
+// a presence flag. This flag will be false if there is no value.
+func (v Val[T]) GetAnyOK() (any, bool) {
+	if !v.nonEmpty {
+		var zero T
+		return zero, false
+	} else {
+		return v.value, true
+	}
+}
+
+// GetAnyOK returns a pointer to the value in an [any] interface wrapper, and
+// a presence flag. This flag will be false if there is no value.
+func (r Ref[T]) GetAnyOK() (any, bool) {
+	if r.reference == nil {
+		return nil, false
+	}
+	return *r.reference, true
+}
+
 // String returns a string representation of the underlying value if present,
 // or an empty string if the option is empty.
 func (v Val[T]) String() string {
@@ -758,14 +860,14 @@ func DeepEqual[T any](o1 Opt[T], o2 Opt[T]) bool {
 }
 
 // FirstOfAny returns the first of a list of any option that has a
-// value. If all are empty it returns an empty [Val][bool].
+// value. If all are empty it returns an empty [Val][struct{}].
 func FirstOfAny(opts ...AnyOpt) AnyOpt {
 	for _, o := range opts {
 		if o.HasValue() {
 			return o
 		}
 	}
-	return Empty[bool]()
+	return Empty[struct{}]()
 }
 
 // FirstOfAny returns the first of a list of any option that has a

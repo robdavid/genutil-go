@@ -3,6 +3,7 @@ package opt_test
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -492,6 +493,62 @@ func TestFirstOfAny(t *testing.T) {
 	}
 	oe := opt.FirstOfAny()
 	assert.True(oe.IsEmpty())
+}
+
+func TestFirstOfAnyGetOK(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	oa, ok := opt.FirstOfAny(opt.Empty[string](), opt.Value(123), opt.Value(true)).GetAnyOK()
+	require.True(ok)
+	switch o := oa.(type) {
+	case string:
+		assert.Fail("String was not expected")
+	case int:
+		assert.Equal(123, o)
+	case bool:
+		assert.Fail("Bool was not expected")
+	default:
+		assert.Fail("No item matched")
+	}
+	oe := opt.FirstOfAny()
+	assert.True(oe.IsEmpty())
+}
+
+func TestGetRefAny(t *testing.T) {
+	assert := assert.New(t)
+	v := opt.Value(123)
+	x := 456
+	r := opt.Reference(&x)
+	ev := opt.Empty[int]()
+	er := opt.EmptyRef[int]()
+	assert.Equal(123, v.GetAny())
+	assert.Equal(456, *(r.RefAny().(*int)))
+	_, ok := ev.GetAnyOK()
+	assert.False(ok)
+	_, ok = er.RefAnyOK()
+	assert.False(ok)
+	assert.Equal(456, r.GetAny())
+	assert.Equal(123, *(v.RefAny().(*int)))
+	p, ok := r.RefAnyOK()
+	assert.True(ok)
+	assert.Equal(456, *p.(*int))
+	p, ok = v.RefAnyOK()
+	assert.Equal(123, *p.(*int))
+}
+
+func TestAnyRef(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	items := []opt.AnyOpt{opt.Empty[string](), opt.Value(123), opt.Reference(regexp.MustCompile("."))}
+	o := opt.FirstOfAny(items...)
+	require.True(o.HasValue())
+	v := functions.IfElseF(o.IsRef(), o.RefAny, o.GetAny)
+	assert.Equal(123, v)
+	items[1] = opt.Empty[int]()
+	o = opt.FirstOfAny(items...)
+	require.True(o.HasValue())
+	v = functions.IfElseF(o.IsRef(), o.RefAny, o.GetAny)
+	assert.Equal(".", v.(fmt.Stringer).String())
 }
 
 func ExampleVal_Try() {
