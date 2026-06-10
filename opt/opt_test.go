@@ -289,6 +289,14 @@ func TestDeepEqual(t *testing.T) {
 	assert.False(opt.DeepEqual(val1, val3))
 }
 
+type stringerPtrStruct struct{}
+
+func (*stringerPtrStruct) String() string { return "this is stringerPtrStruct" }
+
+type stringerStruct struct{}
+
+func (stringerStruct) String() string { return "this is stringerStruct" }
+
 func TestString(t *testing.T) {
 	val1 := opt.Value(123)
 	var x int = 456
@@ -303,6 +311,18 @@ func TestString(t *testing.T) {
 	assert.Equal(t, "-", emptyStr)
 	emptyStr = fmt.Sprintf("%s-%s", &empty, &emptyRef)
 	assert.Equal(t, "-", emptyStr)
+}
+
+func TestStringer(t *testing.T) {
+	assert := assert.New(t)
+	ssv := opt.Value(stringerStruct{})
+	spsv := opt.Value(stringerPtrStruct{})
+	ssr := opt.Reference(&stringerStruct{})
+	spsr := opt.Reference(&stringerPtrStruct{})
+	assert.Equal("this is stringerStruct", ssv.String())
+	assert.Equal("this is stringerPtrStruct", spsv.String())
+	assert.Equal("this is stringerStruct", ssr.String())
+	assert.Equal("this is stringerPtrStruct", spsr.String())
 }
 
 func TestTryRef(t *testing.T) {
