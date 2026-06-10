@@ -576,6 +576,9 @@ func (r Ref[T]) GetAnyOK() (any, bool) {
 // or an empty string if the option is empty.
 func (v Val[T]) String() string {
 	if v.nonEmpty {
+		if str, ok := any(&v.value).(fmt.Stringer); ok {
+			return str.String()
+		}
 		return fmt.Sprint(v.value)
 	} else {
 		return ""
@@ -586,6 +589,9 @@ func (v Val[T]) String() string {
 // or an empty string if the option is empty.
 func (r Ref[T]) String() string {
 	if r.reference != nil {
+		if str, ok := any(r.reference).(fmt.Stringer); ok {
+			return str.String()
+		}
 		return fmt.Sprint(*r.reference)
 	} else {
 		return ""
