@@ -84,27 +84,31 @@ type Opt[T any] interface {
 	// the result of the provided function.
 	GetOrF(fallbackFn func() T) T
 
+	ToVal() Val[T]
+
+	ToRef() Ref[T]
+
 	// Morph, inspired by the concept of [Endomorphism]:
 	// https://en.wikipedia.org/wiki/Endomorphism, maps an [Option] value. If
 	// non-empty, it applies f(T) and wraps the result in a [Val][T]. If empty,
 	// an empty [Val][T] is returned. Mapping to any type other than [Val][T]
 	// requires the use of the [Map]() function.
-	Morph(func(T) T) Opt[T]
+	//Morph(func(T) T) Opt[T]
 
 	// MorphRef, inspired by the concept of [Endomorphism]:
 	// https://en.wikipedia.org/wiki/Endomorphism, maps a Option value. If
 	// non-empty, it applies f(*T) and wraps the resulting pointer in Ref[T]. If
 	// empty, an empty Ref[T] is returned. Mapping to any type other than [Ref][T]
 	// requires the use of the [Map]() function.
-	MorphRef(func(*T) *T) Opt[T]
+	//MorphRef(func(*T) *T) Opt[T]
 
 	// Then executes the supplied function if the Option is non-empty. It always
 	// returns the option instance it was called with.
-	Then(func(T)) Opt[T]
+	//Then(func(T)) Opt[T]
 
 	// Else executes the provided function if the Option is empty. It always
 	// returns the option instance it was called with.
-	Else(func()) Opt[T]
+	//Else(func()) Opt[T]
 
 	// String returns the string representation of the value if present. Otherwise
 	// it returns the empty string.
@@ -123,32 +127,32 @@ type MutOpt[T any] interface {
 
 	// Mutate applies an in place mutation function to an option's value. It is
 	// a no-op if the option is empty. The mutated option is returned.
-	Mutate(f func(*T)) MutOpt[T]
+	//Mutate(f func(*T)) MutOpt[T]
 
 	// Ensure ensures that the option is non-empty. If it is already non-empty,
 	// it is a no-op. Otherwise, it is populated with the zero value. The
 	// mutated or original option is returned.
-	Ensure() MutOpt[T]
+	//Ensure() MutOpt[T]
 
 	// Set sets the underlying value, mutating the option. It will cause the
 	// option to become non-empty, if it isn't already. The mutated option is
 	// returned.
-	Set(value T) MutOpt[T]
+	Set(value T) //MutOpt[T]
 
 	// SetRef sets the underlying value by reference, mutating the option. For a
 	// [Val], the underlying value is set by copying the value pointed to by
 	// reference, unless reference is nil. For a [Ref] the underlying reference
 	// becomes the one provided. If reference is nil, the option becomes empty,
 	// otherwise it becomes non-empty. The mutated option is returned.
-	SetRef(reference *T) MutOpt[T]
+	SetRef(reference *T) //MutOpt[T]
 
 	// Causes the option to become empty, if it isn't already, mutating it. The
 	// mutated option is returned.
-	Unset() MutOpt[T]
+	Unset() //MutOpt[T]
 
 	// SetFrom mutates the option to copy the value or reference from an
 	// [Opt][T] in opt. If opt is empty, the resulting option will be empty.
-	SetFrom(opt Opt[T]) MutOpt[T]
+	SetFrom(opt Opt[T]) //MutOpt[T]
 }
 
 // AnyOpt contains methods common to all [Opt]s that don't involve a type parameter.
@@ -287,7 +291,7 @@ func (v *Val[T]) AsRef() Ref[T] {
 	}
 }
 
-// AsVal converts the [Ref][T] instance to a [Val][T] that has the value referenced
+// AsVal converts the [Ref][T] instance to a [Val][T] that holds a copy the value referenced
 // by the receiver if present. Otherwise it returns an empty [Val][T].
 func (r Ref[T]) AsVal() Val[T] {
 	if r.reference != nil {
@@ -296,6 +300,33 @@ func (r Ref[T]) AsVal() Val[T] {
 		return Empty[T]()
 	}
 }
+
+// AsRef converts the [Val][T] instance to a [Ref][T] that references a copy of the value
+// held if present. Otherwise it returns an empty [Ref][T].
+func (v Val[T]) ToRef() Ref[T] {
+	if v.nonEmpty {
+		return Reference(&v.value)
+	} else {
+		return EmptyRef[T]()
+	}
+}
+
+// ToRef returns a reference to a copy of the value referenced by the receiver, if present.
+// Otherwise, returns an empty reference.
+func (r Ref[T]) ToRef() Ref[T] {
+	if r.reference == nil {
+		return EmptyRef[T]()
+	} else {
+		return Reference(new(*r.reference))
+	}
+}
+
+// ToVal returns a copy of the receiver.
+func (v Val[T]) ToVal() Val[T] { return v }
+
+// AsVal converts the [Ref][T] instance to a [Val][T] that holds a copy the value referenced
+// by the receiver if present. Otherwise it returns an empty [Val][T].
+func (r Ref[T]) ToVal() Val[T] { return r.AsVal() }
 
 // GetOK returns the underlying value and a true boolean if present. It returns
 // the zero value for T and false if not present.
@@ -601,7 +632,7 @@ func (r Ref[T]) String() string {
 // Mutate applies function f to a reference to a copy of the underlying value if
 // present, returning a modified [Val][T] object. If there is no value present,
 // the method is a no-op and the receiver is returned.
-func (v *Val[T]) Mutate(f func(*T)) MutOpt[T] {
+func (v *Val[T]) Mutate(f func(*T)) *Val[T] {
 	if v.nonEmpty {
 		f(&v.value)
 	}
@@ -611,7 +642,7 @@ func (v *Val[T]) Mutate(f func(*T)) MutOpt[T] {
 // Mutate applies function f to a reference to the underlying value if present.
 // The function may alter the value via this pointer. If there is no value
 // present, the method is a no-op. The receiver is always returned.
-func (r *Ref[T]) Mutate(f func(*T)) MutOpt[T] {
+func (r *Ref[T]) Mutate(f func(*T)) *Ref[T] {
 	if r.reference != nil {
 		f(r.reference)
 	}
@@ -620,7 +651,7 @@ func (r *Ref[T]) Mutate(f func(*T)) MutOpt[T] {
 
 // Ensure ensures that the option is non-empty. If it is already non-empty, it
 // returns the receiver. Otherwise, a new empty Val[T] is returned.
-func (v *Val[T]) Ensure() MutOpt[T] {
+func (v *Val[T]) Ensure() *Val[T] {
 	if !v.nonEmpty {
 		var zero T
 		*v = Value(zero)
@@ -631,7 +662,7 @@ func (v *Val[T]) Ensure() MutOpt[T] {
 // Ensure ensures that the option is non-empty. If it is already non-empty, it
 // is a no-op. Otherwise, it is mutated to be populated with the zero value. The
 // mutated or original option is returned.
-func (r *Ref[T]) Ensure() MutOpt[T] {
+func (r *Ref[T]) Ensure() *Ref[T] {
 	if r.reference == nil {
 		var zero T
 		r.reference = &zero
@@ -642,80 +673,72 @@ func (r *Ref[T]) Ensure() MutOpt[T] {
 // Set sets the underlying value, mutating the option. It will cause the
 // option to become non-empty, if it isn't already. The mutated option is
 // returned.
-func (v *Val[T]) Set(value T) MutOpt[T] {
+func (v *Val[T]) Set(value T) {
 	*v = Value(value)
-	return v
 }
 
 // Set sets the underlying value, mutating the option. It will cause the
 // option to become non-empty, if it isn't already. The mutated option is
 // returned.
-func (r *Ref[T]) Set(value T) MutOpt[T] {
+func (r *Ref[T]) Set(value T) {
 	if r.reference == nil {
 		r.reference = &value
 	} else {
 		*r.reference = value
 	}
-	return r
 }
 
 // Unset causes the option to become empty, if it isn't already, mutating it. The
 // mutated option is returned.
-func (v *Val[T]) Unset() MutOpt[T] {
+func (v *Val[T]) Unset() {
 	*v = Empty[T]()
-	return v
 }
 
 // Unset causes the option to become empty, if it isn't already, mutating it. The
 // mutated option is returned.
-func (r *Ref[T]) Unset() MutOpt[T] {
+func (r *Ref[T]) Unset() {
 	r.reference = nil
-	return r
 }
 
 // SetRef sets the underlying value by reference, mutating the option. If
 // reference is nil, the option becomes empty. Otherwise the underlying value is
 // set by copying the value pointed to by reference, and the value becomes
 // non-empty. The mutated option is returned.
-func (v *Val[T]) SetRef(reference *T) MutOpt[T] {
+func (v *Val[T]) SetRef(reference *T) {
 	if reference == nil {
 		*v = Empty[T]()
 	} else {
 		*v = Value(*reference)
 	}
-	return v
 }
 
 // SetRef sets the underlying value by reference, mutating the option. The
 // underlying reference becomes the one provided. If the option was empty, it
 // becomes non empty, unless reference is nil. The mutated option is returned.
-func (r *Ref[T]) SetRef(reference *T) MutOpt[T] {
+func (r *Ref[T]) SetRef(reference *T) {
 	r.reference = reference
-	return r
 }
 
 // SetFrom sets the underlying value from the value obtained from opt, mutating
 // the option. If opt is empty, the option will be empty.
-func (v *Val[T]) SetFrom(opt Opt[T]) MutOpt[T] {
+func (v *Val[T]) SetFrom(opt Opt[T]) {
 	if optv, ok := opt.GetOK(); ok {
 		*v = Value(optv)
 	} else {
 		*v = Empty[T]()
 	}
-	return v
 }
 
 // SetFrom sets the underlying reference from the reference obtained from opt,
 // mutating the option. If opt is empty, the option will be empty.
-func (r *Ref[T]) SetFrom(opt Opt[T]) MutOpt[T] {
+func (r *Ref[T]) SetFrom(opt Opt[T]) {
 	r.reference = opt.RefOr(nil)
-	return r
 }
 
 // Morph transforms the underlying value, if present, by means of the supplied
 // function f. If non-empty, the function is applied to the value, and the
 // result is wrapped in a [Val][T]. If empty, an empty Val[T] is returned.
-func (v Val[T]) Morph(f func(T) T) Opt[T] {
+func (v Val[T]) Morph(f func(T) T) Val[T] {
 	if v.nonEmpty {
 		return Value(f(v.value))
 	} else {
@@ -726,7 +749,7 @@ func (v Val[T]) Morph(f func(T) T) Opt[T] {
 // Morph transforms the underlying value, if present, by means of the supplied
 // function f. If non-empty, it applies f to the pointer and wraps the result in
 // a [Ref][T]. If empty, an empty Ref[T] is returned.
-func (r Ref[T]) Morph(f func(T) T) Opt[T] {
+func (r Ref[T]) Morph(f func(T) T) Ref[T] {
 	if r.reference != nil {
 		value := f(*r.reference)
 		return Reference(&value)
@@ -739,7 +762,7 @@ func (r Ref[T]) Morph(f func(T) T) Opt[T] {
 // supplied function f. If non-empty, a reference to a copy of it is passed to
 // the function, and the resulting pointer is wrapped in a [Val][T]. If empty,
 // an empty [Val][T] is returned. The receiver is not modified.
-func (v Val[T]) MorphRef(f func(*T) *T) Opt[T] {
+func (v Val[T]) MorphRef(f func(*T) *T) Val[T] {
 	if v.nonEmpty {
 		return Value(*f(&v.value))
 	} else {
@@ -751,7 +774,7 @@ func (v Val[T]) MorphRef(f func(*T) *T) Opt[T] {
 // supplied function f. If non-empty, a reference to it is passed to the
 // function, and the resulting pointer is wrapped in a [Ref][T]. If empty, an
 // empty [Ref][T] is returned.
-func (r Ref[T]) MorphRef(f func(*T) *T) Opt[T] {
+func (r Ref[T]) MorphRef(f func(*T) *T) Ref[T] {
 	if r.reference != nil {
 		return Reference(f(r.reference))
 	} else {
@@ -759,18 +782,26 @@ func (r Ref[T]) MorphRef(f func(*T) *T) Opt[T] {
 	}
 }
 
+func (v Val[T]) Map[U any](f func(T) U) Val[U] {
+	if v.nonEmpty {
+		return Value(f(v.value))
+	} else {
+		return Empty[U]()
+	}
+}
+
 // Then executes the supplied function with the value held by v, if v is non-empty. Otherwise, this is a
 // no-op. It always returns a pointer to v.
-func (v Val[T]) Then(f func(T)) Opt[T] {
+func (v Val[T]) Then(f func(T)) Val[T] {
 	if v.nonEmpty {
 		f(v.value)
 	}
-	return &v
+	return v
 }
 
 // Then executes the supplied function with the value referenced by r if r is non-empty. Otherwise, this is a
 // no-op. It always returns r.
-func (r Ref[T]) Then(f func(T)) Opt[T] {
+func (r Ref[T]) Then(f func(T)) Ref[T] {
 	if r.reference != nil {
 		f(*r.reference)
 	}
@@ -779,16 +810,16 @@ func (r Ref[T]) Then(f func(T)) Opt[T] {
 
 // Else executes the provided function if v is empty. It always
 // returns a pointer to v.
-func (v Val[T]) Else(f func()) Opt[T] {
+func (v Val[T]) Else(f func()) Val[T] {
 	if !v.nonEmpty {
 		f()
 	}
-	return &v
+	return v
 }
 
 // Else executes the provided function if r is empty. It always
 // returns r.
-func (r Ref[T]) Else(f func()) Opt[T] {
+func (r Ref[T]) Else(f func()) Ref[T] {
 	if r.reference == nil {
 		f()
 	}
@@ -797,16 +828,16 @@ func (r Ref[T]) Else(f func()) Opt[T] {
 
 // ThenRef invokes the supplied function with a reference to v's value if v is
 // non-empty. Otherwise, this is a no-op. It always returns a pointer to v.
-func (v Val[T]) ThenRef(f func(*T)) Opt[T] {
+func (v Val[T]) ThenRef(f func(*T)) Val[T] {
 	if v.nonEmpty {
 		f(&v.value)
 	}
-	return &v
+	return v
 }
 
 // ThenRef invokes the supplied function with r's pointer to its value if r is non-empty.
 // Otherwise, this is a no-op. It always returns r
-func (r Ref[T]) ThenRef(f func(*T)) Opt[T] {
+func (r Ref[T]) ThenRef(f func(*T)) Ref[T] {
 	if r.reference != nil {
 		f(r.reference)
 	}
@@ -816,7 +847,7 @@ func (r Ref[T]) ThenRef(f func(*T)) Opt[T] {
 // Map applies a function to the non-empty value of an [Opt]. If the option
 // is non-empty, the function is applied to its value, and the result is wrapped
 // as an [Opt][U] and returned. Otherwise, an empty option is returned.
-func Map[T, U any](o Opt[T], f func(T) U) Opt[U] {
+func Map[T, U any](o Opt[T], f func(T) U) Val[U] {
 	if val, ok := o.GetOK(); !ok {
 		return Empty[U]()
 	} else {
@@ -827,7 +858,7 @@ func Map[T, U any](o Opt[T], f func(T) U) Opt[U] {
 // MapRef is a variation of [Map]() in which the mapping function takes and
 // returns pointers to values. The referenced computed value is returned as an
 // [Opt][U].
-func MapRef[T, U any](o Opt[T], f func(*T) *U) Opt[U] {
+func MapRef[T, U any](o Opt[T], f func(*T) *U) Ref[U] {
 	if r := o.RefOr(nil); r == nil {
 		return EmptyRef[U]()
 	} else {

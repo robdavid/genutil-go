@@ -48,6 +48,30 @@ func TestOption(t *testing.T) {
 	assert.Equal(123, intval.Get())
 }
 
+func TestOptImpl(t *testing.T) {
+	assert := assert.New(t)
+	var ov, or opt.Opt[int]
+	ov = opt.Value(123)
+	or = opt.Reference(new(456))
+	assert.Equal(123, ov.Get())
+	assert.Equal(456, or.Get())
+}
+
+func TestMutOptImpl(t *testing.T) {
+	assert := assert.New(t)
+	var ov, or opt.MutOpt[int]
+	ov = new(opt.Value(123))
+	or = new(opt.Reference(new(456)))
+	assert.Equal(123, ov.Get())
+	assert.Equal(456, or.Get())
+	ov.Set(246)
+	or.Set(789)
+	assert.Equal(246, ov.Get())
+	assert.Equal(789, or.Get())
+	assert.Equal(246, ov.ToRef().Get())
+	assert.Equal(789, or.ToVal().Get())
+}
+
 func TestReferenceNil(t *testing.T) {
 	r := opt.Reference[int](nil)
 	assert.True(t, r.IsEmpty())
@@ -365,22 +389,22 @@ func TestMorph(t *testing.T) {
 
 	r = opt.Reference(&hello)
 	assert.Equal("hello", r.Get())
-	uv = r.Morph(strings.ToUpper)
-	assert.Equal("HELLO", uv.Get())
+	ur = r.Morph(strings.ToUpper)
+	assert.Equal("HELLO", ur.Get())
 
 	r = opt.EmptyRef[string]()
 	ur = r.MorphRef(upperRef)
 	assert.True(ur.IsEmpty())
-	uv = r.Morph(strings.ToUpper)
-	assert.True(uv.IsEmpty())
+	ur = r.Morph(strings.ToUpper)
+	assert.True(ur.IsEmpty())
 
 	v = opt.Value("hello")
-	ur = v.MorphRef(upperRef)
-	assert.Equal("HELLO", ur.Get())
+	uv = v.MorphRef(upperRef)
+	assert.Equal("HELLO", uv.Get())
 
 	v = opt.Empty[string]()
-	ur = v.MorphRef(upperRef)
-	assert.True(ur.IsEmpty())
+	uv = v.MorphRef(upperRef)
+	assert.True(uv.IsEmpty())
 }
 
 func TestThenElse(t *testing.T) {
@@ -460,7 +484,7 @@ func TestMap(t *testing.T) {
 
 	v := opt.Value(123)
 	ev := opt.Empty[int]()
-	assert.Equal("123", opt.Map(&v, strconv.Itoa).Get())
+	assert.Equal("123", opt.Map(v, strconv.Itoa).Get())
 	assert.True(opt.Map(&ev, strconv.Itoa).IsEmpty())
 
 	var x int = 123
@@ -479,7 +503,7 @@ func TestMapRef(t *testing.T) {
 	}
 	v := opt.Value(123)
 	ev := opt.Empty[int]()
-	assert.Equal("123", opt.MapRef(&v, itoaRef).Get())
+	assert.Equal("123", opt.MapRef(v, itoaRef).Get())
 	assert.True(opt.MapRef(&ev, itoaRef).IsEmpty())
 
 	var x int = 123
@@ -777,7 +801,7 @@ func ExampleVal_Mutate() {
 }
 
 func ExampleVal_Mutate_vs_Ref() {
-	mutate := func(v1 opt.MutOpt[int], v2 opt.MutOpt[int]) {
+	mutate := func(v1 *opt.Val[int], v2 *opt.Val[int]) {
 		v1.Mutate(func(x *int) { *x++ })
 		// Ref creates a defensive copy for Val[int]
 		// (Ref is not part of opt.MutOpt[T] and takes a non-pointer receiver)
@@ -808,7 +832,7 @@ func ExampleRef_Mutate() {
 }
 
 func ExampleRef_Mutate_vs_Ref() {
-	mutate := func(v1 opt.MutOpt[int], v2 opt.MutOpt[int]) {
+	mutate := func(v1 opt.Ref[int], v2 opt.Ref[int]) {
 		v1.Mutate(func(x *int) { *x++ })
 		*v2.Ref()++
 	}
@@ -816,7 +840,7 @@ func ExampleRef_Mutate_vs_Ref() {
 	v2 := 1
 	r1 := opt.Reference(&v1)
 	r2 := opt.Reference(&v2)
-	mutate(&r1, &r2)
+	mutate(r1, r2)
 	fmt.Printf("v1: %v, v2: %v\n", r1, r2)
 	// Output:
 	// v1: 2, v2: 2
@@ -857,35 +881,36 @@ func ExampleRef_Ensure() {
 func ExampleVal_Set() {
 	v := opt.Value(123)
 	fmt.Println(v)
-	v1 := v.Set(456)
-	fmt.Println(v, v1)
+	v.Set(456)
+	fmt.Println(v)
 
 	// Output:
 	// 123
-	// 456 456
+	// 456
 }
 
 func ExampleVal_Set_chaining() {
 	v := opt.Value(123)
 	fmt.Println(v)
-	v1 := v.Set(456).Set(789)
-	fmt.Println(v, v1)
+	v.Set(456)
+	v.Set(789)
+	fmt.Println(v)
 
 	// Output:
 	// 123
-	// 789 789
+	// 789
 }
 
 func ExampleRef_Set() {
 	x := 123
 	r := opt.Reference(&x)
 	fmt.Println(r)
-	r1 := r.Set(456)
-	fmt.Println(x, r, r1)
+	r.Set(456)
+	fmt.Println(x, r)
 
 	// Output:
 	// 123
-	// 456 456 456
+	// 456 456
 }
 
 func ExampleRef_SetRef() {
@@ -893,40 +918,41 @@ func ExampleRef_SetRef() {
 	y := 456
 	r := opt.Reference(&x)
 	fmt.Println(r)
-	r1 := r.SetRef(&y)
-	fmt.Println(x, y, r, r1)
-	fmt.Println(r.Ref() == r1.Ref(), r.Ref() == &y)
+	r.SetRef(&y)
+	fmt.Println(x, y, r)
+	fmt.Println(r.Ref() == &y)
 
 	// Output:
 	// 123
-	// 123 456 456 456
-	// true true
+	// 123 456 456
+	// true
 }
 
 func ExampleVal_SetRef() {
 	y := 456
 	v := opt.Value(123)
 	fmt.Println(v)
-	v2 := v.SetRef(&y)
-	fmt.Println(v, v2)
-	fmt.Println(v.Ref() == v2.Ref(), v.Ref() == &y)
+	v.SetRef(&y)
+	fmt.Println(v)
+	fmt.Println(v.Ref() == &y)
 
 	// Output:
 	// 123
-	// 456 456
-	// false false
+	// 456
+	// false
 }
 
 func ExampleRef_Set_chaining() {
 	x := 123
 	r := opt.Reference(&x)
 	fmt.Println(r)
-	r1 := r.Set(456).Set(789)
-	fmt.Println(x, r, r1)
+	r.Set(456)
+	r.Set(789)
+	fmt.Println(x, r)
 
 	// Output:
 	// 123
-	// 789 789 789
+	// 789 789
 }
 
 func ExampleRef_SetFrom() {
