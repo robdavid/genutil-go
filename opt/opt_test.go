@@ -766,12 +766,25 @@ func ExampleVal_AsRef() {
 	fmt.Println(value.Get())
 
 	valueRef := value.AsRef()
-	*valueRef.Ref() = 456
-	fmt.Println(value.Get())
+	valueRef.Set(456)
+	fmt.Println(value.Get(), valueRef.Get())
 
 	// Output:
 	// 123
-	// 456
+	// 456 456
+}
+
+func ExampleVal_ToRef() {
+	value := opt.Value(123)
+	fmt.Println(value.Get())
+
+	valueRef := value.ToRef()
+	valueRef.Set(456)
+	fmt.Println(value.Get(), valueRef.Get())
+
+	// Output:
+	// 123
+	// 123 456
 }
 
 func ExampleRef_AsVal() {
@@ -790,7 +803,7 @@ func ExampleVal_Mutate() {
 		value int
 	}
 	v := opt.Empty[mystruct]()
-	v2 := v.Ensure().Mutate(func(m *mystruct) {
+	v2 := v.Ensure().MutateThen(func(m *mystruct) {
 		m.name = "two"
 		m.value = 2
 	})
@@ -852,7 +865,7 @@ func ExampleVal_Ensure() {
 		value int
 	}
 	v := opt.Empty[mystruct]()
-	v2 := v.Ensure().Mutate(func(m *mystruct) {
+	v2 := v.Ensure().MutateThen(func(m *mystruct) {
 		m.name = "two"
 		m.value = 2
 	})

@@ -88,28 +88,6 @@ type Opt[T any] interface {
 
 	ToRef() Ref[T]
 
-	// Morph, inspired by the concept of [Endomorphism]:
-	// https://en.wikipedia.org/wiki/Endomorphism, maps an [Option] value. If
-	// non-empty, it applies f(T) and wraps the result in a [Val][T]. If empty,
-	// an empty [Val][T] is returned. Mapping to any type other than [Val][T]
-	// requires the use of the [Map]() function.
-	//Morph(func(T) T) Opt[T]
-
-	// MorphRef, inspired by the concept of [Endomorphism]:
-	// https://en.wikipedia.org/wiki/Endomorphism, maps a Option value. If
-	// non-empty, it applies f(*T) and wraps the resulting pointer in Ref[T]. If
-	// empty, an empty Ref[T] is returned. Mapping to any type other than [Ref][T]
-	// requires the use of the [Map]() function.
-	//MorphRef(func(*T) *T) Opt[T]
-
-	// Then executes the supplied function if the Option is non-empty. It always
-	// returns the option instance it was called with.
-	//Then(func(T)) Opt[T]
-
-	// Else executes the provided function if the Option is empty. It always
-	// returns the option instance it was called with.
-	//Else(func()) Opt[T]
-
 	// String returns the string representation of the value if present. Otherwise
 	// it returns the empty string.
 	String() string
@@ -291,9 +269,9 @@ func (v *Val[T]) AsRef() Ref[T] {
 	}
 }
 
-// AsVal converts the [Ref][T] instance to a [Val][T] that holds a copy the value referenced
+// AsVal converts the [Ref][T] instance to a [Val][T] that holds a copy of the value referenced
 // by the receiver if present. Otherwise it returns an empty [Val][T].
-func (r Ref[T]) AsVal() Val[T] {
+func (r *Ref[T]) AsVal() Val[T] {
 	if r.reference != nil {
 		return Value(*r.reference)
 	} else {
@@ -630,9 +608,18 @@ func (r Ref[T]) String() string {
 }
 
 // Mutate applies function f to a reference to a copy of the underlying value if
+// present. If there is no value present,
+// the method is a no-op and the receiver is returned.
+func (v *Val[T]) Mutate(f func(*T)) {
+	if v.nonEmpty {
+		f(&v.value)
+	}
+}
+
+// MutateThen applies function f to a reference to a copy of the underlying value if
 // present, returning a modified [Val][T] object. If there is no value present,
 // the method is a no-op and the receiver is returned.
-func (v *Val[T]) Mutate(f func(*T)) *Val[T] {
+func (v *Val[T]) MutateThen(f func(*T)) *Val[T] {
 	if v.nonEmpty {
 		f(&v.value)
 	}
