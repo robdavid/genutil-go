@@ -1,5 +1,6 @@
-ARG GO_DEV_DIGEST=sha256:1f11d8ebe336778bc6031a4ab586f7d1fb6c0c33ec15f8c02074bb4f8e32fb6b
-FROM mcr.microsoft.com/devcontainers/go@$GO_DEV_DIGEST as utils
+ARG GO_DEV_DIGEST=sha256:0027553e7c9696d975bc28afdb254e8c4799fe0df62c75565d33684c4ed602e4
+# Version dev-1.26
+FROM mcr.microsoft.com/devcontainers/go@$GO_DEV_DIGEST AS utils
 RUN go install golang.org/x/pkgsite/cmd/pkgsite@latest
 
 FROM mcr.microsoft.com/devcontainers/go@$GO_DEV_DIGEST
