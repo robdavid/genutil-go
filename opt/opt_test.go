@@ -803,7 +803,7 @@ func ExampleVal_Mutate() {
 		value int
 	}
 	v := opt.Empty[mystruct]()
-	v2 := v.Ensure().MutateThen(func(m *mystruct) {
+	v2 := v.Ensure().MutateTap(func(m *mystruct) {
 		m.name = "two"
 		m.value = 2
 	})
@@ -865,7 +865,7 @@ func ExampleVal_Ensure() {
 		value int
 	}
 	v := opt.Empty[mystruct]()
-	v2 := v.Ensure().MutateThen(func(m *mystruct) {
+	v2 := v.Ensure().MutateTap(func(m *mystruct) {
 		m.name = "two"
 		m.value = 2
 	})
