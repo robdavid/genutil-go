@@ -103,13 +103,13 @@ type Opt[T any] interface {
 type MutOpt[T any] interface {
 	Opt[T]
 
-	// Mutate applies an in place mutation function to an option's value. It is
+	// MutateMut applies an in place mutation function to an option's value. It is
 	// a no-op if the option is empty.
-	Mutate(f func(*T))
+	MutateMut(f func(*T)) MutOpt[T]
 
-	// Ensure ensures that the option is non-empty. If it is already non-empty,
+	// EnsureMut ensures that the option is non-empty. If it is already non-empty,
 	// it is a no-op. Otherwise, it is populated with the zero value.
-	Ensure()
+	EnsureMut() MutOpt[T]
 
 	// Set sets the underlying value, mutating the option. It will cause the
 	// option to become non-empty, if it isn't already. The mutated option is
@@ -607,16 +607,17 @@ func (r Ref[T]) String() string {
 
 // Mutate applies function f to a reference to the underlying value if present.
 // If there is no value present the method is a no-op.
-func (v *Val[T]) Mutate(f func(*T)) {
+func (v *Val[T]) MutateMut(f func(*T)) MutOpt[T] {
 	if v.nonEmpty {
 		f(&v.value)
 	}
+	return v
 }
 
-// MutateTap applies function f to a reference to the underlying value if
+// Mutate applies function f to a reference to the underlying value if
 // present. If there is no value present, the method is a no-op. In either case,
 // the receiver is returned.
-func (v *Val[T]) MutateTap(f func(*T)) *Val[T] {
+func (v *Val[T]) Mutate(f func(*T)) *Val[T] {
 	if v.nonEmpty {
 		f(&v.value)
 	}
@@ -624,36 +625,28 @@ func (v *Val[T]) MutateTap(f func(*T)) *Val[T] {
 }
 
 // Mutate applies function f to a reference to the underlying value if present.
-// If there is no value present, the method is a no-op.
-func (r *Ref[T]) Mutate(f func(*T)) {
-	if r.reference != nil {
-		f(r.reference)
-	}
-}
-
-// MutateTap applies function f to a reference to the underlying value if
-// present. If there is no value present, the method is a no-op. The receiver is
+// If there is no value present, the method is a no-op. The receiver is
 // always returned.
-func (r *Ref[T]) MutateTap(f func(*T)) *Ref[T] {
+func (r *Ref[T]) MutateMut(f func(*T)) MutOpt[T] {
 	if r.reference != nil {
 		f(r.reference)
 	}
 	return r
 }
 
-// Ensure ensures that the option is non-empty. If it is already non-empty, it
-// is a no-op. Otherwise it is mutated to be populated with the zero value.
-func (v *Val[T]) Ensure() {
-	if !v.nonEmpty {
-		var zero T
-		*v = Value(zero)
+// Mutate applies function f to a reference to the underlying value if
+// present. If there is no value present, the method is a no-op. The receiver is
+// always returned.
+func (r *Ref[T]) Mutate(f func(*T)) *Ref[T] {
+	if r.reference != nil {
+		f(r.reference)
 	}
+	return r
 }
 
-// EnsureTap ensures that the option is non-empty. If it is already non-empty,
-// it is is a no-op. Otherwise it is mutated to be populated with the zero
-// value. The receiver is returned.
-func (v *Val[T]) EnsureTap() *Val[T] {
+// EnsureMut ensures that the option is non-empty. If it is already non-empty, it
+// is a no-op. Otherwise it is mutated to be populated with the zero value.
+func (v *Val[T]) EnsureMut() MutOpt[T] {
 	if !v.nonEmpty {
 		var zero T
 		*v = Value(zero)
@@ -661,19 +654,31 @@ func (v *Val[T]) EnsureTap() *Val[T] {
 	return v
 }
 
-// Ensure ensures that the option is non-empty. If it is already non-empty, it
+// Ensure ensures that the option is non-empty. If it is already non-empty,
+// it is is a no-op. Otherwise it is mutated to be populated with the zero
+// value. The receiver is returned.
+func (v *Val[T]) Ensure() *Val[T] {
+	if !v.nonEmpty {
+		var zero T
+		*v = Value(zero)
+	}
+	return v
+}
+
+// EnsureMut ensures that the option is non-empty. If it is already non-empty, it
 // is a no-op. Otherwise, it is mutated to be populated with the zero value.
-func (r *Ref[T]) Ensure() {
+func (r *Ref[T]) EnsureMut() MutOpt[T] {
 	if r.reference == nil {
 		var zero T
 		r.reference = &zero
 	}
+	return r
 }
 
-// EnsureTap ensures that the option is non-empty. If it is already non-empty, it
+// Ensure ensures that the option is non-empty. If it is already non-empty, it
 // is a no-op. Otherwise, it is mutated to be populated with the zero value. The
 // mutated or original option is returned.
-func (r *Ref[T]) EnsureTap() *Ref[T] {
+func (r *Ref[T]) Ensure() *Ref[T] {
 	if r.reference == nil {
 		var zero T
 		r.reference = &zero
