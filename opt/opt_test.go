@@ -494,6 +494,25 @@ func TestMap(t *testing.T) {
 	assert.True(opt.Map(er, strconv.Itoa).IsEmpty())
 }
 
+func TestMapMethod(t *testing.T) {
+	assert := assert.New(t)
+
+	v := opt.Value(123)
+	ev := opt.Empty[int]()
+	mv := v.Map(strconv.Itoa)
+	assert.False(mv.IsRef())
+	assert.Equal("123", mv.Get())
+	assert.True(ev.Map(strconv.Itoa).IsEmpty())
+
+	var x int = 123
+	r := opt.Reference(&x)
+	er := opt.EmptyRef[int]()
+	mr := r.Map(strconv.Itoa)
+	assert.True(mr.IsRef())
+	assert.Equal("123", mr.Get())
+	assert.True(er.Map(strconv.Itoa).IsEmpty())
+}
+
 func TestMapRef(t *testing.T) {
 	assert := assert.New(t)
 

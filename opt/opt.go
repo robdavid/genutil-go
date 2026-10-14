@@ -692,14 +692,6 @@ func (v *Val[T]) Set(value T) {
 	*v = Value(value)
 }
 
-// SetTap sets the underlying value, mutating the option. It will cause the
-// option to become non-empty, if it isn't already. The mutated option is
-// returned.
-func (v *Val[T]) SetTap(value T) *Val[T] {
-	*v = Value(value)
-	return v
-}
-
 // Set sets the underlying value, mutating the option. It will cause the
 // option to become non-empty, if it isn't already. The mutated option is
 // returned.
@@ -709,18 +701,6 @@ func (r *Ref[T]) Set(value T) {
 	} else {
 		*r.reference = value
 	}
-}
-
-// SetTap sets the underlying value, mutating the option. It will cause the
-// option to become non-empty, if it isn't already. The mutated option is
-// returned.
-func (r *Ref[T]) SetTap(value T) *Ref[T] {
-	if r.reference == nil {
-		r.reference = &value
-	} else {
-		*r.reference = value
-	}
-	return r
 }
 
 // Unset causes the option to become empty, if it isn't already, mutating it. The
@@ -825,6 +805,31 @@ func (v Val[T]) Map[U any](f func(T) U) Val[U] {
 	}
 }
 
+func (v Val[T]) MapRef[U any](f func(*T) *U) Val[U] {
+	if v.nonEmpty {
+		return Value(*f(&v.value))
+	} else {
+		return Empty[U]()
+	}
+}
+
+func (r Ref[T]) Map[U any](f func(T) U) Ref[U] {
+	if r.reference != nil {
+		u := f(*r.reference)
+		return Reference(&u)
+	} else {
+		return EmptyRef[U]()
+	}
+}
+
+func (r Ref[T]) MapRef[U any](f func(*T) *U) Ref[U] {
+	if r.reference != nil {
+		return Reference(f(r.reference))
+	} else {
+		return EmptyRef[U]()
+	}
+}
+
 // Then executes the supplied function with the value held by v, if v is non-empty. Otherwise, this is a
 // no-op. It always returns a pointer to v.
 func (v Val[T]) Then(f func(T)) Val[T] {
@@ -881,7 +886,7 @@ func (r Ref[T]) ThenRef(f func(*T)) Ref[T] {
 
 // Map applies a function to the non-empty value of an [Opt]. If the option
 // is non-empty, the function is applied to its value, and the result is wrapped
-// as an [Opt][U] and returned. Otherwise, an empty option is returned.
+// as an [Val][U] and returned. Otherwise, an empty option is returned.
 func Map[T, U any](o Opt[T], f func(T) U) Val[U] {
 	if val, ok := o.GetOK(); !ok {
 		return Empty[U]()
@@ -892,7 +897,7 @@ func Map[T, U any](o Opt[T], f func(T) U) Val[U] {
 
 // MapRef is a variation of [Map]() in which the mapping function takes and
 // returns pointers to values. The referenced computed value is returned as an
-// [Opt][U].
+// [Ref][U].
 func MapRef[T, U any](o Opt[T], f func(*T) *U) Ref[U] {
 	if r := o.RefOr(nil); r == nil {
 		return EmptyRef[U]()
